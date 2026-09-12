@@ -1,0 +1,424 @@
+# 🚀 PROMPT REPLIT UNTUK APLIKASI ERP KONSTRUKSI
+
+Berikut prompt lengkap yang bisa Anda copy-paste langsung ke **Replit Agent** (atau Replit AI). Prompt ini sudah saya optimasi agar Replit bisa langsung mengeksekusi dengan hasil yang terstruktur.
+
+---
+
+## 📋 PROMPT UTAMA (Copy-Paste ke Replit Agent)
+
+```markdown
+# 🏗️ PROYEK: Aplikasi ERP Konstruksi - Phase 1 (MVP)
+
+## 🎯 KONTEKS BISNIS
+Buat aplikasi web **Manajemen Keuangan, Penganggaran, dan Perpajakan untuk Industri Konstruksi** (kontraktor, konsultan, profesional jasa konstruksi).
+
+Aplikasi ini harus menangani:
+- Manajemen proyek konstruksi (multi-proyek)
+- Penganggaran berbasis RAB (Rencana Anggaran Biaya) dengan WBS
+- Cost control & Earned Value Management (EVM)
+- Billing termin & retensi
+- Perpajakan konstruksi Indonesia (PPh Final 4(2), PPN DPP Lain, PPh 23)
+- Audit trail lengkap
+
+## 🛠️ TECH STACK (WAJIB)
+- **Backend**: Node.js + Express + TypeScript
+- **Frontend**: React 18 + Vite + TypeScript + Ant Design 5
+- **Database**: PostgreSQL + Prisma ORM
+- **Validation**: Zod
+- **Auth**: JWT (jsonwebtoken + bcrypt)
+- **API Style**: RESTful dengan response standard
+- **Styling**: Tailwind CSS (untuk utility) + Ant Design (untuk komponen)
+
+## 📁 STRUKTUR FOLDER YANG DIHARAPKAN
+
+```
+/
+├── apps/
+│   ├── api/                    # Backend Express
+│   │   ├── src/
+│   │   │   ├── config/         # DB, env, constants
+│   │   │   ├── modules/        # Feature-based modules
+│   │   │   │   ├── auth/
+│   │   │   │   ├── projects/
+│   │   │   │   ├── rab/
+│   │   │   │   ├── procurement/
+│   │   │   │   ├── billing/
+│   │   │   │   ├── tax/
+│   │   │   │   └── reporting/
+│   │   │   ├── middleware/     # auth, error, validation
+│   │   │   ├── utils/          # helpers, tax engine
+│   │   │   └── app.ts
+│   │   ├── prisma/
+│   │   │   └── schema.prisma
+│   │   └── package.json
+│   │
+│   └── web/                    # Frontend React
+│       ├── src/
+│       │   ├── components/     # Shared components
+│       │   ├── pages/          # Route pages
+│       │   ├── services/       # API calls
+│       │   ├── hooks/          # Custom hooks
+│       │   ├── stores/         # Zustand stores
+│       │   ├── utils/          # Formatters, validators
+│       │   └── App.tsx
+│       └── package.json
+│
+├── packages/
+│   └── shared/                 # Shared types & constants
+│       └── src/
+│           ├── types/
+│           └── constants/
+│
+├── package.json                # Root workspace (pnpm)
+└── README.md
+```
+
+## 🗄️ DATABASE SCHEMA (Prisma) - PRIORITAS
+
+Buat schema.prisma dengan entitas inti berikut:
+
+### Master Data
+1. **Company** - Data perusahaan (NPWP, kualifikasi, jenis usaha: PELAKSANA/PERENCANA/PENGAWAS)
+2. **User** - User dengan role (SUPER_ADMIN, DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT)
+3. **Vendor** - Subkontraktor & supplier (dengan SBU, NPWP, kualifikasi UMKM/NON_UMKM)
+4. **Employee** - Karyawan proyek
+5. **ChartOfAccount** - COA 5 digit
+
+### Project & Budget
+6. **Project** - Master proyek (code, name, owner, contract_value, start_date, end_date, retention_percent, status)
+7. **WBSNode** - Work Breakdown Structure (parent_id, code, name, level)
+8. **RABHeader** - Header RAB (version, is_baseline, approved_at)
+9. **RABItem** - Detail RAB (wbs_code, description, volume, unit, unit_price, total_price, category: MATERIAL/LABOR/EQUIPMENT/OVERHEAD)
+
+### Procurement & Execution
+10. **PurchaseRequest** - PR dari site
+11. **PurchaseOrder** - PO ke vendor (linked to RABItem)
+12. **GoodsReceipt** - Penerimaan barang di site
+13. **SiteExpense** - Biaya langsung lapangan
+14. **Subcontract** - Kontrak subkon
+15. **SubcontrOpname** - Opname pekerjaan subkon
+16. **SubcontrBackcharge** - Potongan subkon
+
+### Billing & Finance
+17. **Invoice** - Termin ke owner (dpp, ppn_amount, pph_final_amount, retention_amount, grand_total)
+18. **Payment** - Pembayaran ke vendor/subkon
+19. **RetentionLedger** - Pencatatan retensi
+20. **AccountingEntry** - Jurnal akuntansi (double-entry)
+
+### Tax
+21. **FakturPajakOutput** - Faktur Pajak PPN
+22. **BuktiPotongPPh42** - Bupot PPh Final konstruksi
+23. **BuktiPotongPPh23** - Bupot PPh 23
+
+### Audit
+24. **AuditLog** - Audit trail (entity, action, user, old_value, new_value, timestamp)
+
+**ATURAN DATABASE:**
+- Semua tabel punya `created_at`, `updated_at`, `created_by`, `updated_by`
+- Gunakan UUID untuk primary key
+- Gunakan enum untuk status dan kategori
+- Tambahkan index untuk kolom yang sering di-query
+- Soft delete dengan `deleted_at`
+
+## 💰 TAX ENGINE (WAJIB ADA)
+
+Buat file `utils/tax-engine.ts` dengan class `ConstructionTaxEngine` yang menangani:
+
+```typescript
+// Tarif PPh Final 4(2) sesuai PP 36/2023
+const PPH_FINAL_RATES = {
+  PELAKSANA: { UMKM: 0.0175, NON_UMKM: 0.025 },
+  PERENCANA: { UMKM: 0.035, NON_UMKM: 0.04 },
+  PENGAWAS:  { UMKM: 0.035, NON_UMKM: 0.04 }
+};
+
+// PPN DPP Lain
+const DPP_LAIN_RATES = {
+  TERINTEGRASI: 0.275,    // EPC/Design-Build
+  NON_TERINTEGRASI: 0.325 // Konstruksi biasa
+};
+
+const PPN_RATE = 0.11;
+const PPH_23_RATE = { UMKM: 0.005, NON_UMKM: 0.02 };
+
+// Methods yang harus ada:
+// - calculateInvoiceTaxes(invoice, contractor, project)
+// - calculateSubcontrPayment(opname, backcharges, subcontract, vendor)
+// - generateFakturNumber(company, sequence)
+// - isIntegratedConstruction(contractor)
+```
+
+## 🎨 FRONTEND PAGES (MVP)
+
+Buat halaman-halaman berikut dengan Ant Design:
+
+1. **Login Page** - Form login sederhana
+2. **Dashboard** - Ringkasan proyek aktif, cashflow, alert
+3. **Projects List** - Tabel proyek dengan filter & search
+4. **Project Detail** - Tab: Overview, RAB, PO, Invoice, Cost Report
+5. **RAB Management** - Tree WBS + tabel item RAB + inline edit
+6. **Purchase Orders** - List PO dengan status
+7. **Invoices/Termin** - List invoice dengan kalkulasi pajak otomatis
+8. **Vendors** - Master vendor dengan validasi NPWP & SBU
+9. **Tax Reports** - Rekap PPh 4(2), PPN, PPh 23 per bulan
+10. **Users Management** - CRUD user & role
+
+## 🔐 AUTHENTICATION & AUTHORIZATION
+
+- JWT-based auth (access token 15 menit, refresh token 7 hari)
+- Password hashing dengan bcrypt (10 rounds)
+- Middleware `requireAuth` untuk protected routes
+- Middleware `requireRole(['FINANCE', 'DIRECTOR'])` untuk role-based access
+- Refresh token rotation
+
+## 📊 BUSINESS RULES (HARD-CODE)
+
+1. **Budget Control**: PO + SiteExpense untuk satu WBS TIDAK BOLEH melebihi RAB Item total_price
+2. **Immutable Ledger**: Invoice/Payment yang sudah POSTED tidak bisa diedit, hanya reversal
+3. **Tax Calculation**: Otomatis saat create invoice/payment, tidak bisa di-override manual
+4. **Retention**: Tidak bisa dicairkan sebelum `retention_release_date`
+5. **Onerous Contract**: Jika estimated_cost > contract_value, wajib akui loss
+
+## ✅ DELIVERABLES PHASE 1
+
+### Backend
+- [ ] Setup Express + TypeScript + Prisma
+- [ ] Database schema lengkap (24+ tabel)
+- [ ] Auth module (register, login, refresh, logout)
+- [ ] CRUD untuk semua master data
+- [ ] Project & RAB management
+- [ ] Purchase Order workflow
+- [ ] Invoice generation dengan tax calculation
+- [ ] Tax engine lengkap
+- [ ] Audit log middleware
+- [ ] Error handling global
+- [ ] API documentation (Swagger/OpenAPI)
+
+### Frontend
+- [ ] Setup React + Vite + Ant Design
+- [ ] Layout dengan sidebar navigation
+- [ ] Auth flow (login, protected routes)
+- [ ] Dashboard dengan charts (recharts)
+- [ ] Semua halaman MVP (10 halaman)
+- [ ] Form validation dengan Ant Design + Zod
+- [ ] Table dengan pagination, filter, sort
+- [ ] Loading states & error handling
+- [ ] Responsive design
+
+### Database
+- [ ] Migration scripts
+- [ ] Seed data (dummy company, users, projects, vendors)
+- [ ] Sample data untuk testing
+
+## 🌱 SEED DATA (WAJIB)
+
+Buat script seed dengan data dummy:
+
+```
+Company: PT. Maju Konstruksi (Pelaksana, Non-UMKM, PKP)
+Users: 
+  - admin@majukonstruksi.com / admin123 (SUPER_ADMIN)
+  - pm@majukonstruksi.com / pm123 (PROJECT_MANAGER)
+  - finance@majukonstruksi.com / finance123 (FINANCE)
+
+Projects: 3 proyek dummy dengan nilai berbeda
+Vendors: 5 vendor (mix UMKM & Non-UMKM)
+RAB: 1 RAB lengkap dengan 20+ item
+Invoices: 3 invoice dengan status berbeda
+```
+
+## 🎯 ATURAN CODING
+
+1. **TypeScript Strict**: Semua file harus `.ts` atau `.tsx`, no `any`
+2. **Modular**: Satu folder = satu fitur, tidak boleh cross-import antar module kecuali via shared
+3. **Validation**: Semua input divalidasi dengan Zod di layer controller
+4. **Error Handling**: Gunakan custom error classes, response format konsisten:
+   ```json
+   {
+     "success": true/false,
+     "data": {...},
+     "message": "...",
+     "errors": [...]
+   }
+   ```
+5. **Comments**: Jelaskan business logic kompleks dengan komentar
+6. **Naming**: 
+   - Files: kebab-case (`purchase-order.service.ts`)
+   - Classes: PascalCase (`PurchaseOrderService`)
+   - Functions: camelCase (`calculateTotal`)
+   - DB tables: snake_case (`purchase_orders`)
+7. **Environment**: Gunakan `.env` untuk semua konfigurasi, jangan hardcode
+8. **Testing**: Minimal unit test untuk tax engine & business rules
+
+## 🚀 CARA MENJALANKAN
+
+Buat README.md dengan instruksi:
+```bash
+# Install dependencies
+pnpm install
+
+# Setup database
+pnpm prisma migrate dev
+pnpm prisma db seed
+
+# Run backend (port 4000)
+pnpm --filter api dev
+
+# Run frontend (port 3000)
+pnpm --filter web dev
+```
+
+## 📝 CATATAN PENTING
+
+1. **MULAI DARI BACKEND DULU** - Setup database & API sebelum frontend
+2. **JANGAN SKIP TAX ENGINE** - Ini jantung aplikasi, harus akurat
+3. **GUNAKAN DUMMY DATA** - Agar bisa langsung demo tanpa input manual
+4. **PRIORITASKAN FUNGSIONAL** - UI bisa jelek asal fitur jalan
+5. **TEST SETIAP MODULE** - Jangan tumpuk semua sampai akhir
+
+## 🎯 DEFINISI SELESAI
+
+Aplikasi dianggap selesai Phase 1 jika:
+- ✅ Bisa login & logout
+- ✅ Bisa create project dengan RAB
+- ✅ Bisa create PO dari RAB
+- ✅ Bisa create invoice dengan kalkulasi pajak otomatis (PPh 4(2) + PPN + Retensi)
+- ✅ Bisa lihat laporan pajak bulanan
+- ✅ Audit trail tercatat untuk semua transaksi
+- ✅ Seed data bisa langsung didemokan
+
+---
+
+**MULAI SEKARANG.** Kerjakan secara bertahap:
+1. Setup project structure & dependencies
+2. Database schema + migration + seed
+3. Backend API (auth → master data → project → RAB → PO → invoice → tax)
+4. Frontend (layout → auth → dashboard → pages)
+5. Testing & polish
+
+Jangan tanya konfirmasi, langsung eksekusi. Jika ada ambiguity, pilih implementasi yang paling sederhana dan functional.
+```
+
+---
+
+## 💡 TIPS MENGGUNAKAN PROMPT DI REPLIT
+
+### 1. **Cara Masuk ke Replit Agent**
+- Buka https://replit.com
+- Klik **"Create Repl"** → pilih **"Agent"** (bukan biasa)
+- Atau gunakan Replit Agent di https://replit.com/agent
+
+### 2. **Strategi Eksekusi**
+Karena prompt ini sangat panjang, saya sarankan **pecah jadi 4 prompt terpisah** agar Replit tidak kewalahan:
+
+**Prompt 1 - Setup & Database:**
+```
+Setup proyek monorepo dengan pnpm workspace. 
+Backend: apps/api (Express + TypeScript + Prisma + PostgreSQL)
+Frontend: apps/web (React + Vite + TypeScript + Ant Design)
+Shared: packages/shared (types & constants)
+
+Buat schema.prisma lengkap dengan 24 tabel sesuai blueprint ERP konstruksi.
+Lalu buat seed script dengan data dummy.
+```
+
+**Prompt 2 - Backend Core:**
+```
+Implementasikan backend API untuk:
+- Auth module (JWT, login, register, refresh)
+- Master data CRUD (company, users, vendors, employees)
+- Project & RAB management
+- Tax engine (ConstructionTaxEngine class)
+- Audit log middleware
+```
+
+**Prompt 3 - Backend Transactions:**
+```
+Lanjutkan backend untuk:
+- Purchase Order workflow
+- Invoice generation dengan kalkulasi pajak otomatis
+- Payment processing
+- Retention management
+- Reporting endpoints
+```
+
+**Prompt 4 - Frontend:**
+```
+Buat frontend React dengan Ant Design untuk:
+- Login page & auth flow
+- Dashboard dengan charts
+- Project list & detail
+- RAB management (tree + table)
+- Invoice list dengan tax breakdown
+- Tax reports
+- Vendor management
+```
+
+### 3. **Iterasi & Refinement**
+Setelah Replit generate kode awal:
+- Test setiap fitur secara manual
+- Jika ada bug, minta Replit fix dengan spesifik: "Fix bug di tax engine, PPN tidak terhitung untuk invoice X"
+- Minta improvement: "Tambahkan fitur export invoice ke PDF"
+
+### 4. **Environment Variables**
+Di Replit, setup di **Secrets** (bukan .env biasa):
+```
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-secret-key
+JWT_REFRESH_SECRET=your-refresh-secret
+PORT=4000
+```
+
+---
+
+## 🎁 BONUS: PROMPT TAMBAHAN (Opsional)
+
+Jika Anda ingin fitur spesifik, gunakan prompt tambahan ini:
+
+**Untuk Mobile App:**
+```
+Buat mobile app Flutter untuk Site Manager dengan fitur:
+- Daily report input (offline-capable)
+- Foto dokumentasi dengan GPS
+- Opname progres fisik
+- Sync ke backend saat online
+```
+
+**Untuk Integrasi Coretax:**
+```
+Buat modul export data pajak dalam format CSV/XML sesuai template DJP Coretax:
+- Export Faktur Pajak Output (format e-Faktur)
+- Export Bukti Potong (format e-Bupot Unifikasi)
+- Template SPT Masa PPh Final 4(2)
+- Template SPT Masa PPN
+```
+
+**Untuk Advanced Analytics:**
+```
+Tambahkan modul EVM (Earned Value Management):
+- Dashboard SPI, CPI, EAC per proyek
+- Kurva S (Planned vs Actual)
+- Variance analysis dengan drill-down
+- Forecasting cashflow 12 bulan
+```
+
+---
+
+## ✅ CHECKLIST SEBELUM MULAI
+
+- [ ] Akun Replit sudah aktif (free tier cukup untuk MVP)
+- [ ] Paham cara menggunakan Replit Agent
+- [ ] Siap untuk iterasi (Replit Agent butuh 2-3x refinement)
+- [ ] Punya basic understanding TypeScript & React (untuk review kode)
+
+---
+
+**Silakan copy prompt utama di atas dan paste ke Replit Agent.** 
+
+Jika Anda ingin saya:
+1. **Buat versi prompt yang lebih pendek** (untuk Replit Agent yang punya context limit)
+2. **Pecah jadi beberapa prompt bertahap** (lebih aman untuk eksekusi)
+3. **Buat prompt untuk fitur spesifik** (misal: hanya tax engine saja)
+4. **Buat prompt dalam bahasa Inggris** (kadang Replit lebih akurat dengan English prompt)
+
+Beri tahu saya, dan saya akan sesuaikan! 🚀

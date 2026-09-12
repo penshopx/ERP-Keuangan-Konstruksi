@@ -1,0 +1,124 @@
+Sangat tepat. Sebelum menyentuh satu baris kode pun, kita harus mengunci **Cetak Biru Konseptual (Conceptual Blueprint)** ini. Ini akan menjadi "Konstitusi" atau *Single Source of Truth* bagi seluruh tim pengembang, bisnis, dan auditor di masa depan.
+
+Berikut adalah **Struktur Pondasi Konsep** yang mantap, spesifik, dan mendalam untuk Aplikasi Manajemen Keuangan, Penganggaran, dan Perpajakan Konstruksi.
+
+---
+
+# 🏛️ CETAK BIRU KONSEPTUAL (CONCEPTUAL BLUEPRINT)
+
+## I. FILOSOFI & PRINSIP DESAIN SISTEM (Design Principles)
+Sistem ini dibangun di atas 4 prinsip mutlak yang tidak bisa dilanggar:
+1. **Project-Centric Accounting**: Tidak ada transaksi "yatim piatu". Setiap rupiah yang masuk/keluar *harus* terikat pada `Project ID` dan `WBS/Cost Code` yang valid.
+2. **Immutable Audit Trail**: Data keuangan dan pajak yang sudah disetujui (`APPROVED`/`POSTED`) **tidak boleh dihapus atau di-edit langsung**. Perubahan hanya boleh dilakukan melalui *Reversal Journal* atau *Variation Order (VO)* yang memiliki jejak audit (siapa, kapan, mengapa).
+3. **Tax-Native by Design**: Perpajakan bukan modul tambahan di akhir bulan. Logika pajak (PPh 4(2), PPN, PPh 23) tertanam (*embedded*) di dalam setiap objek transaksi (PO, Invoice, Payment) sejak awal.
+4. **Single Source of Truth (SSOT) untuk Anggaran**: RAB yang sudah disetujui menjadi *Baseline*. Realisasi biaya selalu dibandingkan terhadap baseline ini. Perubahan anggaran memicu versi RAB baru, bukan menimpa data lama.
+
+---
+
+## II. DOMAIN-DRIVEN DESIGN (DDD) - BOUNDED CONTEXTS
+Untuk mencegah sistem menjadi "monolith spaghetti", kita pecah menjadi 5 domain logis yang terpisah namun berkomunikasi via event/API:
+
+| Bounded Context | Tanggung Jawab Utama | Entitas Kunci |
+| :--- | :--- | :--- |
+| **1. Master & Governance** | Data induk, hak akses, konfigurasi pajak, COA (Chart of Accounts). | `Company`, `User/Role`, `TaxRateConfig`, `ChartOfAccounts`, `Vendor`, `Employee`. |
+| **2. Project & Estimation** | Setup proyek, WBS, RAB/BOQ, Baseline, Kurva S Rencana. | `Project`, `WBS_Node`, `RAB_Header`, `RAB_Item`, `Baseline_Version`. |
+| **3. Procurement & Execution** | Permintaan barang, pemesanan, penerimaan di site, opname progres. | `Purchase_Request (PR)`, `Purchase_Order (PO)`, `Goods_Receipt (GR)`, `Site_Daily_Report`, `Opname_Record`. |
+| **4. Financial & Billing** | Penagihan termin, piutang, utang, kas, retensi, rekonsiliasi bank. | `Invoice`, `Payment_Voucher`, `Receipt`, `Retention_Ledger`, `Cashflow_Forecast`. |
+| **5. Tax & Compliance** | Kalkulasi pajak otomatis, generate dokumen pajak, pelaporan SPT. | `Faktur_Pajak_Output`, `Bukti_Potong (e-Bupot)`, `Tax_Reconciliation`, `SPT_Draft`. |
+
+---
+
+## III. HIERARKI DATA & RELASI INTI (Core Data Hierarchy)
+Struktur data harus mengikuti hierarki bisnis yang ketat. Relasi *parent-child* ini adalah fondasi database:
+
+```text
+[LEVEL 0] COMPANY (Perusahaan Anda)
+   │
+   ├── [LEVEL 1] PROJECT (Proyek Konstruksi)
+   │    │
+   │    ├── [LEVEL 2] WBS / COST CODE (Struktur Pekerjaan)
+   │    │    │
+   │    │    ├── [LEVEL 3] RAB ITEM (Baseline Anggaran per item)
+   │    │    │    │
+   │    │    │    ├── [LEVEL 4a] PURCHASE ORDER (Komitmen pengeluaran)
+   │    │    │    ├── [LEVEL 4b] SITE EXPENSE (Realisasi biaya lapangan)
+   │    │    │    └── [LEVEL 4c] SUBCON OPNAME (Realisasi progres subkon)
+   │    │    │
+   │    │    └── [LEVEL 3] REVENUE RECOGNITION (Pengakuan pendapatan PSAK 72)
+   │    │
+   │    └── [LEVEL 2] BILLING & TAX (Sisi Penerimaan)
+   │         │
+   │         ├── [LEVEL 3] INVOICE / TERMIN (Tagihan ke Owner)
+   │         │    ├── [LEVEL 4] FAKTUR PAJAK (PPN)
+   │         │    └── [LEVEL 4] BUKTI POTONG (PPh 4(2) dipotong Owner)
+   │         │
+   │         └── [LEVEL 3] RETENTION LEDGER (Pencatatan dana tertahan)
+```
+*Aturan Keras:* Transaksi di Level 4 **wajib** memiliki referensi ke Level 3, yang wajib merujuk ke Level 2, dst. Tidak ada *orphan records*.
+
+---
+
+## IV. STATE MACHINE & WORKFLOW GOVERNANCE
+Setiap entitas bisnis memiliki siklus hidup (*state machine*) yang ketat untuk mencegah kesalahan proses.
+
+### 1. State Machine: RAB (Anggaran)
+`DRAFT` → `UNDER_REVIEW` → `BASELINE_APPROVED` → *(Jika ada perubahan)* → `REVISION_REQUESTED` → `REVISED_BASELINE_APPROVED`
+*Catatan:* `BASELINE_APPROVED` mengunci data. Revisi akan membuat `RAB_Header` baru dengan `version + 1`, data lama tetap ada untuk historis.
+
+### 2. State Machine: Invoice / Termin
+`DRAFT` → `PENDING_APPROVAL` (Site Manager → PM → Finance) → `ISSUED` (Terkirim ke Owner) → `PARTIALLY_PAID` / `PAID` → `RETENTION_HELD` → `CLOSED`.
+*Catatan:* Faktur Pajak hanya bisa di-generate saat status berpindah ke `ISSUED`.
+
+### 3. State Machine: Purchase Order (PO)
+`DRAFT` → `PENDING_APPROVAL` → `APPROVED` → `PARTIALLY_RECEIVED` → `FULLY_RECEIVED` → `CLOSED` (atau `CANCELLED`).
+*Catatan:* Pembayaran ke vendor hanya bisa diproses jika status PO minimal `APPROVED` dan ada `Goods Receipt` (bukti terima barang).
+
+---
+
+## V. ATURAN BISNIS KRITIS (Business Invariants)
+Ini adalah "hukum" yang harus divalidasi oleh sistem secara otomatis (*hard-coded validation*):
+
+1. **Aturan Plafon Anggaran**: Total nilai PO + Site Expense untuk satu WBS **tidak boleh melebihi** `Total_Price` di RAB Item yang bersesuaian. Jika melebihi, sistem *block* atau wajibkan proses *Variation Order (VO)*.
+2. **Aturan Pajak Subkon**: Sistem wajib memvalidasi `NPWP` dan `SBU` subkontraktor *saat transaksi*. Jika SBU berubah (misal dari Kecil ke Menengah), tarif PPh 4(2) otomatis menyesuaikan pada invoice berikutnya, bukan ditarik mundur.
+3. **Aturan Retensi**: Dana retensi tidak bisa dicairkan (*released*) sebelum `Tanggal Selesai Masa Pemeliharaan` tercapai, kecuali ada persetujuan khusus dari Direksi (dengan *audit trail* alasan).
+4. **Aturan Revenue Recognition (PSAK 72)**: Jika `Estimated_Total_Cost` > `Contract_Value` (Onerous Contract), sistem **wajib** memaksa pencatatan *Loss Accrual* di periode berjalan. Tidak bisa di-skip.
+5. **Aturan PPN DPP Lain**: Untuk jasa konstruksi, sistem otomatis menghitung PPN berdasarkan persentase DPP Lain (27.5% atau 32.5%), **bukan** 11% dari nilai total tagihan, kecuali ada aturan khusus (misal: penyerahan barang BKP terpisah).
+
+---
+
+## VI. STRATEGI INTEGRASI & KEPATUHAN (Compliance Strategy)
+Aplikasi tidak berdiri sendiri. Ia harus siap "berbicara" dengan ekosistem eksternal:
+
+1. **DJP Coretax (e-Faktur & e-Bupot)**: 
+   - Sistem tidak perlu *direct API* ke DJP (karena kompleksitas sertifikat elektronik), tetapi **wajib** mampu mengekspor data dalam format **CSV/XML** yang 100% sesuai dengan template impor masa pajak Direktorat Jenderal Pajak.
+2. **Perbankan (Rekonsiliasi)**:
+   - Mendukung format mutasi bank (CSV/Excel) untuk dicocokkan otomatis (*auto-match*) dengan `Payment_Voucher` berdasarkan nomor referensi atau jumlah nominal.
+3. **Sistem Legacy / ERP Lain**:
+   - Menyediakan **API Gateway** (RESTful) yang terautentikasi (JWT/OAuth2) jika perusahaan sudah memiliki HRIS (untuk data karyawan) atau sistem gudang terpisah.
+
+---
+
+## VII. NON-FUNCTIONAL REQUIREMENTS (NFR) - Pondasi Teknis
+1. **Keamanan Data**: Enkripsi data sensitif (NPWP, Nomor Rekening) di database (*at-rest encryption*).
+2. **Auditability**: Setiap tabel transaksi wajib memiliki kolom `created_by`, `created_at`, `updated_by`, `updated_at`.
+3. **Concurrency Control**: Menggunakan *Optimistic Locking* (misal: kolom `version`) untuk mencegah dua orang mengedit RAB atau Invoice yang sama secara bersamaan.
+4. **Multi-Tenancy (Opsional tapi disarankan)**: Jika aplikasi ini akan dipakai oleh banyak perusahaan konstruksi (SaaS), gunakan skema `tenant_id` di setiap tabel.
+
+---
+
+## ✅ CHECKLIST VALIDASI PONDASI
+Sebelum kita masuk ke tahap perancangan database detail atau koding, mohon konfirmasi Anda terhadap poin-poin berikut:
+
+- [ ] **Apakah Anda setuju** bahwa sistem akan menggunakan pendekatan *Project-Centric* dan *Immutable Audit Trail*?
+- [ ] **Apakah Anda setuju** dengan pemisahan 5 Bounded Context di atas agar sistem tetap modular dan mudah di-maintain?
+- [ ] **Apakah aturan bisnis kritis** (terutama soal PSAK 72, PPN DPP Lain, dan validasi SBU) sudah sesuai dengan operasional perusahaan Anda?
+- [ ] **Apakah target pengguna utama** saat peluncuran pertama (MVP) adalah: Internal Finance, Project Manager, dan Direksi? (Kita bisa tunda fitur portal Subkontractor untuk fase 2 jika perlu).
+
+---
+
+### Langkah Selanjutnya
+Jika Anda menjawab **"YA"** dan merasa pondasi konsep ini sudah solid dan mewakili visi Anda, maka langkah berikutnya yang paling logis adalah:
+
+👉 **Merancang Skema Database Relasional (ERD) Lengkap** berdasarkan hierarki dan aturan bisnis yang baru saja kita kunci ini, lengkap dengan tipe data, *constraints*, dan *indexing* untuk performa.
+
+Apakah kita lanjut ke perancangan ERD, atau ada bagian dari pondasi konsep di atas yang perlu Anda revisi/tambahkan?

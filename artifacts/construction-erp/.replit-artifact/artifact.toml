@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Konstruksi Finance ERP"
+description = "Aplikasi manajemen keuangan, penganggaran, cost control, dan perpajakan untuk perusahaan konstruksi Indonesia dengan dashboard proyek yang terpusat."
+version = "1.0.0"
+id = "artifacts/construction-erp"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18566
+
+[services.development]
+run = "pnpm --filter @workspace/construction-erp run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/construction-erp", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/construction-erp/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18566"
+BASE_PATH = "/"

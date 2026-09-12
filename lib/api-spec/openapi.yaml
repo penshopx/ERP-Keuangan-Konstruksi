@@ -10,6 +10,16 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Executive dashboard
+  - name: projects
+    description: Construction projects and cost control
+  - name: invoices
+    description: Billing and tax calculations
+  - name: tax
+    description: Tax compliance summaries
+  - name: activity
+    description: Immutable audit activity
 paths:
   /healthz:
     get:
@@ -24,7 +34,186 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get executive dashboard summary
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get project detail
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          description: Project not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}/rab:
+    get:
+      operationId: getProjectRab
+      tags: [projects]
+      summary: Get project RAB baseline
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: RAB baseline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RabSummary"
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: List project invoices
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: projectId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Create invoice with automatic tax calculation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceInput"
+      responses:
+        "201":
+          description: Created invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+  /tax/summary:
+    get:
+      operationId: getTaxSummary
+      tags: [tax]
+      summary: Get monthly tax summary
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tax summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxSummary"
+  /activity:
+    get:
+      operationId: listActivity
+      tags: [activity]
+      summary: List audit activity
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
 components:
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +222,159 @@ components:
           type: string
       required:
         - status
+    DashboardSummary:
+      type: object
+      required: [activeProjects, portfolioValue, committedCost, cashPosition, budgetUtilization, alerts, cashflow]
+      properties:
+        activeProjects: { type: integer }
+        portfolioValue: { type: number }
+        committedCost: { type: number }
+        cashPosition: { type: number }
+        budgetUtilization: { type: number }
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Alert"
+        cashflow:
+          type: array
+          items:
+            $ref: "#/components/schemas/CashflowPoint"
+    Alert:
+      type: object
+      required: [id, severity, title, detail, action]
+      properties:
+        id: { type: string }
+        severity: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        action: { type: string }
+    CashflowPoint:
+      type: object
+      required: [month, inflow, outflow, net]
+      properties:
+        month: { type: string }
+        inflow: { type: number }
+        outflow: { type: number }
+        net: { type: number }
+    Project:
+      type: object
+      required: [id, code, name, owner, contractValue, budget, actualCost, progress, status, health, endDate]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        contractValue: { type: number }
+        budget: { type: number }
+        actualCost: { type: number }
+        progress: { type: number }
+        status: { type: string }
+        health: { type: string }
+        endDate: { type: string }
+    ProjectInput:
+      type: object
+      required: [code, name, owner, contractValue, endDate]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        contractValue: { type: number }
+        endDate: { type: string }
+    ProjectUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        status: { type: string }
+        progress: { type: number }
+    ProjectDetail:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          required: [wbsCount, budgetUtilization, spi, cpi, recentInvoices]
+          properties:
+            wbsCount: { type: integer }
+            budgetUtilization: { type: number }
+            spi: { type: number }
+            cpi: { type: number }
+            recentInvoices:
+              type: array
+              items:
+                $ref: "#/components/schemas/Invoice"
+    RabSummary:
+      type: object
+      required: [projectId, version, status, totalBudget, committed, actual, remaining, items]
+      properties:
+        projectId: { type: string }
+        version: { type: integer }
+        status: { type: string }
+        totalBudget: { type: number }
+        committed: { type: number }
+        actual: { type: number }
+        remaining: { type: number }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RabItem"
+    RabItem:
+      type: object
+      required: [id, code, name, category, budget, committed, actual, variance, utilization]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        budget: { type: number }
+        committed: { type: number }
+        actual: { type: number }
+        variance: { type: number }
+        utilization: { type: number }
+    Invoice:
+      type: object
+      required: [id, number, projectId, projectCode, projectName, period, dpp, ppn, pphFinal, retention, total, status, issuedAt]
+      properties:
+        id: { type: string }
+        number: { type: string }
+        projectId: { type: string }
+        projectCode: { type: string }
+        projectName: { type: string }
+        period: { type: string }
+        dpp: { type: number }
+        ppn: { type: number }
+        pphFinal: { type: number }
+        retention: { type: number }
+        total: { type: number }
+        status: { type: string }
+        issuedAt: { type: string }
+    InvoiceInput:
+      type: object
+      required: [projectId, period, dpp, retentionPercent, integrated, pphRate]
+      properties:
+        projectId: { type: string }
+        period: { type: string }
+        dpp: { type: number }
+        retentionPercent: { type: number }
+        integrated: { type: boolean }
+        pphRate: { type: number }
+    TaxSummary:
+      type: object
+      required: [period, pphFinal, ppn, pph23, total, documents, reconciliation]
+      properties:
+        period: { type: string }
+        pphFinal: { type: number }
+        ppn: { type: number }
+        pph23: { type: number }
+        total: { type: number }
+        documents: { type: integer }
+        reconciliation: { type: number }
+    Activity:
+      type: object
+      required: [id, action, entity, detail, user, timestamp, tone]
+      properties:
+        id: { type: string }
+        action: { type: string }
+        entity: { type: string }
+        detail: { type: string }
+        user: { type: string }
+        timestamp: { type: string }
+        tone: { type: string }
 
