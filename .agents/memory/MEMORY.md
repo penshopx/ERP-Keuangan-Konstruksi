@@ -1,0 +1,1 @@
+- [Versioned tax rules](versioned-tax-rules.md) — Construction tax rates and formulas must be effective-dated configuration, never permanent constants.

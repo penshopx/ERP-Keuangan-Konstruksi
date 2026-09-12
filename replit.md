@@ -1,6 +1,6 @@
-# [Project name]
+# Konstruksi Finance ERP
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A construction-focused ERP for project finance, RAB budgeting, cost control, billing, tax, retention, and audit workflows.
 
 ## Run & Operate
 
@@ -22,15 +22,20 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/construction-erp` — React web application
+- `artifacts/api-server` — Express API and demo domain data
+- `lib/api-spec/openapi.yaml` — source of truth for API contracts
+- `artifacts/construction-erp/src/index.css` — dark blue product theme
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Tax rates and DPP formulas must become effective-dated configuration before production use.
+- Posted financial transactions will be immutable; corrections use reversals.
+- Approved RAB versions are baselines; revisions create a new version rather than overwriting history.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The first build includes a portfolio dashboard, project creation and detail, RAB cost control, automatic invoice tax calculations, monthly tax summaries, and an immutable-style audit timeline.
 
 ## User preferences
 
