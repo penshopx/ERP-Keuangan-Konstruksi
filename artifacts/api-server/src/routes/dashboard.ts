@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { GetDashboardSummaryResponse } from "@workspace/api-zod";
-import { projects } from "../lib/demo-data";
+import { db, projectsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
-router.get("/dashboard/summary", (_req, res) => {
+router.get("/dashboard/summary", async (_req, res) => {
+  const projects = await db.select().from(projectsTable);
   const portfolioValue = projects.reduce((sum, item) => sum + item.contractValue, 0);
   const committedCost = 63_760_000_000;
   const data = {

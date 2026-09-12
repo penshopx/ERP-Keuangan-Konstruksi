@@ -28,7 +28,17 @@ export type InvoiceRecord = {
   issuedAt: string;
 };
 
-export const projects: ProjectRecord[] = [
+import {
+  auditLogsTable,
+  db,
+  invoicesTable,
+  projectsTable,
+  rabBaselinesTable,
+  rabItemsTable,
+  taxCalculationSnapshotsTable,
+} from "@workspace/db";
+
+export const demoProjects: ProjectRecord[] = [
   {
     id: "prj-001",
     code: "GKT-025",
@@ -83,7 +93,7 @@ export const projects: ProjectRecord[] = [
   },
 ];
 
-export const invoices: InvoiceRecord[] = [
+export const demoInvoices: InvoiceRecord[] = [
   {
     id: "inv-001",
     number: "INV/GKT/IX/2026/004",
@@ -131,7 +141,7 @@ export const invoices: InvoiceRecord[] = [
   },
 ];
 
-export const rabItems = [
+export const demoRabItems = [
   { id: "rab-01", code: "1.1", name: "Mobilisasi dan persiapan", category: "OVERHEAD", budget: 1_850_000_000, committed: 1_720_000_000, actual: 1_680_000_000 },
   { id: "rab-02", code: "2.1", name: "Pekerjaan pondasi", category: "MATERIAL", budget: 7_200_000_000, committed: 6_890_000_000, actual: 6_420_000_000 },
   { id: "rab-03", code: "2.2", name: "Struktur beton", category: "MATERIAL", budget: 13_600_000_000, committed: 11_980_000_000, actual: 8_750_000_000 },
@@ -139,7 +149,7 @@ export const rabItems = [
   { id: "rab-05", code: "4.1", name: "MEP dan utilitas", category: "SUBKON", budget: 7_100_000_000, committed: 4_820_000_000, actual: 1_870_000_000 },
 ];
 
-export const activity = [
+export const demoActivity = [
   { id: "act-01", action: "DISETUJUI", entity: "Invoice", detail: "Termin 6 JBT-014 disetujui Finance Manager", user: "Nadia Putri", timestamp: "2026-09-12T09:42:00+07:00", tone: "success" },
   { id: "act-02", action: "DIPOSTING", entity: "Jurnal", detail: "Jurnal biaya proyek GKT-025 periode Agustus", user: "Rizky Mahendra", timestamp: "2026-09-12T08:18:00+07:00", tone: "info" },
   { id: "act-03", action: "PERINGATAN", entity: "Anggaran", detail: "WBS 2.1 JBT-014 mencapai 94% komitmen", user: "Sistem", timestamp: "2026-09-11T16:05:00+07:00", tone: "warning" },
@@ -147,15 +157,47 @@ export const activity = [
   { id: "act-05", action: "DIREKONSILIASI", entity: "Pajak", detail: "PPN masa Agustus cocok 99,8% dengan buku", user: "Siska Amelia", timestamp: "2026-09-11T10:50:00+07:00", tone: "success" },
 ];
 
-export function projectDetail(project: ProjectRecord) {
-  const projectInvoices = invoices.filter((invoice) => invoice.projectId === project.id);
-  const utilization = project.budget === 0 ? 0 : (project.actualCost / project.budget) * 100;
-  return {
-    ...project,
-    wbsCount: project.id === "prj-001" ? 34 : 22,
-    budgetUtilization: Number(utilization.toFixed(1)),
-    spi: project.id === "prj-002" ? 0.88 : 1.04,
-    cpi: project.id === "prj-002" ? 0.91 : 1.08,
-    recentInvoices: projectInvoices,
-  };
+export async function seedDemoData() {
+  await db.transaction(async (tx) => {
+    await tx.insert(projectsTable).values(demoProjects.map((project) => ({
+      ...project,
+      wbsCount: project.id === "prj-001" ? 34 : 22,
+      spiBasisPoints: project.id === "prj-002" ? 88 : 104,
+      cpiBasisPoints: project.id === "prj-002" ? 91 : 108,
+    }))).onConflictDoNothing();
+
+    await tx.insert(rabBaselinesTable).values(demoProjects.map((project) => ({
+      id: `baseline-${project.id}`,
+      projectId: project.id,
+      version: 3,
+      status: "BASELINE DISETUJUI",
+    }))).onConflictDoNothing();
+
+    await tx.insert(rabItemsTable).values(demoProjects.flatMap((project) =>
+      demoRabItems.map((item) => ({
+        ...item,
+        id: project.id === "prj-001" ? item.id : `${item.id}-${project.id}`,
+        baselineId: `baseline-${project.id}`,
+      })),
+    )).onConflictDoNothing();
+
+    await tx.insert(invoicesTable).values(demoInvoices).onConflictDoNothing();
+    await tx.insert(taxCalculationSnapshotsTable).values(demoInvoices.map((invoice) => ({
+      id: `tax-${invoice.id}`,
+      invoiceId: invoice.id,
+      dpp: invoice.dpp,
+      integrated: true,
+      dppLainRateBasisPoints: 2750,
+      ppnRateBasisPoints: 1100,
+      pphRateBasisPoints: 250,
+      retentionPercentBasisPoints: 500,
+      ppn: invoice.ppn,
+      pphFinal: invoice.pphFinal,
+      retention: invoice.retention,
+    }))).onConflictDoNothing();
+    await tx.insert(auditLogsTable).values(demoActivity.map((item) => ({
+      ...item,
+      timestamp: new Date(item.timestamp),
+    }))).onConflictDoNothing();
+  });
 }
