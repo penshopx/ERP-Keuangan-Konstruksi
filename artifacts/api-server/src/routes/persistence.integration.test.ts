@@ -307,6 +307,65 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     }
   });
 
+  await t.test("a rolled-back invoice sequence is skipped and never reused", async () => {
+    let failedAllocation: { id: string; number: string; sequence: number } | undefined;
+    const failingServer = await startTestServer({
+      afterInvoiceNumberAllocated: async (invoice) => {
+        failedAllocation = invoice;
+        throw new Error("Injected failure after invoice number allocation");
+      },
+    });
+    const invoiceBody = {
+      projectId,
+      period: "Termin Sequence Rollback",
+      issuedAt: "2099-05-09",
+      dpp: 10_000,
+      retentionPercent: 5,
+      integrated: false,
+      serviceType: "KONSTRUKSI",
+      qualification: "TANPA_KUALIFIKASI",
+      hasSbu: false,
+      supplierPkp: true,
+      governmentCollector: false,
+    };
+
+    try {
+      const failedResponse = await fetch(`${failingServer.baseUrl}/invoices`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(invoiceBody),
+      });
+      assert.equal(failedResponse.status, 500);
+    } finally {
+      await failingServer.close();
+    }
+
+    assert.ok(failedAllocation);
+    const [failedById] = await db.select().from(invoicesTable)
+      .where(eq(invoicesTable.id, failedAllocation.id));
+    const [failedByNumber] = await db.select().from(invoicesTable)
+      .where(eq(invoicesTable.number, failedAllocation.number));
+    assert.equal(failedById, undefined);
+    assert.equal(failedByNumber, undefined);
+
+    const succeedingServer = await startTestServer();
+    try {
+      const succeeded = await requestJson(succeedingServer.baseUrl, "/invoices", {
+        method: "POST",
+        body: JSON.stringify({ ...invoiceBody, period: "Termin Setelah Sequence Rollback" }),
+      });
+      createdEntityIds.push(String(succeeded.id));
+
+      const [stored] = await db.select().from(invoicesTable)
+        .where(eq(invoicesTable.id, String(succeeded.id)));
+      assert.ok(stored);
+      assert.ok(stored.sequence > failedAllocation.sequence);
+      assert.notEqual(stored.number, failedAllocation.number);
+    } finally {
+      await succeedingServer.close();
+    }
+  });
+
   await t.test("invoice validation and effective-date rule selection cover every tax branch", async () => {
     const server = await startTestServer();
     const dpp = 120_000_000;

@@ -23,6 +23,11 @@ export type InvoicePersistenceHooks = {
   beforeAuditInsert?: (invoiceId: string) => Promise<void>;
   beforeInvoiceInsert?: (invoiceId: string) => Promise<void>;
   afterTaxRuleSelection?: (taxRuleId: string) => Promise<void>;
+  afterInvoiceNumberAllocated?: (invoice: {
+    id: string;
+    number: string;
+    sequence: number;
+  }) => Promise<void>;
 };
 
 export function createInvoicesRouter(hooks: InvoicePersistenceHooks = {}): IRouter {
@@ -141,6 +146,11 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
       .set({ number })
       .where(eq(invoicesTable.id, invoiceId))
       .returning();
+    await hooks.afterInvoiceNumberAllocated?.({
+      id: stored.id,
+      number: stored.number,
+      sequence: stored.sequence,
+    });
     await tx.insert(taxCalculationSnapshotsTable).values({
       id: randomUUID(),
       invoiceId,
