@@ -15,6 +15,7 @@ import {
   ListInvoicesQueryParams,
   ListInvoicesResponse,
 } from "@workspace/api-zod";
+import { buildInvoiceNumber } from "../domain/invoice-number";
 import { canAccessProject, requirePermission } from "../middlewares/access";
 const router: IRouter = Router();
 
@@ -118,7 +119,7 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
   };
   const invoice = await db.transaction(async (tx) => {
     const [created] = await tx.insert(invoicesTable).values(invoiceDraft).returning();
-    const number = `INV/${project.code}/IX/2026/${String(created.sequence).padStart(3, "0")}`;
+    const number = buildInvoiceNumber(project.code, parsed.data.issuedAt, created.sequence);
     const [stored] = await tx.update(invoicesTable)
       .set({ number })
       .where(eq(invoicesTable.id, invoiceId))
