@@ -1,0 +1,515 @@
+# 🎯 ANALISIS PROGRESS & GUIDANCE LANJUTAN
+
+Excellent progress! Tiga task fundamental sudah dieksekusi dengan urutan yang **sangat tepat**. Mari kita bedah satu per satu dan pastikan fondasi ini solid sebelum lanjut.
+
+---
+
+## ✅ TASK #1: POSTGRESQL MIGRATION — VALIDASI
+
+Task ini sudah selesai. Lakukan **smoke test** berikut untuk memastikan fondasi data solid:
+
+### Checklist Validasi Manual
+```bash
+# 1. Restart server 2x untuk konfirmasi persistence
+pnpm dev  # Ctrl+C
+pnpm dev  # Ctrl+C
+pnpm dev  # Biarkan jalan
+
+# 2. Verifikasi data seed masih ada
+curl http://localhost:4000/api/projects
+# Expected: 3 projects dari seed data
+
+# 3. Test mutation persistence
+curl -X POST http://localhost:4000/api/projects \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"TEST-001","name":"Test Persistence","contractValue":500000000}'
+
+# 4. Restart server, lalu cek lagi
+curl http://localhost:4000/api/projects
+# Expected: project TEST-001 masih ada
+
+# 5. Cek audit log
+curl http://localhost:4000/api/audit-logs?entity=project
+# Expected: ada record CREATE dengan user info
+```
+
+### ⚠️ Red Flags yang Harus Dicek
+Minta Replit Agent verifikasi hal-hal ini di schema:
+
+```typescript
+// Cek di lib/db/src/schema/projects.ts
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 30 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
+  contractValue: numeric('contract_value', { precision: 18, scale: 2 }).notNull(),
+  retentionPercent: numeric('retention_percent', { precision: 5, scale: 2 }).default('5.00'),
+  status: varchar('status', { length: 20 }).default('PLANNING'),
+  
+  // WAJIB ADA:
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdBy: uuid('created_by').references(() => users.id),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  deletedAt: timestamp('deleted_at'), // Soft delete
+});
+```
+
+**Jika ada kolom audit (`created_at`, `created_by`, dll) yang hilang**, minta Replit tambahkan sekarang — lebih murah daripada refactor nanti.
+
+---
+
+## ✅ TASK #2: RBAC WITH CLERK — VALIDASI
+
+Task ini juga selesai. Yang perlu Anda pastikan:
+
+### Checklist Validasi RBAC
+```
+Test Scenario 1: Project Manager Scope
+├─ Login sebagai PM (pm@majukonstruksi.com)
+├─ GET /api/projects → hanya lihat proyek yang di-assign ke dia
+├─ POST /api/projects → hanya bisa edit proyek miliknya
+└─ GET /api/projects/<unassigned-project-id> → 403 Forbidden
+
+Test Scenario 2: Finance Access
+├─ Login sebagai Finance
+├─ Akses invoice & tax reports → ✅ Allowed
+├─ Akses RAB editing → ❌ Forbidden
+└─ Approve payment > threshold → butuh Director approval
+
+Test Scenario 3: Audit Trail
+├─ PM approve invoice
+├─ Cek audit log → harus ada:
+│   ├─ actor: PM user ID
+│   ├─ action: "invoice.approve"
+│   ├─ entity: invoice ID
+│   ├─ timestamp: ISO format
+│   └─ metadata: { previous_status, new_status, reason }
+└─ Data ini immutable (tidak bisa diedit)
+```
+
+### 🔍 Pertanyaan Kritis untuk Replit Agent
+Tanyakan ini untuk memastikan implementasi robust:
+
+```
+Pertanyaan untuk Replit Agent:
+
+1. Bagaimana Clerk user ID di-map ke internal user record di database?
+   (Clerk user ID ≠ internal user ID, harus ada mapping table)
+
+2. Jika user di-delete dari Clerk, apa yang terjadi ke data yang dia create?
+   (Harus tetap ada dengan status "orphan" atau di-assign ke admin)
+
+3. Bagaimana handling session expiry?
+   (Refresh token rotation? Force logout dari semua device?)
+
+4. Apakah ada rate limiting per role?
+   (Finance bisa hit tax endpoint 100x/menit, Site Manager hanya 20x)
+```
+
+---
+
+## 🔄 TASK #3: VERSIONED TAX ENGINE — INI YANG KRITIS!
+
+Task ini **sedang berjalan** dan merupakan **jantung aplikasi**. Salah implementasi = bencana compliance. Berikut guidance mendalam agar Replit Agent mengeksekusi dengan benar:
+
+### 🎯 Konsep Kunci: "Time-Travel Tax Calculation"
+
+Setiap invoice harus menyimpan **snapshot aturan pajak yang berlaku saat invoice dibuat**, bukan aturan saat ini. Ini prinsip akuntansi yang tidak bisa ditawar.
+
+### 📋 Prompt Tambahan untuk Replit Agent
+
+Copy-paste ini ke Replit Agent untuk mempertajam Task #3:
+
+```markdown
+## 🎯 TAX ENGINE IMPLEMENTATION DETAILS
+
+### 1. Schema: Tax Rules (Effective-Dated)
+
+Buat tabel `tax_rules` dengan struktur:
+
+```typescript
+export const taxRules = pgTable('tax_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Identifikasi aturan
+  ruleType: varchar('rule_type', { length: 30 }).notNull(), 
+  // Values: 'PPH_FINAL_4_2', 'PPN_DPP_LAIN', 'PPH_23'
+  
+  ruleKey: varchar('rule_key', { length: 50 }).notNull(),
+  // Examples: 'PELAKSANA_UMKM', 'TERINTEGRASI', 'UMKM_SERVICES'
+  
+  // Waktu berlaku
+  effectiveDate: date('effective_date').notNull(),
+  expiryDate: date('expiry_date'), // null = masih berlaku
+  
+  // Nilai tarif
+  rate: numeric('rate', { precision: 8, scale: 6 }).notNull(),
+  
+  // Metadata regulasi
+  regulationSource: varchar('regulation_source', { length: 255 }),
+  // Example: "PP 36/2023 Pasal 14"
+  regulationUrl: text('regulation_url'),
+  notes: text('notes'),
+  
+  // Audit
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  // Index untuk lookup cepat
+  typeKeyDateIdx: uniqueIndex('tax_rule_lookup').on(
+    table.ruleType, table.ruleKey, table.effectiveDate
+  ),
+}));
+```
+
+### 2. Schema: Tax Snapshot di Invoice
+
+Setiap invoice WAJIB menyimpan snapshot lengkap:
+
+```typescript
+export const invoices = pgTable('invoices', {
+  // ... existing fields ...
+  
+  // Tax snapshot (JSONB untuk fleksibilitas)
+  taxSnapshot: jsonb('tax_snapshot').notNull(),
+  // Structure:
+  // {
+  //   "applied_at": "2026-09-13T10:30:00Z",
+  //   "rules_version": {
+  //     "pph_final": { "rule_id": "uuid", "rate": 0.025, "regulation": "PP 36/2023" },
+  //     "ppn": { "rule_id": "uuid", "dpp_lain_rate": 0.275, "ppn_rate": 0.11 },
+  //     "retention": { "rate": 0.05 }
+  //   },
+  //   "contractor_qualification": "NON_UMKM",
+  //   "business_type": "PELAKSANA",
+  //   "is_integrated": true,
+  //   "is_pkp": true,
+  //   "collector_type": "SELF" // or "GOVERNMENT_TREASURER"
+  // }
+  
+  // Status untuk immutability
+  isPosted: boolean('is_posted').default(false),
+  postedAt: timestamp('posted_at'),
+  postedBy: uuid('posted_by').references(() => users.id),
+});
+```
+
+### 3. Tax Engine Class (WAJIB)
+
+```typescript
+// lib/api-server/src/lib/tax-engine.ts
+
+export class TaxEngine {
+  
+  /**
+   * Hitung pajak dengan snapshot aturan pada tanggal tertentu
+   * CRITICAL: Harus deterministic - input sama = output sama selamanya
+   */
+  async calculateInvoiceTaxes(params: {
+    invoiceDate: Date;
+    dpp: number;
+    contractor: {
+      businessType: 'PELAKSANA' | 'PERENCANA' | 'PENGAWAS';
+      qualification: 'UMKM' | 'NON_UMKM';
+      isPKP: boolean;
+      sbuValid: boolean;
+    };
+    project: {
+      isIntegrated: boolean;
+      retentionPercent: number;
+      collectorType: 'SELF' | 'GOVERNMENT_TREASURER';
+    };
+  }): Promise<TaxCalculationResult> {
+    
+    // 1. Ambil aturan yang berlaku pada invoiceDate
+    const pphRule = await this.getEffectiveRule(
+      'PPH_FINAL_4_2',
+      `${params.contractor.businessType}_${params.contractor.qualification}`,
+      params.invoiceDate
+    );
+    
+    const ppnRule = await this.getEffectiveRule(
+      'PPN_DPP_LAIN',
+      params.project.isIntegrated ? 'TERINTEGRASI' : 'NON_TERINTEGRASI',
+      params.invoiceDate
+    );
+    
+    const ppnRateRule = await this.getEffectiveRule(
+      'PPN_RATE', 'STANDARD', params.invoiceDate
+    );
+    
+    // 2. Validasi pre-conditions
+    if (!params.contractor.sbuValid) {
+      throw new TaxValidationError(
+        'Kontraktor tidak memiliki SBU valid. Tidak bisa apply PPh Final 4(2).'
+      );
+    }
+    
+    // 3. Hitung
+    const pphFinal = params.dpp * pphRule.rate;
+    
+    let ppn = 0;
+    if (params.contractor.isPKP) {
+      const dppLain = params.dpp * ppnRule.rate;
+      ppn = dppLain * ppnRateRule.rate;
+    }
+    
+    // Jika pemungut pemerintah, PPN tidak dipungut oleh kontraktor
+    if (params.project.collectorType === 'GOVERNMENT_TREASURER') {
+      ppn = 0; // Akan dipungut langsung oleh bendaharawan
+    }
+    
+    const retention = params.dpp * (params.project.retentionPercent / 100);
+    const grandTotal = params.dpp + ppn - pphFinal - retention;
+    
+    // 4. Return dengan snapshot lengkap
+    return {
+      dpp: params.dpp,
+      pphFinal,
+      pphFinalRate: pphRule.rate,
+      ppn,
+      ppnRate: ppnRateRule.rate,
+      dppLainRate: ppnRule.rate,
+      retention,
+      retentionRate: params.project.retentionPercent / 100,
+      grandTotal,
+      snapshot: {
+        appliedAt: new Date().toISOString(),
+        rulesVersion: {
+          pphFinal: { 
+            ruleId: pphRule.id, 
+            rate: pphRule.rate, 
+            regulation: pphRule.regulationSource 
+          },
+          ppn: { 
+            ruleId: ppnRule.id, 
+            dppLainRate: ppnRule.rate,
+            ppnRate: ppnRateRule.rate,
+            regulation: ppnRule.regulationSource 
+          },
+        },
+        contractorQualification: params.contractor.qualification,
+        businessType: params.contractor.businessType,
+        isIntegrated: params.project.isIntegrated,
+        isPKP: params.contractor.isPKP,
+        collectorType: params.project.collectorType,
+      }
+    };
+  }
+  
+  /**
+   * Get aturan pajak yang berlaku pada tanggal tertentu
+   * Logic: cari rule dengan effectiveDate <= targetDate 
+   *        dan (expiryDate is null OR expiryDate > targetDate)
+   */
+  private async getEffectiveRule(
+    ruleType: string, 
+    ruleKey: string, 
+    targetDate: Date
+  ): Promise<TaxRule> {
+    const rule = await db.query.taxRules.findFirst({
+      where: and(
+        eq(taxRules.ruleType, ruleType),
+        eq(taxRules.ruleKey, ruleKey),
+        lte(taxRules.effectiveDate, targetDate),
+        or(
+          isNull(taxRules.expiryDate),
+          gt(taxRules.expiryDate, targetDate)
+        )
+      ),
+      orderBy: desc(taxRules.effectiveDate),
+    });
+    
+    if (!rule) {
+      throw new TaxRuleNotFoundError(
+        `No tax rule found for ${ruleType}:${ruleKey} on ${targetDate}`
+      );
+    }
+    
+    return rule;
+  }
+}
+```
+
+### 4. Seed Data: Tax Rules Awal
+
+```typescript
+// lib/db/src/seed-tax-rules.ts
+await db.insert(taxRules).values([
+  // PPh Final 4(2) - PP 36/2023
+  { ruleType: 'PPH_FINAL_4_2', ruleKey: 'PELAKSANA_UMKM', 
+    rate: 0.0175, effectiveDate: '2023-04-01', 
+    regulationSource: 'PP 36/2023 Pasal 14 ayat (1a)' },
+  { ruleType: 'PPH_FINAL_4_2', ruleKey: 'PELAKSANA_NON_UMKM', 
+    rate: 0.025, effectiveDate: '2023-04-01', 
+    regulationSource: 'PP 36/2023 Pasal 14 ayat (1b)' },
+  { ruleType: 'PPH_FINAL_4_2', ruleKey: 'PERENCANA_UMKM', 
+    rate: 0.035, effectiveDate: '2023-04-01', 
+    regulationSource: 'PP 36/2023 Pasal 14 ayat (2a)' },
+  { ruleType: 'PPH_FINAL_4_2', ruleKey: 'PERENCANA_NON_UMKM', 
+    rate: 0.04, effectiveDate: '2023-04-01', 
+    regulationSource: 'PP 36/2023 Pasal 14 ayat (2b)' },
+  { ruleType: 'PPH_FINAL_4_2', ruleKey: 'PENGAWAS_UMKM', 
+    rate: 0.035, effectiveDate: '2023-04-01', 
+    regulationSource: 'PP 36/2023 Pasal 14 ayat (2a)' },
+  { ruleType: 'PPH_FINAL_4_2', ruleKey: 'PENGAWAS_NON_UMKM', 
+    rate: 0.04, effectiveDate: '2023-04-01', 
+    regulationSource: 'PP 36/2023 Pasal 14 ayat (2b)' },
+  
+  // PPN DPP Lain - PMK 70/2022
+  { ruleType: 'PPN_DPP_LAIN', ruleKey: 'TERINTEGRASI', 
+    rate: 0.275, effectiveDate: '2022-04-01', 
+    regulationSource: 'PMK 70/2022 Pasal 5 ayat (1)' },
+  { ruleType: 'PPN_DPP_LAIN', ruleKey: 'NON_TERINTEGRASI', 
+    rate: 0.325, effectiveDate: '2022-04-01', 
+    regulationSource: 'PMK 70/2022 Pasal 5 ayat (2)' },
+  
+  // PPN Rate
+  { ruleType: 'PPN_RATE', ruleKey: 'STANDARD', 
+    rate: 0.11, effectiveDate: '2025-01-01', 
+    regulationSource: 'UU HPP Pasal 7' },
+  
+  // PPh 23
+  { ruleType: 'PPH_23', ruleKey: 'UMKM', 
+    rate: 0.005, effectiveDate: '2022-04-01', 
+    regulationSource: 'PP 55/2022' },
+  { ruleType: 'PPH_23', ruleKey: 'NON_UMKM', 
+    rate: 0.02, effectiveDate: '2022-04-01', 
+    regulationSource: 'PP 55/2022' },
+]);
+```
+
+### 5. Test Cases WAJIB (Acceptance Criteria)
+
+```typescript
+// Test 1: Invoice hari ini pakai aturan hari ini
+const invoice1 = await createInvoice({ date: '2026-09-13', ... });
+expect(invoice1.taxSnapshot.rulesVersion.pphFinal.rate).toBe(0.025);
+
+// Test 2: Invoice masa lalu pakai aturan masa lalu
+const invoice2 = await createInvoice({ date: '2022-03-01', ... });
+// Sebelum UU HPP, PPN masih 10%
+expect(invoice2.taxSnapshot.rulesVersion.ppn.ppnRate).toBe(0.10);
+
+// Test 3: Ubah tarif, invoice lama tidak terpengaruh
+await updateTaxRule('PPN_RATE', 'STANDARD', { rate: 0.12, effectiveDate: '2027-01-01' });
+const invoice1Reloaded = await getInvoice(invoice1.id);
+expect(invoice1Reloaded.taxSnapshot.rulesVersion.ppn.ppnRate).toBe(0.11); // Tetap 11%
+
+// Test 4: Validasi SBU gagal
+await expect(
+  createInvoice({ contractor: { sbuValid: false, ... }, ... })
+).rejects.toThrow('SBU valid');
+
+// Test 5: Government treasurer collector
+const invoice3 = await createInvoice({ 
+  project: { collectorType: 'GOVERNMENT_TREASURER', ... }, ... 
+});
+expect(invoice3.ppn).toBe(0); // PPN tidak dipungut kontraktor
+```
+
+### 6. Edge Cases yang HARUS Di-handle
+
+| Edge Case | Expected Behavior |
+|-----------|-------------------|
+| Kontraktor punya multi-SBU | Pilih SBU yang paling sesuai dengan scope pekerjaan di invoice |
+| Kontraktor naik kualifikasi di tengah proyek | Invoice baru pakai tarif baru, invoice lama tetap tarif lama |
+| Aturan pajak belum ada untuk tanggal tertentu | Throw error dengan message jelas, jangan fallback ke aturan terbaru |
+| Invoice di-reversal | Buat invoice reversal baru, jangan edit invoice lama |
+| Kontraktor asing (WPLN) | Apply PPh 26 (20%) atau P3B treaty jika ada |
+| Konstruksi di luar negeri | Tidak apply PPh 4(2), tapi mungkin pajak negara setempat |
+```
+
+---
+
+## 🗺️ ROADMAP TASK BERIKUTNYA
+
+Setelah Task #3 selesai, urutan task yang logis:
+
+### 🎯 Task #4: Subcontractor Management
+```
+- Subcontract CRUD dengan validasi SBU
+- Opname workflow (Site Manager → PM → Finance)
+- Backcharge system
+- Auto-generate Bupot PPh 4(2) untuk subkon
+```
+
+### 🎯 Task #5: Revenue Recognition (PSAK 72)
+```
+- Percentage of Completion calculation
+- Onerous contract detection (loss accrual)
+- Journal entry auto-generation
+- Monthly closing workflow
+```
+
+### 🎯 Task #6: Cashflow Forecasting
+```
+- 12-month cashflow projection
+- Retensi aging & release scheduling
+- Working capital calculation
+- Alert system untuk cashflow negatif
+```
+
+### 🎯 Task #7: Tax Compliance Export
+```
+- Export Faktur Pajak CSV/XML (format e-Faktur)
+- Export Bukti Potong (format e-Bupot)
+- Rekonsiliasi buku vs pajak
+- SPT Masa draft generator
+```
+
+### 🎯 Task #8: Frontend Enhancement
+```
+- Dashboard EVM (SPI, CPI, Kurva S)
+- RAB editor dengan tree WBS
+- Invoice form dengan live tax calculation
+- Tax report dengan filter periode
+```
+
+---
+
+## 🎯 ACTION ITEMS UNTUK ANDA SEKARANG
+
+### 1. **Tunggu Task #3 Selesai** (sedang berjalan)
+Jangan interrupt. Biarkan Replit Agent menyelesaikan tax engine.
+
+### 2. **Siapkan Prompt untuk Validasi**
+Setelah Task #3 selesai, kirim prompt ini:
+
+```
+Task #3 selesai. Sekarang lakukan validasi menyeluruh:
+
+1. Jalankan semua test cases di tax engine
+2. Buat 3 invoice dengan tanggal berbeda (2022, 2024, 2026) 
+   dan verifikasi snapshot pajak berbeda sesuai aturan masa itu
+3. Simulasikan perubahan tarif PPN dari 11% ke 12% per 2027-01-01
+4. Verifikasi invoice lama tidak terpengaruh
+5. Test edge case: kontraktor tanpa SBU, government treasurer collector
+6. Dokumentasikan semua hasil test di .agents/memory/tax-engine-validation.md
+
+Laporkan hasil validasi sebelum lanjut ke task berikutnya.
+```
+
+### 3. **Review Schema Database**
+Minta Replit Agent export schema diagram (bisa pakai `drizzle-kit studio` atau tools online seperti dbdiagram.io) agar Anda bisa review visual.
+
+### 4. **Siapkan Data Uji Nyata**
+Mulai kumpulkan:
+- 1 RAB asli dari proyek Anda (untuk test import)
+- 3 invoice asli (untuk verifikasi kalkulasi pajak)
+- Daftar vendor dengan SBU mereka (untuk test validasi)
+
+---
+
+## ❓ PERTANYAAN UNTUK ANDA
+
+Untuk memastikan saya memberikan guidance yang tepat, tolong konfirmasi:
+
+1. **Apakah Anda sudah punya akses ke Clerk dashboard?** (untuk setup user management)
+2. **Apakah Anda ingin saya buatkan prompt untuk Task #4 sekarang** (persiapan sambil menunggu Task #3)?
+3. **Apakah ada concern spesifik** tentang implementasi tax engine yang sedang berjalan?
+4. **Apakah Anda ingin saya review kode** yang sudah di-generate Replit untuk Task #1 dan #2?
+
+Silakan beri tahu, dan saya akan lanjutkan dengan guidance yang paling relevan! 🚀
