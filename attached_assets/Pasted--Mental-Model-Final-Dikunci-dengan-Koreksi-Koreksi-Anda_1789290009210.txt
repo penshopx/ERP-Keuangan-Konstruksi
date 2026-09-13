@@ -1,0 +1,83 @@
+# ✅ Mental Model Final Dikunci dengan Koreksi
+
+Koreksi Anda diterima. Saya kunci pemahaman akhir yang benar:
+
+## Query yang Benar
+
+```typescript
+// Lookup akses user berdasarkan Clerk user ID
+const [access] = await db
+  .select()
+  .from(userRolesTable)
+  .where(eq(userRolesTable.userId, clerkUserId))
+  .limit(1);
+
+// access.role, access.displayName
+
+// Lookup penugasan proyek
+const assignments = await db
+  .select()
+  .from(projectAssignmentsTable)
+  .where(eq(projectAssignmentsTable.userId, access.userId));
+```
+
+## Konvensi Penamaan
+
+| Layer | Konvensi | Contoh |
+|-------|----------|--------|
+| Drizzle object | camelCase + `Table` suffix | `userRolesTable`, `projectAssignmentsTable` |
+| SQL table | snake_case | `user_roles`, `project_assignments` |
+| Kolom | camelCase (sesuai schema Drizzle) | `userId`, `displayName`, `role` |
+
+## Alur Lazy Provisioning yang Benar
+
+```
+Request terautentikasi masuk ke middleware akses
+        ↓
+Extract Clerk user ID dari token
+        ↓
+SELECT dari userRolesTable WHERE userId = clerkUserId
+        ↓
+    ┌─── Ditemukan? ───┐
+    │                  │
+   YA                 TIDAK
+    │                  │
+Lanjutkan        Cari invitation PENDING by email terverifikasi
+                  dari request
+                       ↓
+               ┌── Ditemukan? ──┐
+               │                │
+              YA              TIDAK
+               │                │
+    Dalam 1 transaksi:    Apakah ini akun pertama
+    ├─ INSERT user_roles   di sistem?
+    ├─ COPY project_         │          │
+    │  assignments          YA         TIDAK
+    └─ UPDATE invitation     │          │
+       → ACCEPTED         role =     role =
+                         DIRECTOR   UNASSIGNED
+                                      │
+                                   Middleware
+                                   return 403
+```
+
+## Status Task yang Benar
+
+| Task | Status |
+|------|--------|
+| #1 PostgreSQL Migration | ✅ Merged |
+| #2 RBAC + Clerk | ✅ Merged |
+| #3 Versioned Tax Engine | ✅ Merged |
+| #7 Invitation System | ✅ Merged |
+| #15, #16 (RAB extensions) | 📝 **PROPOSED** — belum aktif |
+
+## Yang Saya Pahami sebagai Batasan
+
+- Tidak membuat task baru tanpa arahan eksplisit
+- Tidak menganggap task PROPOSED sebagai aktif
+- Tidak mendorong fitur spesifik (termasuk variance analysis) sebagai aksi
+- Menunggu arahan Anda untuk langkah selanjutnya
+
+---
+
+Mental model sekarang sudah sinkron dengan implementasi aktual. Saya menunggu arahan Anda untuk langkah berikutnya — baik itu melanjutkan task yang sedang berjalan, mengaktifkan salah satu task PROPOSED, atau arahan lain.
