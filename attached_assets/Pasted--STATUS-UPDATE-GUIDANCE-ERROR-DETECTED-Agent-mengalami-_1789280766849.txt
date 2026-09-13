@@ -1,0 +1,200 @@
+# 📊 STATUS UPDATE & GUIDANCE
+
+## 🔴 ERROR DETECTED
+
+Agent mengalami error 4 jam lalu. Ini **normal** dalam development iteratif. Yang perlu dilakukan:
+
+### Langkah Penanganan Error
+
+1. **Scroll ke atas** di Replit Agent untuk lihat error message lengkap
+2. **Copy error message** dan kirim balik ke Agent dengan format:
+   ```
+   Fix error ini:
+   [paste error message lengkap]
+   
+   Jangan ubah file lain. Fokus hanya pada error ini.
+   ```
+
+3. **Jika error berulang**, minta Agent rollback ke checkpoint sebelumnya:
+   ```
+   Revert ke checkpoint terakhir yang berhasil. 
+   Lalu coba lagi dengan pendekatan yang lebih sederhana.
+   ```
+
+---
+
+## ✅ TASK BARU: USER INVITATION SYSTEM
+
+Task yang baru dimulai ini **sangat tepat** dan merupakan enhancement kritis untuk production-ready app.
+
+### Analisis Task
+
+**Masalah saat ini:**
+- User baru muncul di sistem **setelah** login pertama
+- Director tidak bisa setup akses **sebelum** staf mulai kerja
+- Tidak ada pre-assignment role & project
+
+**Solusi yang dibangun:**
+- Director bisa invite user via email
+- Role & project assignment dilakukan **sebelum** user login pertama
+- User langsung aktif dengan akses yang tepat saat pertama kali login
+
+### Mengapa Ini Penting
+
+```
+FLOW LAMA (Reactive):
+Staf login pertama → muncul di sistem → Director assign role → manual setup
+
+FLOW BARU (Proactive):
+Director invite → assign role & project → staf terima email → login → langsung aktif ✅
+```
+
+Ini adalah **best practice** untuk enterprise application.
+
+---
+
+## 📋 ACCEPTANCE CRITERIA (Untuk Validasi)
+
+Setelah task invitation system selesai, pastikan:
+
+### 1. Invitation Flow
+```
+Director:
+├─ Klik "Invite User"
+├─ Input: email, nama, role (dropdown)
+├─ Select: project yang boleh diakses (multi-select)
+├─ Submit → sistem kirim email undangan
+└─ User masuk status "PENDING"
+
+Staf (penerima email):
+├─ Klik link di email
+├─ Setup password pertama kali
+├─ Login → langsung punya role & project access
+└─ Tidak perlu Director assign manual lagi
+```
+
+### 2. Database Schema (Harus Ada)
+```sql
+-- Tabel invitations
+invitations:
+  id, email, name, role, invited_by, invited_at, 
+  accepted_at, status (PENDING/ACCEPTED/EXPIRED),
+  expires_at, token (unique)
+
+-- Tabel user_projects (many-to-many)
+user_projects:
+  user_id, project_id, assigned_at, assigned_by
+
+-- Update tabel users
+users:
+  + invited_by (nullable, FK → users)
+  + invitation_accepted_at (nullable)
+```
+
+### 3. API Endpoints (Harus Ada)
+```
+POST   /api/invitations          # Director invite user
+GET    /api/invitations          # List all invitations
+GET    /api/invitations/:token   # Get invitation detail (public)
+POST   /api/invitations/:token/accept  # User accept & setup password
+DELETE /api/invitations/:id      # Cancel invitation
+POST   /api/invitations/:id/resend     # Resend email
+
+GET    /api/users/:id/projects   # Get user's assigned projects
+PUT    /api/users/:id/projects   # Update user's project access
+```
+
+### 4. Business Rules
+```
+✓ Invitation expired setelah 7 hari (configurable)
+✓ Email tidak bisa di-invite 2x (jika sudah ada user)
+✓ Director hanya bisa invite role di bawah dia (tidak bisa invite SUPER_ADMIN)
+✓ User yang di-invite otomatis dapat access ke project yang di-select
+✓ Audit log: siapa invite siapa, kapan, role apa
+```
+
+### 5. Email Template
+```
+Subject: Undangan Bergabung di [Company Name] - Construction ERP
+
+Body:
+Halo [Name],
+
+Anda diundang oleh [Inviter Name] untuk bergabung di [Company Name].
+
+Role: [Role Name]
+Project: [Project List]
+
+Klik link berikut untuk setup akun Anda:
+[Accept Link]
+
+Link ini akan expired dalam 7 hari.
+
+Salam,
+[Company Name] Team
+```
+
+### 6. Frontend Pages
+```
+1. Invitation List Page (Director only)
+   - Tabel: Email | Name | Role | Status | Actions
+   - Tombol: Invite New, Resend, Cancel
+
+2. Invitation Form (Modal/Drawer)
+   - Email input
+   - Name input
+   - Role dropdown
+   - Project multi-select
+   - Submit button
+
+3. Accept Invitation Page (Public, no auth needed)
+   - Show invitation detail
+   - Password setup form
+   - Accept button
+```
+
+---
+
+## 🎯 ACTION ITEMS
+
+### Untuk Anda Sekarang:
+
+1. **Handle Error Dulu**
+   - Scroll ke atas, lihat error message
+   - Kirim error ke Agent untuk di-fix
+   - Tunggu sampai agent selesai fix
+
+2. **Biarkan Task Invitation Berjalan**
+   - Jangan interrupt, biarkan Agent kerja
+   - Task ini penting dan sudah dimulai
+
+3. **Setelah Invitation Selesai, Validasi:**
+   ```
+   Test invitation flow:
+   1. Login sebagai Director
+   2. Invite user baru (email: test@example.com, role: FINANCE)
+   3. Cek email undangan (atau lihat di console log jika dev mode)
+   4. Klik link undangan
+   5. Setup password
+   6. Login sebagai user baru
+   7. Verifikasi: role = FINANCE, hanya bisa akses project yang di-assign
+   8. Cek audit log: harus ada record invitation
+   ```
+
+4. **Siapkan Prompt Berikutnya**
+   Setelah invitation system selesai & validated, kita lanjut ke:
+   - **Prompt A: Modul RAB** (sudah saya siapkan sebelumnya)
+   - Atau fitur lain sesuai prioritas Anda
+
+---
+
+## ❓ PERTANYAAN
+
+Apakah Anda ingin saya:
+
+1. **Bantu troubleshoot error** yang dialami Agent? (Copy error message ke saya)
+2. **Perdalam spesifikasi invitation system** di atas?
+3. **Siapkan prompt untuk fitur lain** sambil menunggu task invitation selesai?
+4. **Buat checklist testing lengkap** untuk invitation system?
+
+Silakan beri tahu! 🚀
