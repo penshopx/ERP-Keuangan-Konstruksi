@@ -1,24 +1,29 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import healthRouter from "./health";
 import activityRouter from "./activity";
 import dashboardRouter from "./dashboard";
-import invoicesRouter from "./invoices";
+import { createInvoicesRouter, type InvoicePersistenceHooks } from "./invoices";
 import projectsRouter from "./projects";
 import taxRouter from "./tax";
 import accessRouter from "./access";
 import rabTemplatesRouter from "./rab-templates";
 import { requireAccess } from "../middlewares/access";
 
-const router: IRouter = Router();
+export function createApiRouter(
+  accessMiddleware: RequestHandler = requireAccess,
+  invoicePersistenceHooks: InvoicePersistenceHooks = {},
+): IRouter {
+  const router: IRouter = Router();
+  router.use(healthRouter);
+  router.use(accessMiddleware);
+  router.use(accessRouter);
+  router.use(activityRouter);
+  router.use(dashboardRouter);
+  router.use(createInvoicesRouter(invoicePersistenceHooks));
+  router.use(projectsRouter);
+  router.use(rabTemplatesRouter);
+  router.use(taxRouter);
+  return router;
+}
 
-router.use(healthRouter);
-router.use(requireAccess);
-router.use(accessRouter);
-router.use(activityRouter);
-router.use(dashboardRouter);
-router.use(invoicesRouter);
-router.use(projectsRouter);
-router.use(rabTemplatesRouter);
-router.use(taxRouter);
-
-export default router;
+export default createApiRouter();

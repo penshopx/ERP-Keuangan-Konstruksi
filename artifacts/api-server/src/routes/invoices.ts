@@ -17,6 +17,12 @@ import {
 } from "@workspace/api-zod";
 import { buildInvoiceNumber } from "../domain/invoice-number";
 import { canAccessProject, requirePermission } from "../middlewares/access";
+
+export type InvoicePersistenceHooks = {
+  beforeAuditInsert?: (invoiceId: string) => Promise<void>;
+};
+
+export function createInvoicesRouter(hooks: InvoicePersistenceHooks = {}): IRouter {
 const router: IRouter = Router();
 
 router.get("/invoices", requirePermission("invoices:view"), async (req, res) => {
@@ -147,6 +153,7 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
       pph23,
       retention,
     });
+    await hooks.beforeAuditInsert?.(invoiceId);
     await tx.insert(auditLogsTable).values({
       id: randomUUID(),
       action: "DIBUAT",
@@ -163,4 +170,7 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
   res.status(201).json(CreateInvoiceResponse.parse(invoice));
 });
 
-export default router;
+return router;
+}
+
+export default createInvoicesRouter();
