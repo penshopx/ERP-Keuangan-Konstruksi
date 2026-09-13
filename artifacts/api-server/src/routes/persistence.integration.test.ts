@@ -479,6 +479,60 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     }
   });
 
+  await t.test("tax summary uses actual invoice taxes for the requested month", async () => {
+    const server = await startTestServer();
+    try {
+      const construction = await requestJson(server.baseUrl, "/invoices", {
+        method: "POST",
+        body: JSON.stringify({
+          projectId,
+          period: "Ringkasan konstruksi",
+          issuedAt: "2098-05-10",
+          dpp: 100_000_000,
+          retentionPercent: 0,
+          integrated: false,
+          serviceType: "KONSTRUKSI",
+          qualification: "KECIL",
+          hasSbu: true,
+          supplierPkp: false,
+          governmentCollector: false,
+        }),
+      });
+      const otherService = await requestJson(server.baseUrl, "/invoices", {
+        method: "POST",
+        body: JSON.stringify({
+          projectId,
+          period: "Ringkasan jasa lain",
+          issuedAt: "2098-05-20",
+          dpp: 50_000_000,
+          retentionPercent: 0,
+          integrated: false,
+          serviceType: "JASA_LAIN",
+          qualification: "TIDAK_BERLAKU",
+          hasSbu: false,
+          supplierPkp: true,
+          governmentCollector: false,
+        }),
+      });
+      createdEntityIds.push(String(construction.id), String(otherService.id));
+
+      const summary = await requestJson(server.baseUrl, "/tax/summary?period=2098-05");
+      assert.equal(summary.period, "2098-05");
+      assert.equal(summary.pphFinal, 1_750_000);
+      assert.equal(summary.ppn, 5_500_200);
+      assert.equal(summary.pph23, 1_000_000);
+      assert.equal(summary.total, 8_250_200);
+
+      const emptyMonth = await requestJson(server.baseUrl, "/tax/summary?period=2098-06");
+      assert.equal(emptyMonth.pphFinal, 0);
+      assert.equal(emptyMonth.ppn, 0);
+      assert.equal(emptyMonth.pph23, 0);
+      assert.equal(emptyMonth.total, 0);
+    } finally {
+      await server.close();
+    }
+  });
+
   await t.test("concurrent supersession cannot leave a new invoice on the old rule", async () => {
     const raceRuleId = continuedTaxRuleId;
     let signalSelected!: () => void;

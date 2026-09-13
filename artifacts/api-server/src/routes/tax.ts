@@ -38,12 +38,29 @@ router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const invoices = await db.select().from(invoicesTable);
-  const pphFinal = invoices.reduce((sum, item) => sum + item.pphFinal, 0);
-  const ppn = invoices.reduce((sum, item) => sum + item.ppn, 0);
-  const pph23 = 48_750_000;
+  const period = parsed.data.period ?? "2026-09";
+  const match = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) {
+    res.status(400).json({ error: "Periode harus menggunakan format YYYY-MM." });
+    return;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const periodStart = `${match[1]}-${match[2]}-01`;
+  const nextPeriodStart = month === 12
+    ? `${year + 1}-01-01`
+    : `${match[1]}-${String(month + 1).padStart(2, "0")}-01`;
+  const [summary] = await db.select({
+    pphFinal: sql<number>`coalesce(sum(${invoicesTable.pphFinal}), 0)`.mapWith(Number),
+    ppn: sql<number>`coalesce(sum(${invoicesTable.ppn}), 0)`.mapWith(Number),
+    pph23: sql<number>`coalesce(sum(${invoicesTable.pph23}), 0)`.mapWith(Number),
+  }).from(invoicesTable).where(and(
+    gte(invoicesTable.issuedAt, periodStart),
+    sql`${invoicesTable.issuedAt} < ${nextPeriodStart}`,
+  ));
+  const { pphFinal, ppn, pph23 } = summary;
   res.json(GetTaxSummaryResponse.parse({
-    period: parsed.data.period ?? "September 2026",
+    period,
     pphFinal,
     ppn,
     pph23,
