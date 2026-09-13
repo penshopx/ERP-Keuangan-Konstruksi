@@ -1,0 +1,88 @@
+# ✅ Koreksi Keamanan Terakhir Diterima
+
+Koreksi ini kritis dari sisi keamanan. Saya perbarui implementasi mental model:
+
+## Implementasi Email Matching yang Benar
+
+```typescript
+// 1. Ambil user dari Clerk berdasarkan userId (bukan dari request body)
+const clerkUser = await clerkClient.users.getUser(clerkUserId);
+
+// 2. Filter HANYA email yang sudah terverifikasi + normalize ke lowercase
+const verifiedEmails = clerkUser.emailAddresses
+  .filter((item) => item.verification?.status === "verified")
+  .map((item) => item.emailAddress.toLowerCase());
+
+// 3. Cocokkan dengan invitation aktif (juga di-lowercase untuk case-insensitive match)
+const [activeInvitation] = await db
+  .select()
+  .from(invitationsTable)
+  .where(
+    and(
+      eq(invitationsTable.status, "PENDING"),
+      inArray(
+        sql`LOWER(${invitationsTable.email})`,
+        verifiedEmails
+      )
+    )
+  )
+  .limit(1);
+```
+
+## Implikasi Keamanan
+
+| Risiko jika salah | Dampak |
+|-------------------|--------|
+| Pakai `emailAddresses[0]` tanpa filter verified | Email belum terverifikasi bisa diklaim → spoofing |
+| Ambil email dari request body | Client bisa manipulasi email → klaim undangan orang lain |
+| Tanpa lowercase | `User@Example.com` ≠ `user@example.com` → undangan valid tidak ter-claim |
+
+Filter `verification.status === "verified"` memastikan hanya email yang sudah dibuktikan kepemilikannya oleh Clerk yang bisa dipakai untuk matching invitation. Ini menutup celah di mana attacker mendaftarkan Clerk account dengan email orang lain (yang belum mereka verifikasi) lalu mencoba claim invitation.
+
+---
+
+## Mental Model Final — Fully Aligned
+
+```
+Request terautentikasi → middleware akses
+        ↓
+Extract clerkUserId dari Clerk token
+        ↓
+SELECT userRolesTable WHERE userId = clerkUserId
+        ↓
+    ┌─── Ditemukan? ───┐
+    │                  │
+   YA                 TIDAK
+    │                  │
+Lanjutkan        clerkClient.users.getUser(clerkUserId)
+                  ↓
+                 Filter emailAddresses → verified + lowercase
+                  ↓
+                 Cari invitation PENDING yang email-nya match
+                  ↓
+              ┌── Ditemukan? ──┐
+              │                │
+             YA              TIDAK
+              │                │
+   Transaksi atomik:     Akun pertama di sistem?
+   ├─ INSERT user_roles       │          │
+   ├─ COPY project_          YA         TIDAK
+   │  assignments             │          │
+   └─ invitation → ACCEPTED  role =    role =
+                            DIRECTOR  UNASSIGNED
+                                       │
+                                    return 403
+```
+
+## Status Task Final
+
+| Task | Deskripsi | Status |
+|------|-----------|--------|
+| #1 | PostgreSQL Migration | ✅ Merged |
+| #2 | RBAC + Clerk | ✅ Merged |
+| #3 | Versioned Tax Engine | ✅ Merged |
+| #7 | Invitation System | ✅ Merged |
+| #15 | Overlap validation periode pajak | 📝 PROPOSED |
+| #16 | Pratinjau dampak tarif | 📝 PROPOSED |
+
+Mental model sekarang fully aligned dengan implementasi aktual — termasuk koreksi keamanan email verification. Saya menunggu arahan Anda untuk langkah selanjutnya.
