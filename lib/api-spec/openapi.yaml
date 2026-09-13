@@ -22,6 +22,8 @@ tags:
     description: Immutable audit activity
   - name: access
     description: Authenticated user access and approvals
+  - name: rab
+    description: Reusable construction budget templates
 paths:
   /healthz:
     get:
@@ -137,6 +139,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RabSummary"
+  /projects/{projectId}/rab/import:
+    post:
+      operationId: importProjectRabTemplate
+      tags: [projects, rab]
+      summary: Import a reusable RAB template as a new draft baseline
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RabTemplateImportInput"
+      responses:
+        "201":
+          description: Imported RAB baseline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RabSummary"
+  /rab/templates:
+    get:
+      operationId: listRabTemplates
+      tags: [rab]
+      summary: List reusable RAB templates
+      responses:
+        "200":
+          description: RAB template library
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RabTemplate"
   /invoices:
     get:
       operationId: listInvoices
@@ -391,17 +427,66 @@ components:
             $ref: "#/components/schemas/RabItem"
     RabItem:
       type: object
-      required: [id, code, name, category, budget, committed, actual, variance, utilization]
+      required: [id, code, name, category, level, unit, quantity, unitPrice, materialCost, laborCost, equipmentCost, budget, committed, actual, variance, utilization]
       properties:
         id: { type: string }
         code: { type: string }
         name: { type: string }
         category: { type: string }
+        parentCode: { type: ["string", "null"] }
+        level: { type: integer }
+        unit: { type: string }
+        quantity: { type: number }
+        unitPrice: { type: number }
+        materialCost: { type: number }
+        laborCost: { type: number }
+        equipmentCost: { type: number }
         budget: { type: number }
         committed: { type: number }
         actual: { type: number }
         variance: { type: number }
         utilization: { type: number }
+    RabTemplateItem:
+      type: object
+      required: [code, level, name, category, unit, quantity, unitPrice, materialCost, laborCost, equipmentCost, budget]
+      properties:
+        code: { type: string }
+        parentCode: { type: ["string", "null"] }
+        level: { type: integer }
+        name: { type: string }
+        category: { type: string }
+        unit: { type: string }
+        quantity: { type: number }
+        unitPrice: { type: number }
+        materialCost: { type: number }
+        laborCost: { type: number }
+        equipmentCost: { type: number }
+        budget: { type: number }
+    RabTemplate:
+      type: object
+      required: [id, name, projectType, description, sourceNote, itemCount, totalBudget, items]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        projectType: { type: string }
+        description: { type: string }
+        sourceNote: { type: string }
+        itemCount: { type: integer }
+        totalBudget: { type: number }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RabTemplateItem"
+    RabTemplateImportInput:
+      type: object
+      required: [templateId, priceFactor]
+      properties:
+        templateId: { type: string }
+        priceFactor:
+          type: number
+          minimum: 0.01
+          maximum: 100
+          description: Multiplier used to adjust reference prices to the project location and period
     Invoice:
       type: object
       required: [id, number, projectId, projectCode, projectName, period, dpp, ppn, pphFinal, retention, total, status, issuedAt]

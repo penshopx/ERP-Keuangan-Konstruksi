@@ -6,6 +6,7 @@ import invoicesRouter from "./invoices";
 import projectsRouter from "./projects";
 import taxRouter from "./tax";
 import accessRouter from "./access";
+import rabTemplatesRouter from "./rab-templates";
 import { requireAccess } from "../middlewares/access";
 
 const router: IRouter = Router();
@@ -17,6 +18,7 @@ router.use(activityRouter);
 router.use(dashboardRouter);
 router.use(invoicesRouter);
 router.use(projectsRouter);
+router.use(rabTemplatesRouter);
 router.use(taxRouter);
 
 export default router;

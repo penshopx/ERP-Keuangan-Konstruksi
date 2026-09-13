@@ -35,7 +35,7 @@ A construction-focused ERP for project finance, RAB budgeting, cost control, bil
 
 ## Product
 
-The first build includes a portfolio dashboard, project creation and detail, RAB cost control, automatic invoice tax calculations, monthly tax summaries, and an immutable-style audit timeline.
+The app includes a portfolio dashboard, project creation and detail, reusable RAB templates with versioned import, RAB cost control, automatic invoice tax calculations, monthly tax summaries, and an immutable-style audit timeline.
 
 ## User preferences
 

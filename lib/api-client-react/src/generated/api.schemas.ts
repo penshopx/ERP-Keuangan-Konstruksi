@@ -91,6 +91,15 @@ export interface RabItem {
   code: string;
   name: string;
   category: string;
+  /** @nullable */
+  parentCode?: string | null;
+  level: number;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  materialCost: number;
+  laborCost: number;
+  equipmentCost: number;
   budget: number;
   committed: number;
   actual: number;
@@ -107,6 +116,43 @@ export interface RabSummary {
   actual: number;
   remaining: number;
   items: RabItem[];
+}
+
+export interface RabTemplateItem {
+  code: string;
+  /** @nullable */
+  parentCode?: string | null;
+  level: number;
+  name: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  materialCost: number;
+  laborCost: number;
+  equipmentCost: number;
+  budget: number;
+}
+
+export interface RabTemplate {
+  id: string;
+  name: string;
+  projectType: string;
+  description: string;
+  sourceNote: string;
+  itemCount: number;
+  totalBudget: number;
+  items: RabTemplateItem[];
+}
+
+export interface RabTemplateImportInput {
+  templateId: string;
+  /**
+     * Multiplier used to adjust reference prices to the project location and period
+     * @minimum 0.01
+     * @maximum 100
+     */
+  priceFactor: number;
 }
 
 export interface InvoiceInput {

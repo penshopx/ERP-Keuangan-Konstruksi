@@ -1,1 +1,2 @@
 - [Versioned tax rules](versioned-tax-rules.md) — Construction tax rates and formulas must be effective-dated configuration, never permanent constants.
+- [RAB reference templates](rab-reference-templates.md) — Uploaded learning materials define structure and terminology, not authoritative current market prices.

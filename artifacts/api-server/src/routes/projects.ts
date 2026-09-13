@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
-import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { and, desc, eq, ilike, max, or, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -8,6 +8,7 @@ import {
   projectsTable,
   rabBaselinesTable,
   rabItemsTable,
+  rabTemplatesTable,
 } from "@workspace/db";
 import {
   CreateProjectBody,
@@ -16,6 +17,8 @@ import {
   GetProjectRabParams,
   GetProjectRabResponse,
   GetProjectResponse,
+  ImportProjectRabTemplateBody,
+  ImportProjectRabTemplateResponse,
   ListProjectsQueryParams,
   ListProjectsResponse,
   UpdateProjectBody,
@@ -194,8 +197,9 @@ router.get("/projects/:projectId/rab", requirePermission("projects:view"), async
     .orderBy(rabItemsTable.code);
   const items = storedItems.map((item) => ({
     ...item,
+    quantity: item.quantityBasisPoints / 100,
     variance: item.budget - item.actual,
-    utilization: Number(((item.actual / item.budget) * 100).toFixed(1)),
+    utilization: item.budget === 0 ? 0 : Number(((item.actual / item.budget) * 100).toFixed(1)),
   }));
   const totalBudget = items.reduce((sum, item) => sum + item.budget, 0);
   const committed = items.reduce((sum, item) => sum + item.committed, 0);
@@ -209,6 +213,92 @@ router.get("/projects/:projectId/rab", requirePermission("projects:view"), async
     actual,
     remaining: totalBudget - actual,
     items,
+  }));
+});
+
+router.post("/projects/:projectId/rab/import", requirePermission("projects:write"), async (req, res) => {
+  const params = GetProjectRabParams.safeParse(req.params);
+  const body = ImportProjectRabTemplateBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Pilihan template atau faktor harga tidak valid" });
+    return;
+  }
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, params.data.projectId)).limit(1);
+  if (!project) {
+    res.status(404).json({ error: "Proyek tidak ditemukan" });
+    return;
+  }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
+    return;
+  }
+  const [template] = await db.select().from(rabTemplatesTable).where(eq(rabTemplatesTable.id, body.data.templateId)).limit(1);
+  if (!template) {
+    res.status(404).json({ error: "Template RAB tidak ditemukan" });
+    return;
+  }
+  const baselineId = randomUUID();
+  const factor = body.data.priceFactor;
+  const importedItems = template.items.map((item) => {
+    const unitPrice = Math.round(item.unitPrice * factor);
+    return {
+      id: randomUUID(),
+      baselineId,
+      code: item.code,
+      name: item.name,
+      category: item.category,
+      parentCode: item.parentCode ?? null,
+      level: item.level,
+      unit: item.unit,
+      quantityBasisPoints: Math.round(item.quantity * 100),
+      unitPrice,
+      materialCost: Math.round(item.materialCost * factor),
+      laborCost: Math.round(item.laborCost * factor),
+      equipmentCost: Math.round(item.equipmentCost * factor),
+      budget: Math.round(item.quantity * unitPrice),
+      committed: 0,
+      actual: 0,
+    };
+  });
+  const totalBudget = importedItems.reduce((sum, item) => sum + item.budget, 0);
+  const version = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${project.id}))`);
+    const [{ nextVersion }] = await tx.select({
+      nextVersion: max(rabBaselinesTable.version),
+    }).from(rabBaselinesTable).where(eq(rabBaselinesTable.projectId, project.id));
+    const lockedVersion = (nextVersion ?? 0) + 1;
+    await tx.insert(rabBaselinesTable).values({ id: baselineId, projectId: project.id, version: lockedVersion, status: "DRAF" });
+    await tx.insert(rabItemsTable).values(importedItems);
+    await tx.update(projectsTable).set({ budget: totalBudget, wbsCount: importedItems.length }).where(eq(projectsTable.id, project.id));
+    await tx.insert(auditLogsTable).values({
+      id: randomUUID(),
+      action: "DIIMPOR",
+      entity: "RAB",
+      entityId: baselineId,
+      detail: `${template.name} menjadi RAB ${project.code} versi ${lockedVersion}`,
+      user: req.access!.displayName,
+      actorUserId: req.access!.userId,
+      actorRole: req.access!.role,
+      tone: "info",
+      metadata: { templateId: template.id, priceFactor: factor, itemCount: importedItems.length },
+    });
+    return lockedVersion;
+  });
+  const responseItems = importedItems.map((item) => ({
+    ...item,
+    quantity: item.quantityBasisPoints / 100,
+    variance: item.budget,
+    utilization: 0,
+  }));
+  res.status(201).json(ImportProjectRabTemplateResponse.parse({
+    projectId: project.id,
+    version,
+    status: "DRAF",
+    totalBudget,
+    committed: 0,
+    actual: 0,
+    remaining: totalBudget,
+    items: responseItems,
   }));
 });
 

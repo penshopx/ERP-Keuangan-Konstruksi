@@ -37,6 +37,8 @@ import type {
   ProjectInput,
   ProjectUpdate,
   RabSummary,
+  RabTemplate,
+  RabTemplateImportInput,
   TaxSummary
 } from './api.schemas';
 
@@ -625,6 +627,172 @@ export function useGetProjectRab<TData = Awaited<ReturnType<typeof getProjectRab
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetProjectRabQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getImportProjectRabTemplateUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/rab/import`
+}
+
+/**
+ * @summary Import a reusable RAB template as a new draft baseline
+ */
+export const importProjectRabTemplate = async (projectId: string,
+    rabTemplateImportInput: RabTemplateImportInput, options?: Parameters<typeof customFetch>[1]): Promise<RabSummary> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RabSummary>(getImportProjectRabTemplateUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rabTemplateImportInput)
+  }
+);}
+
+
+
+
+
+export const getImportProjectRabTemplateMutationKey = () => ['importProjectRabTemplate'] as const;
+
+export const getImportProjectRabTemplateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importProjectRabTemplate>>, TError,ImportProjectRabTemplateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importProjectRabTemplate>>, TError,ImportProjectRabTemplateMutationVariables, TContext> => {
+
+const mutationKey = getImportProjectRabTemplateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importProjectRabTemplate>>, ImportProjectRabTemplateMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  importProjectRabTemplate(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportProjectRabTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof importProjectRabTemplate>>>
+    export type ImportProjectRabTemplateMutationBody = BodyType<RabTemplateImportInput>
+    export type ImportProjectRabTemplateMutationError = ErrorType<unknown>
+    export type ImportProjectRabTemplateMutationVariables = {projectId: string;data: BodyType<RabTemplateImportInput>}
+
+    /**
+ * @summary Import a reusable RAB template as a new draft baseline
+ */
+export const useImportProjectRabTemplate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importProjectRabTemplate>>, TError,ImportProjectRabTemplateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importProjectRabTemplate>>,
+        TError,
+        ImportProjectRabTemplateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getImportProjectRabTemplateMutationOptions(options));
+    }
+
+export const getListRabTemplatesUrl = () => {
+
+
+
+
+  return `/api/rab/templates`
+}
+
+/**
+ * @summary List reusable RAB templates
+ */
+export const listRabTemplates = async ( options?: Parameters<typeof customFetch>[1]): Promise<RabTemplate[]> => {
+
+  return customFetch<RabTemplate[]>(getListRabTemplatesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRabTemplatesQueryKey = () => {
+    return [
+    `/api/rab/templates`
+    ] as const;
+    }
+
+
+export const getListRabTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listRabTemplates>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRabTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRabTemplatesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRabTemplates>>> = ({ signal }) => listRabTemplates({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRabTemplates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRabTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listRabTemplates>>>
+export type ListRabTemplatesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List reusable RAB templates
+ */
+
+export function useListRabTemplates<TData = Awaited<ReturnType<typeof listRabTemplates>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRabTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRabTemplatesQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

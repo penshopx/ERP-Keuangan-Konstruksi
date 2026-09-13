@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedDemoData } from "./lib/demo-data";
+import { seedRabTemplates } from "./lib/rab-template-data";
 
 const rawPort = process.env["PORT"];
 
@@ -16,6 +17,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+await seedRabTemplates();
 if (process.env.NODE_ENV === "development") {
   await seedDemoData();
 }

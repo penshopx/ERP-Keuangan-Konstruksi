@@ -11,6 +11,15 @@ export interface RabItem {
   code: string;
   name: string;
   category: string;
+  /** @nullable */
+  parentCode?: string | null;
+  level: number;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  materialCost: number;
+  laborCost: number;
+  equipmentCost: number;
   budget: number;
   committed: number;
   actual: number;

@@ -30,4 +30,7 @@ export * from './projectInput';
 export * from './projectUpdate';
 export * from './rabItem';
 export * from './rabSummary';
+export * from './rabTemplate';
+export * from './rabTemplateImportInput';
+export * from './rabTemplateItem';
 export * from './taxSummary';

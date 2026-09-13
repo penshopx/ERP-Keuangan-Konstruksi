@@ -182,6 +182,14 @@ export const GetProjectRabResponse = zod.object({
   "code": zod.string(),
   "name": zod.string(),
   "category": zod.string(),
+  "parentCode": zod.string().nullish(),
+  "level": zod.number().int(),
+  "unit": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "materialCost": zod.number(),
+  "laborCost": zod.number(),
+  "equipmentCost": zod.number(),
   "budget": zod.number(),
   "committed": zod.number(),
   "actual": zod.number(),
@@ -189,6 +197,82 @@ export const GetProjectRabResponse = zod.object({
   "utilization": zod.number()
 }))
 })
+
+
+/**
+ * @summary Import a reusable RAB template as a new draft baseline
+ */
+export const ImportProjectRabTemplateParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const importProjectRabTemplateBodyPriceFactorMin = 0.01;
+export const importProjectRabTemplateBodyPriceFactorMax = 100;
+
+
+
+export const ImportProjectRabTemplateBody = zod.object({
+  "templateId": zod.string(),
+  "priceFactor": zod.number().min(importProjectRabTemplateBodyPriceFactorMin).max(importProjectRabTemplateBodyPriceFactorMax).describe('Multiplier used to adjust reference prices to the project location and period')
+})
+
+export const ImportProjectRabTemplateResponse = zod.object({
+  "projectId": zod.string(),
+  "version": zod.number().int(),
+  "status": zod.string(),
+  "totalBudget": zod.number(),
+  "committed": zod.number(),
+  "actual": zod.number(),
+  "remaining": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "parentCode": zod.string().nullish(),
+  "level": zod.number().int(),
+  "unit": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "materialCost": zod.number(),
+  "laborCost": zod.number(),
+  "equipmentCost": zod.number(),
+  "budget": zod.number(),
+  "committed": zod.number(),
+  "actual": zod.number(),
+  "variance": zod.number(),
+  "utilization": zod.number()
+}))
+})
+
+
+/**
+ * @summary List reusable RAB templates
+ */
+export const ListRabTemplatesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "projectType": zod.string(),
+  "description": zod.string(),
+  "sourceNote": zod.string(),
+  "itemCount": zod.number().int(),
+  "totalBudget": zod.number(),
+  "items": zod.array(zod.object({
+  "code": zod.string(),
+  "parentCode": zod.string().nullish(),
+  "level": zod.number().int(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "unit": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "materialCost": zod.number(),
+  "laborCost": zod.number(),
+  "equipmentCost": zod.number(),
+  "budget": zod.number()
+}))
+})
+export const ListRabTemplatesResponse = zod.array(ListRabTemplatesResponseItem)
 
 
 /**
