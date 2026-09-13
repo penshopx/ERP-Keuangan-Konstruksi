@@ -504,7 +504,7 @@ export const ListAccessInvitationsResponseItem = zod.object({
   "displayName": zod.string(),
   "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
   "assignedProjectIds": zod.array(zod.string()),
-  "status": zod.enum(['PENDING', 'EXPIRED']),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
   "expiresAt": zod.coerce.date(),
   "createdAt": zod.coerce.date()
 })
@@ -530,7 +530,45 @@ export const CreateAccessInvitationResponse = zod.object({
   "displayName": zod.string(),
   "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
   "assignedProjectIds": zod.array(zod.string()),
-  "status": zod.enum(['PENDING', 'EXPIRED']),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
+  "expiresAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Revoke a pending staff invitation
+ */
+export const RevokeAccessInvitationParams = zod.object({
+  "invitationId": zod.coerce.string()
+})
+
+export const RevokeAccessInvitationResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "displayName": zod.string(),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string()),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
+  "expiresAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Resend an expired staff invitation with the same access
+ */
+export const ResendAccessInvitationParams = zod.object({
+  "invitationId": zod.coerce.string()
+})
+
+export const ResendAccessInvitationResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "displayName": zod.string(),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string()),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
   "expiresAt": zod.coerce.date(),
   "createdAt": zod.coerce.date()
 })

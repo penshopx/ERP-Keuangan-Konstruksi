@@ -6,7 +6,10 @@ import {
   useListAccessInvitations,
   useListAccessUsers,
   useListProjects,
+  useResendAccessInvitation,
+  useRevokeAccessInvitation,
   useUpdateAccessUser,
+  type AccessInvitation,
   type AccessInvitationInputRole,
   type AccessUser,
   type AccessUserUpdateRole,
@@ -30,12 +33,45 @@ export default function AccessManagement() {
   return <div className="space-y-6"><div><h1 className="text-3xl font-bold">Hak Akses</h1><p className="text-muted-foreground">Undang staf dan siapkan jabatan serta proyek sebelum mereka pertama kali masuk.</p></div>
     <InviteCard projects={projects ?? []} />
     {invitations && invitations.length > 0 && <Card><CardHeader><CardTitle className="text-base">Undangan staf</CardTitle></CardHeader><CardContent className="grid gap-3">
-      {invitations.map((invite) => <div key={invite.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-        <div><p className="font-medium">{invite.displayName}</p><p className="text-sm text-muted-foreground">{invite.email} · {invite.role.replaceAll("_", " ")}</p></div>
-        <div className="text-right"><span className={invite.status === "PENDING" ? "text-sm font-medium text-amber-600" : "text-sm font-medium text-red-600"}>{invite.status === "PENDING" ? "Tertunda" : "Kedaluwarsa"}</span><p className="text-xs text-muted-foreground">berakhir {new Date(invite.expiresAt).toLocaleDateString("id-ID")}</p></div>
-      </div>)}
+      {invitations.map((invite) => <InvitationRow key={invite.id} invite={invite} />)}
     </CardContent></Card>}
     <div className="grid gap-4">{users?.map((user) => <AccessCard key={user.userId} user={user} projects={projects ?? []} />)}</div>
+  </div>;
+}
+
+function InvitationRow({ invite }: { invite: AccessInvitation }) {
+  const revoke = useRevokeAccessInvitation();
+  const resend = useResendAccessInvitation();
+  const client = useQueryClient();
+  const [message, setMessage] = useState("");
+  const refresh = () => client.invalidateQueries({ queryKey: getListAccessInvitationsQueryKey() });
+  const status = invite.status === "PENDING" ? "Tertunda" : invite.status === "EXPIRED" ? "Kedaluwarsa" : "Dibatalkan";
+  const statusClass = invite.status === "PENDING"
+    ? "text-amber-600"
+    : invite.status === "EXPIRED"
+      ? "text-red-600"
+      : "text-muted-foreground";
+  return <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+    <div><p className="font-medium">{invite.displayName}</p><p className="text-sm text-muted-foreground">{invite.email} · {invite.role.replaceAll("_", " ")}</p></div>
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="text-right"><span className={`text-sm font-medium ${statusClass}`}>{status}</span><p className="text-xs text-muted-foreground">berakhir {new Date(invite.expiresAt).toLocaleDateString("id-ID")}</p></div>
+      {invite.status === "PENDING" && <Button variant="outline" size="sm" disabled={revoke.isPending} onClick={() => {
+        if (!window.confirm(`Batalkan undangan untuk ${invite.email}? Tautan undangan tidak dapat digunakan lagi.`)) return;
+        setMessage("");
+        revoke.mutate({ invitationId: invite.id }, {
+          onSuccess: () => { setMessage("Undangan dibatalkan."); refresh(); },
+          onError: () => setMessage("Undangan gagal dibatalkan."),
+        });
+      }}>{revoke.isPending ? "Membatalkan..." : "Batalkan"}</Button>}
+      {invite.status === "EXPIRED" && <Button variant="outline" size="sm" disabled={resend.isPending} onClick={() => {
+        setMessage("");
+        resend.mutate({ invitationId: invite.id }, {
+          onSuccess: () => { setMessage("Undangan dikirim ulang."); refresh(); },
+          onError: () => setMessage("Undangan gagal dikirim ulang."),
+        });
+      }}>{resend.isPending ? "Mengirim..." : "Kirim ulang"}</Button>}
+      {message && <p className="w-full text-right text-xs text-muted-foreground">{message}</p>}
+    </div>
   </div>;
 }
 

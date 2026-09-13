@@ -1626,6 +1626,154 @@ export const useCreateAccessInvitation = <TError = ErrorType<unknown>,
       return useMutation(getCreateAccessInvitationMutationOptions(options));
     }
 
+export const getRevokeAccessInvitationUrl = (invitationId: string,) => {
+
+
+
+
+  return `/api/access/invitations/${invitationId}/revoke`
+}
+
+/**
+ * @summary Revoke a pending staff invitation
+ */
+export const revokeAccessInvitation = async (invitationId: string, options?: Parameters<typeof customFetch>[1]): Promise<AccessInvitation> => {
+
+  return customFetch<AccessInvitation>(getRevokeAccessInvitationUrl(invitationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeAccessInvitationMutationKey = () => ['revokeAccessInvitation'] as const;
+
+export const getRevokeAccessInvitationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeAccessInvitation>>, TError,RevokeAccessInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeAccessInvitation>>, TError,RevokeAccessInvitationMutationVariables, TContext> => {
+
+const mutationKey = getRevokeAccessInvitationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeAccessInvitation>>, RevokeAccessInvitationMutationVariables> = (props) => {
+          const {invitationId} = props ?? {};
+
+          return  revokeAccessInvitation(invitationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeAccessInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof revokeAccessInvitation>>>
+
+    export type RevokeAccessInvitationMutationError = ErrorType<unknown>
+    export type RevokeAccessInvitationMutationVariables = {invitationId: string}
+
+    /**
+ * @summary Revoke a pending staff invitation
+ */
+export const useRevokeAccessInvitation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeAccessInvitation>>, TError,RevokeAccessInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeAccessInvitation>>,
+        TError,
+        RevokeAccessInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevokeAccessInvitationMutationOptions(options));
+    }
+
+export const getResendAccessInvitationUrl = (invitationId: string,) => {
+
+
+
+
+  return `/api/access/invitations/${invitationId}/resend`
+}
+
+/**
+ * @summary Resend an expired staff invitation with the same access
+ */
+export const resendAccessInvitation = async (invitationId: string, options?: Parameters<typeof customFetch>[1]): Promise<AccessInvitation> => {
+
+  return customFetch<AccessInvitation>(getResendAccessInvitationUrl(invitationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResendAccessInvitationMutationKey = () => ['resendAccessInvitation'] as const;
+
+export const getResendAccessInvitationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendAccessInvitation>>, TError,ResendAccessInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resendAccessInvitation>>, TError,ResendAccessInvitationMutationVariables, TContext> => {
+
+const mutationKey = getResendAccessInvitationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resendAccessInvitation>>, ResendAccessInvitationMutationVariables> = (props) => {
+          const {invitationId} = props ?? {};
+
+          return  resendAccessInvitation(invitationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResendAccessInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof resendAccessInvitation>>>
+
+    export type ResendAccessInvitationMutationError = ErrorType<unknown>
+    export type ResendAccessInvitationMutationVariables = {invitationId: string}
+
+    /**
+ * @summary Resend an expired staff invitation with the same access
+ */
+export const useResendAccessInvitation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendAccessInvitation>>, TError,ResendAccessInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resendAccessInvitation>>,
+        TError,
+        ResendAccessInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResendAccessInvitationMutationOptions(options));
+    }
+
 export const getUpdateAccessUserUrl = (userId: string,) => {
 
 

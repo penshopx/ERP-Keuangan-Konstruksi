@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { clerkClient } from "@clerk/express";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { auditLogsTable, db, invoicesTable, projectAssignmentsTable, projectsTable, staffInvitationProjectsTable, staffInvitationsTable, userRolesTable } from "@workspace/db";
 import {
   DecideInvoiceBody,
@@ -12,6 +12,10 @@ import {
   CreateAccessInvitationResponse,
   ListAccessInvitationsResponse,
   ListAccessUsersResponse,
+  ResendAccessInvitationParams,
+  ResendAccessInvitationResponse,
+  RevokeAccessInvitationParams,
+  RevokeAccessInvitationResponse,
   UpdateAccessUserBody,
   UpdateAccessUserParams,
   UpdateAccessUserResponse,
@@ -19,6 +23,25 @@ import {
 import { canAccessProject, requirePermission } from "../middlewares/access";
 
 const router: IRouter = Router();
+
+const serializeInvitation = (
+  invitation: typeof staffInvitationsTable.$inferSelect,
+  assignedProjectIds: string[],
+  now = new Date(),
+) => ({
+  id: invitation.id,
+  email: invitation.email,
+  displayName: invitation.displayName,
+  role: invitation.role,
+  assignedProjectIds,
+  status: invitation.status === "REVOKED"
+    ? "REVOKED"
+    : invitation.status === "EXPIRED" || invitation.expiresAt <= now
+      ? "EXPIRED"
+      : "PENDING",
+  expiresAt: invitation.expiresAt.toISOString(),
+  createdAt: invitation.createdAt.toISOString(),
+});
 
 router.get("/me", (req, res) => {
   res.json(GetCurrentUserResponse.parse(req.access));
@@ -48,16 +71,11 @@ router.get("/access/invitations", async (req, res) => {
     .filter((invite) => invite.status !== "ACCEPTED");
   const projects = await db.select().from(staffInvitationProjectsTable);
   const now = new Date();
-  res.json(ListAccessInvitationsResponse.parse(invitations.map((invite) => ({
-    id: invite.id,
-    email: invite.email,
-    displayName: invite.displayName,
-    role: invite.role,
-    assignedProjectIds: projects.filter((item) => item.invitationId === invite.id).map((item) => item.projectId),
-    status: invite.status === "EXPIRED" || invite.expiresAt <= now ? "EXPIRED" : "PENDING",
-    expiresAt: invite.expiresAt.toISOString(),
-    createdAt: invite.createdAt.toISOString(),
-  }))));
+  res.json(ListAccessInvitationsResponse.parse(invitations.map((invite) => serializeInvitation(
+    invite,
+    projects.filter((item) => item.invitationId === invite.id).map((item) => item.projectId),
+    now,
+  ))));
 });
 
 router.post("/access/invitations", async (req, res) => {
@@ -126,6 +144,123 @@ router.post("/access/invitations", async (req, res) => {
     assignedProjectIds: body.data.assignedProjectIds, status: "PENDING",
     expiresAt: result.expiresAt.toISOString(), createdAt: result.createdAt.toISOString(),
   }));
+});
+
+router.post("/access/invitations/:invitationId/revoke", async (req, res) => {
+  if (req.access?.role !== "DIRECTOR") {
+    res.status(403).json({ error: "Hanya Director yang dapat membatalkan undangan" });
+    return;
+  }
+  const params = RevokeAccessInvitationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Undangan tidak valid" });
+    return;
+  }
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`erp-staff-invite-id:${params.data.invitationId}`}))`);
+    const [invitation] = await tx.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, params.data.invitationId)).limit(1);
+    if (!invitation) return { outcome: "not-found" } as const;
+    if (invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+      return { outcome: "not-pending" } as const;
+    }
+    await clerkClient.invitations.revokeInvitation(invitation.clerkInvitationId);
+    const [updated] = await tx.update(staffInvitationsTable).set({ status: "REVOKED" })
+      .where(and(
+        eq(staffInvitationsTable.id, invitation.id),
+        eq(staffInvitationsTable.status, "PENDING"),
+      )).returning();
+    if (!updated) throw new Error("Undangan berubah saat pembatalan diproses");
+    await tx.insert(auditLogsTable).values({
+      id: randomUUID(), action: "UNDANGAN STAF DIBATALKAN", entity: "Undangan", entityId: invitation.id,
+      detail: `${invitation.displayName} · ${invitation.email} · ${invitation.role}`, user: req.access!.displayName,
+      actorUserId: req.access!.userId, actorRole: req.access!.role, tone: "warning",
+      metadata: { email: invitation.email, role: invitation.role, previousStatus: invitation.status },
+    });
+    const projects = await tx.select({ projectId: staffInvitationProjectsTable.projectId })
+      .from(staffInvitationProjectsTable).where(eq(staffInvitationProjectsTable.invitationId, invitation.id));
+    return { outcome: "revoked", invitation: updated, projectIds: projects.map(({ projectId }) => projectId) } as const;
+  });
+  if (result.outcome === "not-found") {
+    res.status(404).json({ error: "Undangan tidak ditemukan" });
+    return;
+  }
+  if (result.outcome === "not-pending") {
+    res.status(409).json({ error: "Hanya undangan tertunda yang dapat dibatalkan" });
+    return;
+  }
+  res.json(RevokeAccessInvitationResponse.parse(serializeInvitation(result.invitation, result.projectIds)));
+});
+
+router.post("/access/invitations/:invitationId/resend", async (req, res) => {
+  if (req.access?.role !== "DIRECTOR") {
+    res.status(403).json({ error: "Hanya Director yang dapat mengirim ulang undangan" });
+    return;
+  }
+  const params = ResendAccessInvitationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Undangan tidak valid" });
+    return;
+  }
+  let createdClerkInvitationId: string | undefined;
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`erp-staff-invite-id:${params.data.invitationId}`}))`);
+    const [invitation] = await tx.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, params.data.invitationId)).limit(1);
+    if (!invitation) return { outcome: "not-found" } as const;
+    if (invitation.status !== "EXPIRED" && !(invitation.status === "PENDING" && invitation.expiresAt <= new Date())) {
+      return { outcome: "not-expired" } as const;
+    }
+    const clerkInvitation = await clerkClient.invitations.createInvitation({
+      emailAddress: invitation.email,
+      expiresInDays: 30,
+      ignoreExisting: true,
+      publicMetadata: { source: "construction-erp" },
+    });
+    createdClerkInvitationId = clerkInvitation.id;
+    const expiresAt = new Date(new Date(clerkInvitation.createdAt).getTime() + 30 * 86_400_000);
+    const [updated] = await tx.update(staffInvitationsTable).set({
+      clerkInvitationId: clerkInvitation.id,
+      status: "PENDING",
+      expiresAt,
+    }).where(and(
+      eq(staffInvitationsTable.id, invitation.id),
+      or(
+        eq(staffInvitationsTable.status, "EXPIRED"),
+        and(eq(staffInvitationsTable.status, "PENDING"), sql`${staffInvitationsTable.expiresAt} <= now()`),
+      ),
+    )).returning();
+    if (!updated) throw new Error("Undangan berubah saat pengiriman ulang diproses");
+    await tx.insert(auditLogsTable).values({
+      id: randomUUID(), action: "UNDANGAN STAF DIKIRIM ULANG", entity: "Undangan", entityId: invitation.id,
+      detail: `${invitation.displayName} · ${invitation.email} · ${invitation.role}`, user: req.access!.displayName,
+      actorUserId: req.access!.userId, actorRole: req.access!.role, tone: "info",
+      metadata: {
+        email: invitation.email,
+        role: invitation.role,
+        previousStatus: invitation.status,
+        previousExpiresAt: invitation.expiresAt.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+    const projects = await tx.select({ projectId: staffInvitationProjectsTable.projectId })
+      .from(staffInvitationProjectsTable).where(eq(staffInvitationProjectsTable.invitationId, invitation.id));
+    return { outcome: "resent", invitation: updated, projectIds: projects.map(({ projectId }) => projectId) } as const;
+  }).catch(async (error) => {
+    if (createdClerkInvitationId) {
+      await clerkClient.invitations.revokeInvitation(createdClerkInvitationId).catch(() => undefined);
+    }
+    throw error;
+  });
+  if (result.outcome === "not-found") {
+    res.status(404).json({ error: "Undangan tidak ditemukan" });
+    return;
+  }
+  if (result.outcome === "not-expired") {
+    res.status(409).json({ error: "Hanya undangan kedaluwarsa yang dapat dikirim ulang" });
+    return;
+  }
+  res.json(ResendAccessInvitationResponse.parse(serializeInvitation(result.invitation, result.projectIds)));
 });
 
 router.put("/access/users/:userId", async (req, res) => {

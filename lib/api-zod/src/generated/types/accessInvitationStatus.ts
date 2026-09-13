@@ -12,4 +12,5 @@ export type AccessInvitationStatus = typeof AccessInvitationStatus[keyof typeof 
 export const AccessInvitationStatus = {
   PENDING: 'PENDING',
   EXPIRED: 'EXPIRED',
+  REVOKED: 'REVOKED',
 } as const;
