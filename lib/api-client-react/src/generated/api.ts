@@ -41,6 +41,8 @@ import type {
   RabSummary,
   RabTemplate,
   RabTemplateImportInput,
+  TaxRule,
+  TaxRuleInput,
   TaxSummary
 } from './api.schemas';
 
@@ -1062,6 +1064,171 @@ export function useGetTaxSummary<TData = Awaited<ReturnType<typeof getTaxSummary
 
 
 
+
+export const getListTaxRulesUrl = () => {
+
+
+
+
+  return `/api/tax/rules`
+}
+
+/**
+ * @summary List versioned tax rules
+ */
+export const listTaxRules = async ( options?: Parameters<typeof customFetch>[1]): Promise<TaxRule[]> => {
+
+  return customFetch<TaxRule[]>(getListTaxRulesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTaxRulesQueryKey = () => {
+    return [
+    `/api/tax/rules`
+    ] as const;
+    }
+
+
+export const getListTaxRulesQueryOptions = <TData = Awaited<ReturnType<typeof listTaxRules>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTaxRules>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTaxRulesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTaxRules>>> = ({ signal }) => listTaxRules({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaxRules>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTaxRulesQueryResult = NonNullable<Awaited<ReturnType<typeof listTaxRules>>>
+export type ListTaxRulesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List versioned tax rules
+ */
+
+export function useListTaxRules<TData = Awaited<ReturnType<typeof listTaxRules>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTaxRules>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTaxRulesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateTaxRuleUrl = () => {
+
+
+
+
+  return `/api/tax/rules`
+}
+
+/**
+ * @summary Add a new tax rule version
+ */
+export const createTaxRule = async (taxRuleInput: TaxRuleInput, options?: Parameters<typeof customFetch>[1]): Promise<TaxRule> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TaxRule>(getCreateTaxRuleUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(taxRuleInput)
+  }
+);}
+
+
+
+
+
+export const getCreateTaxRuleMutationKey = () => ['createTaxRule'] as const;
+
+export const getCreateTaxRuleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTaxRule>>, TError,CreateTaxRuleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTaxRule>>, TError,CreateTaxRuleMutationVariables, TContext> => {
+
+const mutationKey = getCreateTaxRuleMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTaxRule>>, CreateTaxRuleMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTaxRule(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTaxRuleMutationResult = NonNullable<Awaited<ReturnType<typeof createTaxRule>>>
+    export type CreateTaxRuleMutationBody = BodyType<TaxRuleInput>
+    export type CreateTaxRuleMutationError = ErrorType<void>
+    export type CreateTaxRuleMutationVariables = {data: BodyType<TaxRuleInput>}
+
+    /**
+ * @summary Add a new tax rule version
+ */
+export const useCreateTaxRule = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTaxRule>>, TError,CreateTaxRuleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTaxRule>>,
+        TError,
+        CreateTaxRuleMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateTaxRuleMutationOptions(options));
+    }
 
 export const getListActivityUrl = () => {
 

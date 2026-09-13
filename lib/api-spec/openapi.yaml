@@ -230,6 +230,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TaxSummary"
+  /tax/rules:
+    get:
+      operationId: listTaxRules
+      tags: [tax]
+      summary: List versioned tax rules
+      responses:
+        "200":
+          description: Tax rule versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaxRule"
+    post:
+      operationId: createTaxRule
+      tags: [tax]
+      summary: Add a new tax rule version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxRuleInput"
+      responses:
+        "201":
+          description: Created tax rule version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxRule"
+        "409":
+          description: The effective period overlaps an existing rule with the same criteria
   /activity:
     get:
       operationId: listActivity
@@ -567,6 +600,53 @@ components:
         total: { type: number }
         documents: { type: integer }
         reconciliation: { type: number }
+    TaxRule:
+      type: object
+      required: [id, version, effectiveFrom, effectiveTo, regulatorySource, serviceType, qualification, requiresSbu, supplierPkp, governmentCollector, integrated, dppRateBasisPoints, ppnRateBasisPoints, pphFinalRateBasisPoints, pph23RateBasisPoints, createdAt, invoiceUsageCount]
+      properties:
+        id: { type: string }
+        version: { type: string }
+        effectiveFrom: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        effectiveTo: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        regulatorySource: { type: string }
+        serviceType:
+          type: string
+          enum: [KONSTRUKSI, JASA_LAIN]
+        qualification:
+          type: ["string", "null"]
+          enum: [KECIL, MENENGAH, BESAR, TANPA_KUALIFIKASI, null]
+        requiresSbu: { type: boolean }
+        supplierPkp: { type: boolean }
+        governmentCollector: { type: boolean }
+        integrated: { type: boolean }
+        dppRateBasisPoints: { type: integer }
+        ppnRateBasisPoints: { type: integer }
+        pphFinalRateBasisPoints: { type: integer }
+        pph23RateBasisPoints: { type: integer }
+        createdAt: { type: string, format: date-time }
+        invoiceUsageCount: { type: integer }
+    TaxRuleInput:
+      type: object
+      required: [version, effectiveFrom, regulatorySource, serviceType, qualification, requiresSbu, supplierPkp, governmentCollector, integrated, dppRateBasisPoints, ppnRateBasisPoints, pphFinalRateBasisPoints, pph23RateBasisPoints]
+      properties:
+        version: { type: string, minLength: 1, maxLength: 100 }
+        effectiveFrom: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        effectiveTo: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        regulatorySource: { type: string, minLength: 1, maxLength: 1000 }
+        serviceType:
+          type: string
+          enum: [KONSTRUKSI, JASA_LAIN]
+        qualification:
+          type: ["string", "null"]
+          enum: [KECIL, MENENGAH, BESAR, TANPA_KUALIFIKASI, null]
+        requiresSbu: { type: boolean }
+        supplierPkp: { type: boolean }
+        governmentCollector: { type: boolean }
+        integrated: { type: boolean }
+        dppRateBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+        ppnRateBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+        pphFinalRateBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+        pph23RateBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
     Activity:
       type: object
       required: [id, action, entity, detail, user, timestamp, tone]

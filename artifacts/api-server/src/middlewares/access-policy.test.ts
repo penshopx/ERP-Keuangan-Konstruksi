@@ -3,10 +3,10 @@ import test from "node:test";
 import { roleCanAccessProject, roleHasPermission, roles } from "./access-policy";
 
 const expected: Record<(typeof roles)[number], string[]> = {
-  DIRECTOR: ["projects:view", "projects:write", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "audit:view"],
+  DIRECTOR: ["projects:view", "projects:write", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view"],
   PROJECT_MANAGER: ["projects:view", "projects:write", "invoices:view", "invoices:approve"],
   SITE_MANAGER: ["projects:view", "invoices:view"],
-  FINANCE: ["projects:view", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "audit:view"],
+  FINANCE: ["projects:view", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view"],
   TAX_STAFF: ["invoices:view", "tax:view", "audit:view"],
   PROCUREMENT: ["projects:view"],
 };

@@ -363,6 +363,100 @@ export const GetTaxSummaryResponse = zod.object({
 
 
 /**
+ * @summary List versioned tax rules
+ */
+export const listTaxRulesResponseEffectiveFromRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const listTaxRulesResponseEffectiveToRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const ListTaxRulesResponseItem = zod.object({
+  "id": zod.string(),
+  "version": zod.string(),
+  "effectiveFrom": zod.string().regex(listTaxRulesResponseEffectiveFromRegExp),
+  "effectiveTo": zod.string().regex(listTaxRulesResponseEffectiveToRegExp).nullable(),
+  "regulatorySource": zod.string(),
+  "serviceType": zod.enum(['KONSTRUKSI', 'JASA_LAIN']),
+  "qualification": zod.union([zod.literal('KECIL'),zod.literal('MENENGAH'),zod.literal('BESAR'),zod.literal('TANPA_KUALIFIKASI'),zod.literal(null)]).nullable(),
+  "requiresSbu": zod.boolean(),
+  "supplierPkp": zod.boolean(),
+  "governmentCollector": zod.boolean(),
+  "integrated": zod.boolean(),
+  "dppRateBasisPoints": zod.number().int(),
+  "ppnRateBasisPoints": zod.number().int(),
+  "pphFinalRateBasisPoints": zod.number().int(),
+  "pph23RateBasisPoints": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "invoiceUsageCount": zod.number().int()
+})
+export const ListTaxRulesResponse = zod.array(ListTaxRulesResponseItem)
+
+
+/**
+ * @summary Add a new tax rule version
+ */
+export const createTaxRuleBodyVersionMax = 100;
+
+export const createTaxRuleBodyEffectiveFromRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createTaxRuleBodyEffectiveToRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createTaxRuleBodyRegulatorySourceMax = 1000;
+
+export const createTaxRuleBodyDppRateBasisPointsMin = 0;
+export const createTaxRuleBodyDppRateBasisPointsMax = 10000;
+
+export const createTaxRuleBodyPpnRateBasisPointsMin = 0;
+export const createTaxRuleBodyPpnRateBasisPointsMax = 10000;
+
+export const createTaxRuleBodyPphFinalRateBasisPointsMin = 0;
+export const createTaxRuleBodyPphFinalRateBasisPointsMax = 10000;
+
+export const createTaxRuleBodyPph23RateBasisPointsMin = 0;
+export const createTaxRuleBodyPph23RateBasisPointsMax = 10000;
+
+
+
+export const CreateTaxRuleBody = zod.object({
+  "version": zod.string().min(1).max(createTaxRuleBodyVersionMax),
+  "effectiveFrom": zod.string().regex(createTaxRuleBodyEffectiveFromRegExp),
+  "effectiveTo": zod.string().regex(createTaxRuleBodyEffectiveToRegExp).nullish(),
+  "regulatorySource": zod.string().min(1).max(createTaxRuleBodyRegulatorySourceMax),
+  "serviceType": zod.enum(['KONSTRUKSI', 'JASA_LAIN']),
+  "qualification": zod.union([zod.literal('KECIL'),zod.literal('MENENGAH'),zod.literal('BESAR'),zod.literal('TANPA_KUALIFIKASI'),zod.literal(null)]).nullable(),
+  "requiresSbu": zod.boolean(),
+  "supplierPkp": zod.boolean(),
+  "governmentCollector": zod.boolean(),
+  "integrated": zod.boolean(),
+  "dppRateBasisPoints": zod.number().int().min(createTaxRuleBodyDppRateBasisPointsMin).max(createTaxRuleBodyDppRateBasisPointsMax),
+  "ppnRateBasisPoints": zod.number().int().min(createTaxRuleBodyPpnRateBasisPointsMin).max(createTaxRuleBodyPpnRateBasisPointsMax),
+  "pphFinalRateBasisPoints": zod.number().int().min(createTaxRuleBodyPphFinalRateBasisPointsMin).max(createTaxRuleBodyPphFinalRateBasisPointsMax),
+  "pph23RateBasisPoints": zod.number().int().min(createTaxRuleBodyPph23RateBasisPointsMin).max(createTaxRuleBodyPph23RateBasisPointsMax)
+})
+
+export const createTaxRuleResponseEffectiveFromRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createTaxRuleResponseEffectiveToRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const CreateTaxRuleResponse = zod.object({
+  "id": zod.string(),
+  "version": zod.string(),
+  "effectiveFrom": zod.string().regex(createTaxRuleResponseEffectiveFromRegExp),
+  "effectiveTo": zod.string().regex(createTaxRuleResponseEffectiveToRegExp).nullable(),
+  "regulatorySource": zod.string(),
+  "serviceType": zod.enum(['KONSTRUKSI', 'JASA_LAIN']),
+  "qualification": zod.union([zod.literal('KECIL'),zod.literal('MENENGAH'),zod.literal('BESAR'),zod.literal('TANPA_KUALIFIKASI'),zod.literal(null)]).nullable(),
+  "requiresSbu": zod.boolean(),
+  "supplierPkp": zod.boolean(),
+  "governmentCollector": zod.boolean(),
+  "integrated": zod.boolean(),
+  "dppRateBasisPoints": zod.number().int(),
+  "ppnRateBasisPoints": zod.number().int(),
+  "pphFinalRateBasisPoints": zod.number().int(),
+  "pph23RateBasisPoints": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "invoiceUsageCount": zod.number().int()
+})
+
+
+/**
  * @summary List audit activity
  */
 export const ListActivityResponseItem = zod.object({

@@ -202,6 +202,121 @@ export interface TaxSummary {
   reconciliation: number;
 }
 
+export type TaxRuleServiceType = typeof TaxRuleServiceType[keyof typeof TaxRuleServiceType];
+
+
+export const TaxRuleServiceType = {
+  KONSTRUKSI: 'KONSTRUKSI',
+  JASA_LAIN: 'JASA_LAIN',
+} as const;
+
+/**
+ * @nullable
+ */
+export type TaxRuleQualification = typeof TaxRuleQualification[keyof typeof TaxRuleQualification] | null;
+
+
+export const TaxRuleQualification = {
+  KECIL: 'KECIL',
+  MENENGAH: 'MENENGAH',
+  BESAR: 'BESAR',
+  TANPA_KUALIFIKASI: 'TANPA_KUALIFIKASI',
+} as const;
+
+export interface TaxRule {
+  id: string;
+  version: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  effectiveFrom: string;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  effectiveTo: string | null;
+  regulatorySource: string;
+  serviceType: TaxRuleServiceType;
+  /** @nullable */
+  qualification: TaxRuleQualification;
+  requiresSbu: boolean;
+  supplierPkp: boolean;
+  governmentCollector: boolean;
+  integrated: boolean;
+  dppRateBasisPoints: number;
+  ppnRateBasisPoints: number;
+  pphFinalRateBasisPoints: number;
+  pph23RateBasisPoints: number;
+  createdAt: string;
+  invoiceUsageCount: number;
+}
+
+export type TaxRuleInputServiceType = typeof TaxRuleInputServiceType[keyof typeof TaxRuleInputServiceType];
+
+
+export const TaxRuleInputServiceType = {
+  KONSTRUKSI: 'KONSTRUKSI',
+  JASA_LAIN: 'JASA_LAIN',
+} as const;
+
+/**
+ * @nullable
+ */
+export type TaxRuleInputQualification = typeof TaxRuleInputQualification[keyof typeof TaxRuleInputQualification] | null;
+
+
+export const TaxRuleInputQualification = {
+  KECIL: 'KECIL',
+  MENENGAH: 'MENENGAH',
+  BESAR: 'BESAR',
+  TANPA_KUALIFIKASI: 'TANPA_KUALIFIKASI',
+} as const;
+
+export interface TaxRuleInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  version: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  effectiveFrom: string;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  effectiveTo?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  regulatorySource: string;
+  serviceType: TaxRuleInputServiceType;
+  /** @nullable */
+  qualification: TaxRuleInputQualification;
+  requiresSbu: boolean;
+  supplierPkp: boolean;
+  governmentCollector: boolean;
+  integrated: boolean;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  dppRateBasisPoints: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  ppnRateBasisPoints: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  pphFinalRateBasisPoints: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  pph23RateBasisPoints: number;
+}
+
 export interface Activity {
   id: string;
   action: string;

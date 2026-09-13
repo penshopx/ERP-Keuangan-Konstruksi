@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
-import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -16,10 +16,12 @@ import {
   ListInvoicesResponse,
 } from "@workspace/api-zod";
 import { buildInvoiceNumber } from "../domain/invoice-number";
+import { taxRuleLockKey } from "../domain/tax-rule-lock";
 import { canAccessProject, requirePermission } from "../middlewares/access";
 
 export type InvoicePersistenceHooks = {
   beforeAuditInsert?: (invoiceId: string) => Promise<void>;
+  afterTaxRuleSelection?: (taxRuleId: string) => Promise<void>;
 };
 
 export function createInvoicesRouter(hooks: InvoicePersistenceHooks = {}): IRouter {
@@ -84,46 +86,53 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
     res.status(400).json({ error: "Opsi pekerjaan terintegrasi hanya berlaku untuk jasa konstruksi" });
     return;
   }
-  const [rule] = await db.select().from(taxRuleVersionsTable).where(and(
-    eq(taxRuleVersionsTable.serviceType, parsed.data.serviceType),
-    parsed.data.serviceType === "KONSTRUKSI"
-      ? eq(taxRuleVersionsTable.qualification, parsed.data.qualification)
-      : isNull(taxRuleVersionsTable.qualification),
-    eq(taxRuleVersionsTable.requiresSbu, parsed.data.hasSbu),
-    eq(taxRuleVersionsTable.supplierPkp, parsed.data.supplierPkp),
-    eq(taxRuleVersionsTable.governmentCollector, parsed.data.governmentCollector),
-    eq(taxRuleVersionsTable.integrated, parsed.data.integrated),
-    lte(taxRuleVersionsTable.effectiveFrom, parsed.data.issuedAt),
-    or(isNull(taxRuleVersionsTable.effectiveTo), gte(taxRuleVersionsTable.effectiveTo, parsed.data.issuedAt)),
-  )).orderBy(desc(taxRuleVersionsTable.effectiveFrom)).limit(1);
-  if (!rule) {
-    res.status(422).json({ error: "Tidak ada aturan pajak yang berlaku untuk kombinasi invoice ini" });
-    return;
-  }
-  const taxableDpp = Math.round(parsed.data.dpp * rule.dppRateBasisPoints / 10_000);
-  const ppn = parsed.data.supplierPkp ? Math.round(taxableDpp * rule.ppnRateBasisPoints / 10_000) : 0;
-  const pphFinal = Math.round(parsed.data.dpp * rule.pphFinalRateBasisPoints / 10_000);
-  const pph23 = Math.round(parsed.data.dpp * rule.pph23RateBasisPoints / 10_000);
-  const retention = Math.round(parsed.data.dpp * (parsed.data.retentionPercent / 100));
   const invoiceId = randomUUID();
-  const invoiceDraft = {
-    id: invoiceId,
-    number: `PENDING/${invoiceId}`,
-    projectId: project.id,
-    projectCode: project.code,
-    projectName: project.name,
-    period: parsed.data.period,
-    dpp: parsed.data.dpp,
-    ppn,
-    pphFinal,
-    retention,
-    pph23,
-    total: parsed.data.dpp + (parsed.data.governmentCollector ? 0 : ppn) - pphFinal - pph23 - retention,
-    status: "DRAF",
-    issuedAt: parsed.data.issuedAt,
-    taxRuleVersionId: rule.id,
-  };
-  const invoice = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    const criteriaKey = taxRuleLockKey({
+      serviceType: parsed.data.serviceType,
+      qualification: parsed.data.serviceType === "KONSTRUKSI" ? parsed.data.qualification : null,
+      requiresSbu: parsed.data.hasSbu,
+      supplierPkp: parsed.data.supplierPkp,
+      governmentCollector: parsed.data.governmentCollector,
+      integrated: parsed.data.integrated,
+    });
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`tax-rule:${criteriaKey}`}))`);
+    const [rule] = await tx.select().from(taxRuleVersionsTable).where(and(
+      eq(taxRuleVersionsTable.serviceType, parsed.data.serviceType),
+      parsed.data.serviceType === "KONSTRUKSI"
+        ? eq(taxRuleVersionsTable.qualification, parsed.data.qualification)
+        : isNull(taxRuleVersionsTable.qualification),
+      eq(taxRuleVersionsTable.requiresSbu, parsed.data.hasSbu),
+      eq(taxRuleVersionsTable.supplierPkp, parsed.data.supplierPkp),
+      eq(taxRuleVersionsTable.governmentCollector, parsed.data.governmentCollector),
+      eq(taxRuleVersionsTable.integrated, parsed.data.integrated),
+      lte(taxRuleVersionsTable.effectiveFrom, parsed.data.issuedAt),
+      or(isNull(taxRuleVersionsTable.effectiveTo), gte(taxRuleVersionsTable.effectiveTo, parsed.data.issuedAt)),
+    )).orderBy(desc(taxRuleVersionsTable.effectiveFrom)).limit(1);
+    if (!rule) return { invoice: null };
+    await hooks.afterTaxRuleSelection?.(rule.id);
+    const taxableDpp = Math.round(parsed.data.dpp * rule.dppRateBasisPoints / 10_000);
+    const ppn = parsed.data.supplierPkp ? Math.round(taxableDpp * rule.ppnRateBasisPoints / 10_000) : 0;
+    const pphFinal = Math.round(parsed.data.dpp * rule.pphFinalRateBasisPoints / 10_000);
+    const pph23 = Math.round(parsed.data.dpp * rule.pph23RateBasisPoints / 10_000);
+    const retention = Math.round(parsed.data.dpp * (parsed.data.retentionPercent / 100));
+    const invoiceDraft = {
+      id: invoiceId,
+      number: `PENDING/${invoiceId}`,
+      projectId: project.id,
+      projectCode: project.code,
+      projectName: project.name,
+      period: parsed.data.period,
+      dpp: parsed.data.dpp,
+      ppn,
+      pphFinal,
+      retention,
+      pph23,
+      total: parsed.data.dpp + (parsed.data.governmentCollector ? 0 : ppn) - pphFinal - pph23 - retention,
+      status: "DRAF",
+      issuedAt: parsed.data.issuedAt,
+      taxRuleVersionId: rule.id,
+    };
     const [created] = await tx.insert(invoicesTable).values(invoiceDraft).returning();
     const number = buildInvoiceNumber(project.code, parsed.data.issuedAt, created.sequence);
     const [stored] = await tx.update(invoicesTable)
@@ -165,9 +174,13 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
       actorRole: req.access!.role,
       tone: "info",
     });
-    return stored;
+    return { invoice: stored };
   });
-  res.status(201).json(CreateInvoiceResponse.parse(invoice));
+  if (!result.invoice) {
+    res.status(422).json({ error: "Tidak ada aturan pajak yang berlaku untuk kombinasi invoice ini" });
+    return;
+  }
+  res.status(201).json(CreateInvoiceResponse.parse(result.invoice));
 });
 
 return router;

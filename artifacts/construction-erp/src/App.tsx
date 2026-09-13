@@ -27,6 +27,7 @@ import ProjectDetail from '@/pages/ProjectDetail';
 import ProjectRab from '@/pages/ProjectRab';
 import Invoices from '@/pages/Invoices';
 import TaxSummary from '@/pages/TaxSummary';
+import TaxRules from '@/pages/TaxRules';
 import AuditActivity from '@/pages/AuditActivity';
 import AccessManagement from '@/pages/AccessManagement';
 
@@ -85,6 +86,7 @@ function Portal() {
           <Route path="/portal/projects/:id/rab" component={ProjectRab} />
           <Route path="/portal/invoices" component={Invoices} />
           <Route path="/portal/tax" component={TaxSummary} />
+          <Route path="/portal/tax-rules" component={TaxRules} />
           <Route path="/portal/audit" component={AuditActivity} />
           <Route path="/portal/access" component={AccessManagement} />
           <Route component={NotFound} />

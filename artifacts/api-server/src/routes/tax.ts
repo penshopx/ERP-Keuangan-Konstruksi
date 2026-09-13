@@ -1,9 +1,25 @@
+import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
-import { GetTaxSummaryQueryParams, GetTaxSummaryResponse } from "@workspace/api-zod";
-import { db, invoicesTable } from "@workspace/db";
+import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import {
+  CreateTaxRuleBody,
+  CreateTaxRuleResponse,
+  GetTaxSummaryQueryParams,
+  GetTaxSummaryResponse,
+  ListTaxRulesResponse,
+} from "@workspace/api-zod";
+import { auditLogsTable, db, invoicesTable, taxRuleVersionsTable } from "@workspace/db";
+import { taxRuleLockKey } from "../domain/tax-rule-lock";
 import { requirePermission } from "../middlewares/access";
 
 const router: IRouter = Router();
+
+function previousCalendarDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
 
 router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
   const parsed = GetTaxSummaryQueryParams.safeParse(req.query);
@@ -24,6 +40,130 @@ router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
     documents: 18,
     reconciliation: 99.8,
   }));
+});
+
+router.get("/tax/rules", requirePermission("tax-rules:manage"), async (_req, res): Promise<void> => {
+  const rules = await db.select({
+    id: taxRuleVersionsTable.id,
+    version: taxRuleVersionsTable.version,
+    effectiveFrom: taxRuleVersionsTable.effectiveFrom,
+    effectiveTo: taxRuleVersionsTable.effectiveTo,
+    regulatorySource: taxRuleVersionsTable.regulatorySource,
+    serviceType: taxRuleVersionsTable.serviceType,
+    qualification: taxRuleVersionsTable.qualification,
+    requiresSbu: taxRuleVersionsTable.requiresSbu,
+    supplierPkp: taxRuleVersionsTable.supplierPkp,
+    governmentCollector: taxRuleVersionsTable.governmentCollector,
+    integrated: taxRuleVersionsTable.integrated,
+    dppRateBasisPoints: taxRuleVersionsTable.dppRateBasisPoints,
+    ppnRateBasisPoints: taxRuleVersionsTable.ppnRateBasisPoints,
+    pphFinalRateBasisPoints: taxRuleVersionsTable.pphFinalRateBasisPoints,
+    pph23RateBasisPoints: taxRuleVersionsTable.pph23RateBasisPoints,
+    createdAt: taxRuleVersionsTable.createdAt,
+    invoiceUsageCount: sql<number>`count(${invoicesTable.id})::int`,
+  }).from(taxRuleVersionsTable)
+    .leftJoin(invoicesTable, eq(invoicesTable.taxRuleVersionId, taxRuleVersionsTable.id))
+    .groupBy(taxRuleVersionsTable.id)
+    .orderBy(desc(taxRuleVersionsTable.effectiveFrom), desc(taxRuleVersionsTable.createdAt));
+  res.json(ListTaxRulesResponse.parse(rules));
+});
+
+router.post("/tax/rules", requirePermission("tax-rules:manage"), async (req, res): Promise<void> => {
+  const parsed = CreateTaxRuleBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Data aturan pajak tidak valid. Sumber regulasi dan tanggal berlaku wajib diisi." });
+    return;
+  }
+  const data = {
+    ...parsed.data,
+    version: parsed.data.version.trim(),
+    regulatorySource: parsed.data.regulatorySource.trim(),
+    effectiveTo: parsed.data.effectiveTo ?? null,
+    qualification: parsed.data.qualification ?? null,
+  };
+  if (!data.version || !data.regulatorySource || (data.effectiveTo && data.effectiveTo < data.effectiveFrom)) {
+    res.status(400).json({ error: "Versi, sumber regulasi, dan periode berlaku harus valid." });
+    return;
+  }
+  if (data.serviceType === "JASA_LAIN" && (data.qualification !== null || data.requiresSbu || data.integrated)) {
+    res.status(400).json({ error: "Kualifikasi, SBU, dan pekerjaan terintegrasi hanya berlaku untuk jasa konstruksi." });
+    return;
+  }
+  if (data.serviceType === "KONSTRUKSI" && data.qualification === null) {
+    res.status(400).json({ error: "Kualifikasi wajib diisi untuk jasa konstruksi." });
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const criteriaKey = taxRuleLockKey(data);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`tax-rule:${criteriaKey}`}))`);
+    const [sameVersion] = await tx.select({ id: taxRuleVersionsTable.id }).from(taxRuleVersionsTable)
+      .where(eq(taxRuleVersionsTable.version, data.version)).limit(1);
+    if (sameVersion) return { conflict: "version" as const };
+    const overlaps = await tx.select({
+      id: taxRuleVersionsTable.id,
+      effectiveFrom: taxRuleVersionsTable.effectiveFrom,
+      effectiveTo: taxRuleVersionsTable.effectiveTo,
+    }).from(taxRuleVersionsTable)
+      .where(and(
+        eq(taxRuleVersionsTable.serviceType, data.serviceType),
+        data.qualification === null
+          ? isNull(taxRuleVersionsTable.qualification)
+          : eq(taxRuleVersionsTable.qualification, data.qualification),
+        eq(taxRuleVersionsTable.requiresSbu, data.requiresSbu),
+        eq(taxRuleVersionsTable.supplierPkp, data.supplierPkp),
+        eq(taxRuleVersionsTable.governmentCollector, data.governmentCollector),
+        eq(taxRuleVersionsTable.integrated, data.integrated),
+        or(isNull(taxRuleVersionsTable.effectiveTo), gte(taxRuleVersionsTable.effectiveTo, data.effectiveFrom)),
+        data.effectiveTo ? lte(taxRuleVersionsTable.effectiveFrom, data.effectiveTo) : undefined,
+      ));
+    let supersededRuleId: string | undefined;
+    if (overlaps.length > 0) {
+      const [openEnded] = overlaps;
+      const canSupersede = overlaps.length === 1
+        && openEnded.effectiveTo === null
+        && openEnded.effectiveFrom < data.effectiveFrom;
+      if (!canSupersede) return { conflict: "period" as const };
+      const [affectedInvoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable)
+        .where(and(
+          eq(invoicesTable.taxRuleVersionId, openEnded.id),
+          gte(invoicesTable.issuedAt, data.effectiveFrom),
+        )).limit(1);
+      if (affectedInvoice) return { conflict: "historical" as const };
+      await tx.update(taxRuleVersionsTable)
+        .set({ effectiveTo: previousCalendarDate(data.effectiveFrom) })
+        .where(eq(taxRuleVersionsTable.id, openEnded.id));
+      supersededRuleId = openEnded.id;
+    }
+    const [created] = await tx.insert(taxRuleVersionsTable).values({
+      id: randomUUID(),
+      ...data,
+    }).returning();
+    await tx.insert(auditLogsTable).values({
+      id: randomUUID(),
+      action: "ATURAN PAJAK DITAMBAHKAN",
+      entity: "Aturan Pajak",
+      entityId: created.id,
+      detail: `${created.version} · berlaku ${created.effectiveFrom}${created.effectiveTo ? ` s.d. ${created.effectiveTo}` : " dan seterusnya"}`,
+      user: req.access!.displayName,
+      actorUserId: req.access!.userId,
+      actorRole: req.access!.role,
+      tone: "info",
+      metadata: { regulatorySource: created.regulatorySource },
+    });
+    return { created, supersededRuleId };
+  });
+  if ("conflict" in result) {
+    res.status(409).json({
+      error: result.conflict === "version"
+        ? "Nama versi aturan sudah digunakan."
+        : result.conflict === "historical"
+          ? "Tanggal berlaku akan mengubah aturan untuk invoice yang sudah dibuat."
+        : "Periode berlaku tumpang tindih dengan aturan berkriteria sama.",
+    });
+    return;
+  }
+  res.status(201).json(CreateTaxRuleResponse.parse({ ...result.created, invoiceUsageCount: 0 }));
 });
 
 export default router;

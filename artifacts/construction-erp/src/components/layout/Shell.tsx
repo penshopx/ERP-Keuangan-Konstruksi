@@ -4,6 +4,7 @@ import {
   LayoutDashboard, 
   ReceiptText, 
   Calculator,
+  Scale,
   History,
   Settings,
   Bell
@@ -17,7 +18,8 @@ const navigation = [
   { name: "Dashboard", href: "/portal", icon: LayoutDashboard },
   { name: "Projects", href: "/portal/projects", icon: Building2, permission: "projects:view" },
   { name: "Invoices", href: "/portal/invoices", icon: ReceiptText, permission: "invoices:view" },
-  { name: "Tax & Recon", href: "/portal/tax", icon: Calculator, permission: "tax:view" },
+  { name: "Tax & Recon", href: "/portal/tax", icon: Calculator, permission: "tax:view", exact: true },
+  { name: "Aturan Pajak", href: "/portal/tax-rules", icon: Scale, permission: "tax-rules:manage" },
   { name: "Audit Trail", href: "/portal/audit", icon: History, permission: "audit:view" },
   { name: "Hak Akses", href: "/portal/access", icon: Settings, role: "DIRECTOR" },
 ]
@@ -42,7 +44,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-auto py-4">
           <nav className="grid items-start px-4 text-sm font-medium gap-1">
             {navigation.filter((item) => (!item.permission || hasPermission(access, item.permission)) && (!item.role || item.role === access.role)).map((item) => {
-              const isActive = item.href === "/portal" ? location === "/portal" : location.startsWith(item.href)
+              const isActive = item.href === "/portal" || item.exact ? location === item.href : location.startsWith(item.href)
               return (
                 <Link
                   key={item.name}
