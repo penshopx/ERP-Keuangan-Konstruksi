@@ -212,6 +212,7 @@ export const importProjectRabTemplateBodyPriceFactorMin = 0.01;
 export const importProjectRabTemplateBodyPriceFactorMax = 100;
 
 
+
 export const ImportProjectRabTemplateBody = zod.object({
   "templateId": zod.string(),
   "priceFactor": zod.number().min(importProjectRabTemplateBodyPriceFactorMin).max(importProjectRabTemplateBodyPriceFactorMax).describe('Multiplier used to adjust reference prices to the project location and period')
@@ -303,10 +304,13 @@ export const ListInvoicesResponseItem = zod.object({
 })
 export const ListInvoicesResponse = zod.array(ListInvoicesResponseItem)
 
+
 /**
  * @summary Create invoice with automatic tax calculation
  */
 export const createInvoiceBodyIssuedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
 export const CreateInvoiceBody = zod.object({
   "projectId": zod.string(),
   "period": zod.string(),
@@ -398,11 +402,54 @@ export const ListAccessUsersResponse = zod.array(ListAccessUsersResponseItem)
 
 
 /**
+ * @summary List pending and expired staff invitations
+ */
+export const ListAccessInvitationsResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "displayName": zod.string(),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string()),
+  "status": zod.enum(['PENDING', 'EXPIRED']),
+  "expiresAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAccessInvitationsResponse = zod.array(ListAccessInvitationsResponseItem)
+
+
+/**
+ * @summary Invite staff and prepare access before first sign-in
+ */
+
+
+
+export const CreateAccessInvitationBody = zod.object({
+  "email": zod.string().email(),
+  "displayName": zod.string().min(1),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string())
+})
+
+export const CreateAccessInvitationResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "displayName": zod.string(),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string()),
+  "status": zod.enum(['PENDING', 'EXPIRED']),
+  "expiresAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Assign a role and projects to a user
  */
 export const UpdateAccessUserParams = zod.object({
   "userId": zod.coerce.string()
 })
+
+
 
 
 export const UpdateAccessUserBody = zod.object({
@@ -429,6 +476,7 @@ export const DecideInvoiceParams = zod.object({
 export const decideInvoiceBodyNoteMax = 500;
 
 
+
 export const DecideInvoiceBody = zod.object({
   "decision": zod.enum(['APPROVE', 'REJECT']),
   "note": zod.string().max(decideInvoiceBodyNoteMax).optional()
@@ -451,4 +499,5 @@ export const DecideInvoiceResponse = zod.object({
   "issuedAt": zod.string(),
   "taxRuleVersionId": zod.string().nullable()
 })
+
 

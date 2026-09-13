@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
-import { eq, inArray } from "drizzle-orm";
-import { auditLogsTable, db, invoicesTable, projectAssignmentsTable, projectsTable, userRolesTable } from "@workspace/db";
+import { clerkClient } from "@clerk/express";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { auditLogsTable, db, invoicesTable, projectAssignmentsTable, projectsTable, staffInvitationProjectsTable, staffInvitationsTable, userRolesTable } from "@workspace/db";
 import {
   DecideInvoiceBody,
   DecideInvoiceParams,
   DecideInvoiceResponse,
   GetCurrentUserResponse,
+  CreateAccessInvitationBody,
+  CreateAccessInvitationResponse,
+  ListAccessInvitationsResponse,
   ListAccessUsersResponse,
   UpdateAccessUserBody,
   UpdateAccessUserParams,
@@ -33,6 +37,95 @@ router.get("/access/users", async (req, res) => {
     role: user.role,
     assignedProjectIds: assignments.filter((item) => item.userId === user.userId).map((item) => item.projectId),
   }))));
+});
+
+router.get("/access/invitations", async (req, res) => {
+  if (req.access?.role !== "DIRECTOR") {
+    res.status(403).json({ error: "Hanya Director yang dapat melihat undangan" });
+    return;
+  }
+  const invitations = (await db.select().from(staffInvitationsTable))
+    .filter((invite) => invite.status !== "ACCEPTED");
+  const projects = await db.select().from(staffInvitationProjectsTable);
+  const now = new Date();
+  res.json(ListAccessInvitationsResponse.parse(invitations.map((invite) => ({
+    id: invite.id,
+    email: invite.email,
+    displayName: invite.displayName,
+    role: invite.role,
+    assignedProjectIds: projects.filter((item) => item.invitationId === invite.id).map((item) => item.projectId),
+    status: invite.status === "EXPIRED" || invite.expiresAt <= now ? "EXPIRED" : "PENDING",
+    expiresAt: invite.expiresAt.toISOString(),
+    createdAt: invite.createdAt.toISOString(),
+  }))));
+});
+
+router.post("/access/invitations", async (req, res) => {
+  if (req.access?.role !== "DIRECTOR") {
+    res.status(403).json({ error: "Hanya Director yang dapat mengundang staf" });
+    return;
+  }
+  const body = CreateAccessInvitationBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Data undangan tidak valid" });
+    return;
+  }
+  const email = body.data.email.trim().toLowerCase();
+  if (body.data.assignedProjectIds.length > 0) {
+    const projects = await db.select({ id: projectsTable.id }).from(projectsTable)
+      .where(inArray(projectsTable.id, body.data.assignedProjectIds));
+    if (projects.length !== new Set(body.data.assignedProjectIds).size) {
+      res.status(400).json({ error: "Salah satu proyek penugasan tidak ditemukan" });
+      return;
+    }
+  }
+  let createdClerkInvitationId: string | undefined;
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`erp-staff-invite:${email}`}))`);
+    const existing = await tx.select().from(staffInvitationsTable)
+      .where(and(eq(staffInvitationsTable.email, email), eq(staffInvitationsTable.status, "PENDING"))).limit(1);
+    if (existing.some((invite) => invite.expiresAt > new Date())) return { conflict: true } as const;
+    await tx.update(staffInvitationsTable).set({ status: "EXPIRED" })
+      .where(and(eq(staffInvitationsTable.email, email), eq(staffInvitationsTable.status, "PENDING")));
+    const clerkInvitation = await clerkClient.invitations.createInvitation({
+      emailAddress: email,
+      expiresInDays: 30,
+      ignoreExisting: true,
+      publicMetadata: { source: "construction-erp" },
+    });
+    createdClerkInvitationId = clerkInvitation.id;
+    const id = randomUUID();
+    const createdAt = new Date(clerkInvitation.createdAt);
+    const expiresAt = new Date(createdAt.getTime() + 30 * 86_400_000);
+    await tx.insert(staffInvitationsTable).values({
+      id, clerkInvitationId: clerkInvitation.id, email, displayName: body.data.displayName.trim(),
+      role: body.data.role, expiresAt, invitedByUserId: req.access!.userId,
+    });
+    if (body.data.assignedProjectIds.length) {
+      await tx.insert(staffInvitationProjectsTable).values(body.data.assignedProjectIds.map((projectId) => ({ invitationId: id, projectId })));
+    }
+    await tx.insert(auditLogsTable).values({
+      id: randomUUID(), action: "STAF DIUNDANG", entity: "Undangan", entityId: id,
+      detail: `${body.data.displayName.trim()} · ${email} · ${body.data.role}`, user: req.access!.displayName,
+      actorUserId: req.access!.userId, actorRole: req.access!.role, tone: "info",
+      metadata: { email, role: body.data.role, assignedProjectIds: body.data.assignedProjectIds },
+    });
+    return { conflict: false, id, createdAt, expiresAt } as const;
+  }).catch(async (error) => {
+    if (createdClerkInvitationId) {
+      await clerkClient.invitations.revokeInvitation(createdClerkInvitationId).catch(() => undefined);
+    }
+    throw error;
+  });
+  if (result.conflict) {
+    res.status(409).json({ error: "Undangan aktif untuk email ini sudah ada" });
+    return;
+  }
+  res.status(201).json(CreateAccessInvitationResponse.parse({
+    id: result.id, email, displayName: body.data.displayName.trim(), role: body.data.role,
+    assignedProjectIds: body.data.assignedProjectIds, status: "PENDING",
+    expiresAt: result.expiresAt.toISOString(), createdAt: result.createdAt.toISOString(),
+  }));
 });
 
 router.put("/access/users/:userId", async (req, res) => {

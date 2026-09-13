@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { getListAccessUsersQueryKey, useListAccessUsers, useListProjects, useUpdateAccessUser, type AccessUser, type AccessUserUpdateRole, type Project } from "@workspace/api-client-react";
+import {
+  getListAccessInvitationsQueryKey,
+  getListAccessUsersQueryKey,
+  useCreateAccessInvitation,
+  useListAccessInvitations,
+  useListAccessUsers,
+  useListProjects,
+  useUpdateAccessUser,
+  type AccessInvitationInputRole,
+  type AccessUser,
+  type AccessUserUpdateRole,
+  type Project,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,11 +24,48 @@ const roles = ["DIRECTOR", "PROJECT_MANAGER", "SITE_MANAGER", "FINANCE", "TAX_ST
 
 export default function AccessManagement() {
   const { data: users, isLoading } = useListAccessUsers();
+  const { data: invitations } = useListAccessInvitations();
   const { data: projects } = useListProjects();
   if (isLoading) return <div>Memuat pengguna...</div>;
-  return <div className="space-y-6"><div><h1 className="text-3xl font-bold">Hak Akses</h1><p className="text-muted-foreground">Tetapkan jabatan dan proyek untuk setiap pengguna yang pernah masuk.</p></div>
+  return <div className="space-y-6"><div><h1 className="text-3xl font-bold">Hak Akses</h1><p className="text-muted-foreground">Undang staf dan siapkan jabatan serta proyek sebelum mereka pertama kali masuk.</p></div>
+    <InviteCard projects={projects ?? []} />
+    {invitations && invitations.length > 0 && <Card><CardHeader><CardTitle className="text-base">Undangan staf</CardTitle></CardHeader><CardContent className="grid gap-3">
+      {invitations.map((invite) => <div key={invite.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+        <div><p className="font-medium">{invite.displayName}</p><p className="text-sm text-muted-foreground">{invite.email} · {invite.role.replaceAll("_", " ")}</p></div>
+        <div className="text-right"><span className={invite.status === "PENDING" ? "text-sm font-medium text-amber-600" : "text-sm font-medium text-red-600"}>{invite.status === "PENDING" ? "Tertunda" : "Kedaluwarsa"}</span><p className="text-xs text-muted-foreground">berakhir {new Date(invite.expiresAt).toLocaleDateString("id-ID")}</p></div>
+      </div>)}
+    </CardContent></Card>}
     <div className="grid gap-4">{users?.map((user) => <AccessCard key={user.userId} user={user} projects={projects ?? []} />)}</div>
   </div>;
+}
+
+function InviteCard({ projects }: { projects: Project[] }) {
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState<AccessInvitationInputRole>("SITE_MANAGER");
+  const [assigned, setAssigned] = useState<string[]>([]);
+  const [message, setMessage] = useState("");
+  const create = useCreateAccessInvitation();
+  const client = useQueryClient();
+  const toggle = (id: string) => setAssigned((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const submit = () => {
+    setMessage("");
+    create.mutate({ data: { email, displayName, role, assignedProjectIds: role === "PROJECT_MANAGER" ? assigned : [] } }, {
+      onSuccess: () => {
+        setEmail(""); setDisplayName(""); setAssigned([]);
+        setMessage("Undangan berhasil dikirim.");
+        client.invalidateQueries({ queryKey: getListAccessInvitationsQueryKey() });
+      },
+      onError: () => setMessage("Undangan gagal dikirim. Periksa email atau undangan yang masih aktif."),
+    });
+  };
+  return <Card><CardHeader><CardTitle className="text-base">Undang staf baru</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
+    <div className="space-y-2"><Label>Nama staf</Label><Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Nama lengkap" /></div>
+    <div className="space-y-2"><Label>Email kerja</Label><Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nama@perusahaan.com" /></div>
+    <div className="space-y-2"><Label>Jabatan</Label><Select value={role} onValueChange={(value) => setRole(value as typeof role)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((item) => <SelectItem key={item} value={item}>{item.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></div>
+    <div className="space-y-2"><Label>Proyek PM</Label><div className="flex min-h-10 flex-wrap items-center gap-3">{role === "PROJECT_MANAGER" ? projects.map((project) => <label key={project.id} className="flex items-center gap-2 text-sm"><Checkbox checked={assigned.includes(project.id)} onCheckedChange={() => toggle(project.id)} />{project.code}</label>) : <span className="text-sm text-muted-foreground">Hanya diperlukan untuk Project Manager</span>}</div></div>
+    <div className="flex items-center gap-3 md:col-span-2"><Button disabled={create.isPending || !displayName.trim() || !email.includes("@")} onClick={submit}>{create.isPending ? "Mengirim..." : "Kirim undangan"}</Button>{message && <p className="text-sm text-muted-foreground">{message}</p>}</div>
+  </CardContent></Card>;
 }
 
 function AccessCard({ user, projects }: { user: AccessUser, projects: Project[] }) {

@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accessInvitation';
+export * from './accessInvitationInput';
+export * from './accessInvitationInputRole';
+export * from './accessInvitationRole';
+export * from './accessInvitationStatus';
 export * from './accessUser';
 export * from './accessUserRole';
 export * from './accessUserUpdate';

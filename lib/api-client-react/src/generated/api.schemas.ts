@@ -121,8 +121,6 @@ export interface RabSummary {
   items: RabItem[];
 }
 
-export type InvoiceInputServiceType = typeof InvoiceInputServiceType[keyof typeof InvoiceInputServiceType];
-
 export interface RabTemplateItem {
   code: string;
   /** @nullable */
@@ -159,6 +157,25 @@ export interface RabTemplateImportInput {
      */
   priceFactor: number;
 }
+
+export type InvoiceInputServiceType = typeof InvoiceInputServiceType[keyof typeof InvoiceInputServiceType];
+
+
+export const InvoiceInputServiceType = {
+  KONSTRUKSI: 'KONSTRUKSI',
+  JASA_LAIN: 'JASA_LAIN',
+} as const;
+
+export type InvoiceInputQualification = typeof InvoiceInputQualification[keyof typeof InvoiceInputQualification];
+
+
+export const InvoiceInputQualification = {
+  KECIL: 'KECIL',
+  MENENGAH: 'MENENGAH',
+  BESAR: 'BESAR',
+  TANPA_KUALIFIKASI: 'TANPA_KUALIFIKASI',
+  TIDAK_BERLAKU: 'TIDAK_BERLAKU',
+} as const;
 
 export interface InvoiceInput {
   projectId: string;
@@ -268,6 +285,57 @@ export interface AccessUserUpdate {
   assignedProjectIds: string[];
 }
 
+export type AccessInvitationRole = typeof AccessInvitationRole[keyof typeof AccessInvitationRole];
+
+
+export const AccessInvitationRole = {
+  DIRECTOR: 'DIRECTOR',
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  SITE_MANAGER: 'SITE_MANAGER',
+  FINANCE: 'FINANCE',
+  TAX_STAFF: 'TAX_STAFF',
+  PROCUREMENT: 'PROCUREMENT',
+} as const;
+
+export type AccessInvitationStatus = typeof AccessInvitationStatus[keyof typeof AccessInvitationStatus];
+
+
+export const AccessInvitationStatus = {
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccessInvitation {
+  id: string;
+  email: string;
+  displayName: string;
+  role: AccessInvitationRole;
+  assignedProjectIds: string[];
+  status: AccessInvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export type AccessInvitationInputRole = typeof AccessInvitationInputRole[keyof typeof AccessInvitationInputRole];
+
+
+export const AccessInvitationInputRole = {
+  DIRECTOR: 'DIRECTOR',
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  SITE_MANAGER: 'SITE_MANAGER',
+  FINANCE: 'FINANCE',
+  TAX_STAFF: 'TAX_STAFF',
+  PROCUREMENT: 'PROCUREMENT',
+} as const;
+
+export interface AccessInvitationInput {
+  email: string;
+  /** @minLength 1 */
+  displayName: string;
+  role: AccessInvitationInputRole;
+  assignedProjectIds: string[];
+}
+
 export type ListProjectsParams = {
 status?: string;
 search?: string;
@@ -282,18 +350,3 @@ export type GetTaxSummaryParams = {
 period?: string;
 };
 
-
-export const InvoiceInputServiceType = {
-  KONSTRUKSI: 'KONSTRUKSI',
-  JASA_LAIN: 'JASA_LAIN',
-} as const;
-
-export const InvoiceInputQualification = {
-  KECIL: 'KECIL',
-  MENENGAH: 'MENENGAH',
-  BESAR: 'BESAR',
-  TANPA_KUALIFIKASI: 'TANPA_KUALIFIKASI',
-  TIDAK_BERLAKU: 'TIDAK_BERLAKU',
-} as const;
-
-export type InvoiceInputQualification = typeof InvoiceInputQualification[keyof typeof InvoiceInputQualification];

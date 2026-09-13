@@ -270,6 +270,37 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AccessUser"
+  /access/invitations:
+    get:
+      operationId: listAccessInvitations
+      tags: [access]
+      summary: List pending and expired staff invitations
+      responses:
+        "200":
+          description: Invitation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccessInvitation"
+    post:
+      operationId: createAccessInvitation
+      tags: [access]
+      summary: Invite staff and prepare access before first sign-in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessInvitationInput"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessInvitation"
   /access/users/{userId}:
     put:
       operationId: updateAccessUser
@@ -588,6 +619,36 @@ components:
       type: object
       required: [displayName, role, assignedProjectIds]
       properties:
+        displayName: { type: string, minLength: 1 }
+        role:
+          type: string
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+        assignedProjectIds:
+          type: array
+          items: { type: string }
+    AccessInvitation:
+      type: object
+      required: [id, email, displayName, role, assignedProjectIds, status, expiresAt, createdAt]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        role:
+          type: string
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+        assignedProjectIds:
+          type: array
+          items: { type: string }
+        status:
+          type: string
+          enum: [PENDING, EXPIRED]
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    AccessInvitationInput:
+      type: object
+      required: [email, displayName, role, assignedProjectIds]
+      properties:
+        email: { type: string, format: email }
         displayName: { type: string, minLength: 1 }
         role:
           type: string
