@@ -1,0 +1,214 @@
+# ✅ KLARIFIKASI ARSITEKTUR DISETUJUI
+
+Terima kasih atas koreksi kritis ini. Saya sekarang paham constraint yang benar:
+
+## 🏗️ ARSITEKTUR FINAL (Replit-Managed Clerk)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              CLERK (Replit-Managed)                      │
+│  ✓ User identity (email, password, session)            │
+│  ✓ Invitation system (email invitation)                │
+│  ✓ Session management (JWT tokens)                     │
+│  ✗ Organizations (TIDAK SUPPORTED)                     │
+│  ✗ Organization roles (org:finance, dll)               │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+              [Clerk JWT Token di setiap request]
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│              POSTGRESQL (Internal DB)                    │
+│  ✓ users table (mapping clerk_user_id → internal data) │
+│  ✓ roles table (SUPER_ADMIN, DIRECTOR, FINANCE, dll)   │
+│  ✓ user_roles (many-to-many: user ↔ role)              │
+│  ✓ user_projects (many-to-many: user ↔ project)        │
+│  ✓ projects, invoices, RAB, dll                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+## 🔄 FLOW YANG BENAR
+
+```
+1. Director invite user via Clerk API
+   → Clerk kirim email invitation
+   → User accept → jadi Clerk user
+   → clerk_user_id tercipta
+
+2. User login pertama kali
+   → Backend extract clerk_user_id dari JWT
+   → Cek tabel users: apakah clerk_user_id sudah ada?
+   → Jika BELUM ada → create user record di PostgreSQL
+   → Assign default role (misal: VIEWER) atau biarkan unassigned
+
+3. Director assign role & project
+   → Director pilih user dari list (yang sudah login)
+   → Assign role: FINANCE, PROJECT_MANAGER, dll
+   → Assign project access: PROJ-001, PROJ-002, dll
+   → Simpan di user_roles & user_projects tables
+
+4. Subsequent requests
+   → Backend extract clerk_user_id dari JWT
+   → Lookup role & project access dari PostgreSQL
+   → Enforce RBAC berdasarkan data internal
+```
+
+## 📋 IMPLIKASI UNTUK TASK INVITATION YANG SEDANG BERJALAN
+
+Task agent yang sedang mengerjakan invitation system harus:
+
+### ✅ Yang HARUS Ada:
+```typescript
+// 1. Clerk invitation (tanpa organization roles)
+await clerkClient.invitations.createInvitation({
+  emailAddress: 'staff@example.com',
+  // JANGAN pakai: role: 'org:finance'
+  // BOLEH pakai publicMetadata untuk tracking:
+  publicMetadata: {
+    invitedBy: 'director-clerk-id',
+    invitedAt: '2026-09-13T10:00:00Z'
+  }
+});
+
+// 2. User record di PostgreSQL (created saat first login atau via webhook optional)
+users table:
+  id (uuid, PK)
+  clerk_user_id (unique, from Clerk)
+  email (from Clerk)
+  name (from Clerk)
+  created_at (saat first login)
+  last_login_at
+
+// 3. Role assignment di PostgreSQL
+roles table:
+  id, name (SUPER_ADMIN, DIRECTOR, FINANCE, PROJECT_MANAGER, SITE_MANAGER, TAX_STAFF, PROCUREMENT, VIEWER)
+
+user_roles table:
+  user_id (FK → users)
+  role_id (FK → roles)
+  assigned_at
+  assigned_by (FK → users)
+
+// 4. Project assignment di PostgreSQL
+user_projects table:
+  user_id (FK → users)
+  project_id (FK → projects)
+  assigned_at
+  assigned_by (FK → users)
+```
+
+### ❌ Yang TIDAK BOLEH Ada:
+```typescript
+// JANGAN lakukan ini:
+await clerkClient.organizations.create(...) // Not supported
+await clerkClient.invitations.createInvitation({
+  role: 'org:finance' // Not supported
+})
+
+// JANGAN rely on Clerk untuk:
+// - Role management
+// - Project assignment
+// - Business logic authorization
+```
+
+## 🎯 MIDDLEWARE AUTH (Contoh Implementasi)
+
+```typescript
+// middleware/auth.ts
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  // 1. Extract Clerk token
+  const { userId } = getAuth(req); // dari @clerk/clerk-sdk-node
+  
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  // 2. Lookup internal user
+  const user = await db.query.users.findFirst({
+    where: eq(users.clerkUserId, userId)
+  });
+  
+  if (!user) {
+    // User baru login pertama kali, create record
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const newUser = await db.insert(users).values({
+      clerkUserId: userId,
+      email: clerkUser.emailAddresses[0].emailAddress,
+      name: `${clerkUser.firstName} ${clerkUser.lastName}`.trim(),
+      createdAt: new Date()
+    }).returning();
+    
+    req.user = newUser[0];
+  } else {
+    req.user = user;
+  }
+  
+  // 3. Load roles & project access
+  req.userRoles = await getUserRoles(req.user.id);
+  req.userProjects = await getUserProjectIds(req.user.id);
+  
+  next();
+}
+
+// middleware/rbac.ts
+export function requireRole(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const userRoleNames = req.userRoles.map(r => r.name);
+    const hasRole = roles.some(role => userRoleNames.includes(role));
+    
+    if (!hasRole) {
+      return res.status(403).json({ 
+        error: 'Forbidden',
+        message: `Required roles: ${roles.join(', ')}`
+      });
+    }
+    
+    next();
+  };
+}
+
+export function requireProjectAccess(req: Request, res: Response, next: NextFunction) {
+  const projectId = req.params.projectId;
+  
+  // SUPER_ADMIN & DIRECTOR bisa akses semua project
+  const isAdmin = req.userRoles.some(r => 
+    r.name === 'SUPER_ADMIN' || r.name === 'DIRECTOR'
+  );
+  
+  if (isAdmin) {
+    return next();
+  }
+  
+  // Check project access
+  if (!req.userProjects.includes(projectId)) {
+    return res.status(403).json({ 
+      error: 'Forbidden',
+      message: 'No access to this project'
+    });
+  }
+  
+  next();
+}
+```
+
+## ✅ STATUS & NEXT STEPS
+
+### Current State:
+- ✅ Task invitation system sedang berjalan
+- ✅ Arsitektur sudah jelas: Clerk (auth) + PostgreSQL (business logic)
+- ✅ Tidak akan interrupt task yang sedang berjalan
+
+### Setelah Task Invitation Selesai:
+1. **Validasi flow**:
+   - Director bisa invite user
+   - User accept invitation → login pertama
+   - Director assign role & project
+   - RBAC bekerja dengan benar
+
+2. **Lanjut ke modul berikutnya**:
+   - RAB Management
+   - Procurement & Budget Control
+   - Retention & Cashflow
+
+---
+
+**Apakah ada yang perlu saya klarifikasi lebih lanjut tentang arsitektur ini, atau kita tunggu sampai task invitation selesai?**
