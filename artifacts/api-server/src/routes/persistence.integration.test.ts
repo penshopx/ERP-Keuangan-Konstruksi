@@ -17,9 +17,11 @@ import {
 import { createApiRouter } from "./index";
 import type { AccessContext } from "../middlewares/access";
 import type { InvoicePersistenceHooks } from "./invoices";
+import type { ProjectPersistenceHooks } from "./projects";
 
 const runId = randomUUID();
 const projectCode = `TST-${runId.slice(0, 8)}`;
+const testProjectCodes = [projectCode];
 const taxRuleId = "tax-2022-construction-TANPA_KUALIFIKASI-true-false-false";
 const createdEntityIds: string[] = [];
 const createdTaxRuleIds: string[] = [];
@@ -38,19 +40,27 @@ const access: AccessContext = {
   permissions: [],
 };
 
-function createTestApp(invoicePersistenceHooks: InvoicePersistenceHooks = {}, testAccess: AccessContext = access): Express {
+function createTestApp(
+  invoicePersistenceHooks: InvoicePersistenceHooks = {},
+  testAccess: AccessContext = access,
+  projectPersistenceHooks: ProjectPersistenceHooks = {},
+): Express {
   const app = express();
   app.use(express.json());
   const testAccessMiddleware: express.RequestHandler = (req, _res, next) => {
     req.access = testAccess;
     next();
   };
-  app.use("/api", createApiRouter(testAccessMiddleware, invoicePersistenceHooks));
+  app.use("/api", createApiRouter(testAccessMiddleware, invoicePersistenceHooks, projectPersistenceHooks));
   return app;
 }
 
-async function startTestServer(invoicePersistenceHooks: InvoicePersistenceHooks = {}, testAccess: AccessContext = access) {
-  const server = createTestApp(invoicePersistenceHooks, testAccess).listen(0, "127.0.0.1");
+async function startTestServer(
+  invoicePersistenceHooks: InvoicePersistenceHooks = {},
+  testAccess: AccessContext = access,
+  projectPersistenceHooks: ProjectPersistenceHooks = {},
+) {
+  const server = createTestApp(invoicePersistenceHooks, testAccess, projectPersistenceHooks).listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);
     server.once("error", reject);
@@ -81,11 +91,11 @@ after(async () => {
     }
     const testProjects = await tx.select({ id: projectsTable.id })
       .from(projectsTable)
-      .where(eq(projectsTable.code, projectCode));
+      .where(inArray(projectsTable.code, testProjectCodes));
     if (testProjects.length > 0) {
       await tx.delete(invoicesTable).where(inArray(invoicesTable.projectId, testProjects.map(({ id }) => id)));
     }
-    await tx.delete(projectsTable).where(eq(projectsTable.code, projectCode));
+    await tx.delete(projectsTable).where(inArray(projectsTable.code, testProjectCodes));
     if (createdTaxRuleIds.length > 0) {
       await tx.delete(taxRuleVersionsTable).where(inArray(taxRuleVersionsTable.id, createdTaxRuleIds));
     }
@@ -138,6 +148,53 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       await restartedServer.close();
     }
   });
+
+  for (const failurePoint of ["baseline", "audit"] as const) {
+    await t.test(`project creation rolls back project, baseline, and audit when ${failurePoint} insert fails`, async () => {
+      const rollbackCode = `TST-RB-${failurePoint}-${runId.slice(0, 8)}`;
+      testProjectCodes.push(rollbackCode);
+      let rollbackProjectId = "";
+      const fail = async (projectId: string) => {
+        rollbackProjectId = projectId;
+        createdEntityIds.push(projectId);
+        throw new Error(`Injected project ${failurePoint} insert failure`);
+      };
+      const projectHooks: ProjectPersistenceHooks = failurePoint === "baseline"
+        ? { beforeBaselineInsert: fail }
+        : { beforeAuditInsert: fail };
+      const server = await startTestServer({}, access, projectHooks);
+      try {
+        const response = await fetch(`${server.baseUrl}/projects`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            code: rollbackCode,
+            name: `Proyek Rollback ${failurePoint}`,
+            owner: "Regression Test",
+            contractValue: 50_000_000,
+            endDate: "2027-12-31",
+          }),
+        });
+        assert.equal(response.status, 500);
+      } finally {
+        await server.close();
+      }
+
+      assert.notEqual(rollbackProjectId, "");
+      const [project] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, rollbackProjectId));
+      const [baseline] = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.projectId, rollbackProjectId));
+      const [audit] = await db.select().from(auditLogsTable)
+        .where(and(
+          eq(auditLogsTable.entity, "Proyek"),
+          eq(auditLogsTable.entityId, rollbackProjectId),
+        ));
+      assert.equal(project, undefined);
+      assert.equal(baseline, undefined);
+      assert.equal(audit, undefined);
+    });
+  }
 
   await t.test("invoice, tax snapshot, and audit are committed together", async () => {
     const server = await startTestServer();

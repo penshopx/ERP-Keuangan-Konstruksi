@@ -26,6 +26,13 @@ import {
   UpdateProjectResponse,
 } from "@workspace/api-zod";
 import { canAccessProject, requirePermission } from "../middlewares/access";
+
+export type ProjectPersistenceHooks = {
+  beforeBaselineInsert?: (projectId: string) => Promise<void>;
+  beforeAuditInsert?: (projectId: string) => Promise<void>;
+};
+
+export function createProjectsRouter(hooks: ProjectPersistenceHooks = {}): IRouter {
 const router: IRouter = Router();
 
 function projectResponse(project: typeof projectsTable.$inferSelect) {
@@ -84,12 +91,14 @@ router.post("/projects", requirePermission("projects:write"), async (req, res) =
   };
   await db.transaction(async (tx) => {
     await tx.insert(projectsTable).values(project);
+    await hooks.beforeBaselineInsert?.(projectId);
     await tx.insert(rabBaselinesTable).values({
       id: randomUUID(),
       projectId,
       version: 1,
       status: "DRAF",
     });
+    await hooks.beforeAuditInsert?.(projectId);
     await tx.insert(auditLogsTable).values({
       id: randomUUID(),
       action: "DIBUAT",
@@ -302,4 +311,7 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
   }));
 });
 
-export default router;
+return router;
+}
+
+export default createProjectsRouter();
