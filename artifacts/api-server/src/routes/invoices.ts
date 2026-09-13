@@ -21,6 +21,7 @@ import { canAccessProject, requirePermission } from "../middlewares/access";
 
 export type InvoicePersistenceHooks = {
   beforeAuditInsert?: (invoiceId: string) => Promise<void>;
+  beforeInvoiceInsert?: (invoiceId: string) => Promise<void>;
   afterTaxRuleSelection?: (taxRuleId: string) => Promise<void>;
 };
 
@@ -133,6 +134,7 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
       issuedAt: parsed.data.issuedAt,
       taxRuleVersionId: rule.id,
     };
+    await hooks.beforeInvoiceInsert?.(invoiceId);
     const [created] = await tx.insert(invoicesTable).values(invoiceDraft).returning();
     const number = buildInvoiceNumber(project.code, parsed.data.issuedAt, created.sequence);
     const [stored] = await tx.update(invoicesTable)

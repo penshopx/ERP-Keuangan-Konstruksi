@@ -180,6 +180,75 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     assert.equal(snapshot.taxRuleVersionId, taxRuleId);
   });
 
+  await t.test("concurrent invoice transactions keep sequence numbers unique and issued-at periods intact", async () => {
+    const concurrentCount = 4;
+    let waitingAtInsert = 0;
+    let releaseInserts!: () => void;
+    const allTransactionsAtInsert = new Promise<void>((resolve) => {
+      releaseInserts = resolve;
+    });
+    const server = await startTestServer({
+      beforeInvoiceInsert: async () => {
+        waitingAtInsert += 1;
+        if (waitingAtInsert === concurrentCount) releaseInserts();
+        await allTransactionsAtInsert;
+      },
+    });
+    const issuedDates = [
+      "2099-01-05",
+      "2099-02-06",
+      "2099-03-07",
+      "2099-04-08",
+    ];
+    const taxCriteria = [
+      { supplierPkp: false, governmentCollector: false, integrated: false },
+      { supplierPkp: false, governmentCollector: true, integrated: false },
+      { supplierPkp: true, governmentCollector: false, integrated: false },
+      { supplierPkp: true, governmentCollector: true, integrated: false },
+    ];
+
+    try {
+      const createdInvoices = await Promise.all(issuedDates.map((issuedAt, index) =>
+        requestJson(server.baseUrl, "/invoices", {
+          method: "POST",
+          body: JSON.stringify({
+            projectId,
+            period: `Termin Concurrent ${index + 1}`,
+            issuedAt,
+            dpp: 100_000_000 + index,
+            retentionPercent: 5,
+            serviceType: "KONSTRUKSI",
+            qualification: "TANPA_KUALIFIKASI",
+            hasSbu: false,
+            ...taxCriteria[index],
+          }),
+        })
+      ));
+      const invoiceIds = createdInvoices.map(({ id }) => String(id));
+      createdEntityIds.push(...invoiceIds);
+
+      const storedInvoices = await db.select().from(invoicesTable)
+        .where(inArray(invoicesTable.id, invoiceIds));
+      assert.equal(storedInvoices.length, issuedDates.length);
+      assert.equal(new Set(storedInvoices.map(({ number }) => number)).size, issuedDates.length);
+      assert.equal(new Set(storedInvoices.map(({ sequence }) => sequence)).size, issuedDates.length);
+
+      assert.equal(waitingAtInsert, concurrentCount);
+      const expectedRomanMonths = ["I", "II", "III", "IV"];
+      for (const [index, issuedAt] of issuedDates.entries()) {
+        const stored = storedInvoices.find((invoice) => invoice.issuedAt === issuedAt);
+        assert.ok(stored, `Invoice untuk issuedAt ${issuedAt} tidak tersimpan`);
+        assert.equal(
+          stored.number,
+          `INV/${projectCode}/${expectedRomanMonths[index]}/2099/${String(stored.sequence).padStart(3, "0")}`,
+        );
+      }
+    } finally {
+      releaseInserts();
+      await server.close();
+    }
+  });
+
   await t.test("invoice validation and effective-date rule selection cover every tax branch", async () => {
     const server = await startTestServer();
     const dpp = 120_000_000;
