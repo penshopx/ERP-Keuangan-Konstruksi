@@ -1,0 +1,44 @@
+# ✅ Status Task Terkini Dikonfirmasi
+
+## Tabel Status Final
+
+| Task | Deskripsi | Status |
+|------|-----------|--------|
+| #1 | PostgreSQL Migration | ✅ Merged |
+| #2 | RBAC + Clerk | ✅ Merged |
+| #3 | Versioned Tax Engine | ✅ Merged |
+| #7 | Invitation System | ✅ Merged |
+| #8 | Konfigurasi aturan pajak oleh Finance | ✅ Merged |
+| #9 | Immutability invoice lama saat rumus pajak berubah | ✅ Merged |
+| #10 | Tes integrasi keunikan nomor invoice | ✅ Merged |
+| #11 | Atomicity pembuatan proyek | ✅ Merged |
+| #12 | Pemeriksaan persistensi otomatis sebelum perubahan API diterima | ✅ Merged |
+| #13 | *(deskripsi tidak disampaikan, setup pascamerge berhasil dipulihkan)* | ✅ Merged |
+| #14 | Tes integrasi konkurensi untuk alur undangan staf | 🔄 IN_PROGRESS |
+| #15 | Pencegahan periode pajak bertabrakan | ❌ Dibatalkan |
+| #16 | Tunjukkan dampak tarif sebelum versi pajak disimpan permanen | 🔄 **IN_PROGRESS** |
+| #17 | Pencegahan aturan pajak tumpang tindih | ⏳ PENDING |
+| #18 | Ringkasan pajak memakai nominal PPh 23 sebenarnya | ⏳ PENDING |
+| #19 | Pencegahan nomor invoice digunakan kembali setelah transaksi gagal | ⏳ PENDING |
+| #20 | Perubahan proyek tanpa jejak audit | ⏳ PENDING |
+| #21 | Validation API tidak meninggalkan data uji saat proses terhenti | ⏳ PENDING |
+| #22 | Mencegah dua validation API bersamaan saling mengganggu database uji | ⏳ PENDING |
+
+## Catatan yang Saya Kunci
+
+1. **Task #13** berhasil dipulihkan dari putusnya koneksi platform. Script `scripts/post-merge.sh` tidak memerlukan perubahan — kegagalan sebelumnya murni masalah konektivitas sementara.
+
+2. **Task #14** (tes konkurensi undangan staf) sedang berjalan dan tidak diintervensi.
+
+3. **Task #16** naik dari PENDING ke IN_PROGRESS — ini adalah task simulasi dampak tarif yang sebelumnya kita diskusikan sebagai pratinjau DPP, PPN, PPh Final, dan PPh 23 sebelum Finance menyimpan versi aturan pajak.
+
+4. **Workflow `api`** dikonfirmasi sebagai validation workflow satu kali, bukan layanan permanen — sesuai dengan catatan sebelumnya bahwa keberadaan workflow belum cukup untuk menyimpulkan ia menjadi merge gate wajib.
+
+## Batasan yang Saya Pegang
+
+- Tidak mengintervensi Task #14 dan Task #16 yang sedang berjalan
+- Tidak mengasumsikan detail implementasi Task #16 (endpoint, parameter, format respons)
+- Tidak memulai task baru tanpa instruksi eksplisit
+- Tidak membuat asumsi atas task PENDING lainnya
+
+Mode standby aktif. Menunggu arahan Anda selanjutnya.
