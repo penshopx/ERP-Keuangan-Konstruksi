@@ -22,7 +22,14 @@ import {
 } from "@workspace/api-zod";
 import { canAccessProject, requirePermission } from "../middlewares/access";
 
-const router: IRouter = Router();
+export type AccessRouterDependencies = {
+  createClerkInvitation: typeof clerkClient.invitations.createInvitation;
+  revokeClerkInvitation: typeof clerkClient.invitations.revokeInvitation;
+};
+
+export type AccessPersistenceHooks = {
+  beforeInvitationInsert?: (clerkInvitationId: string) => Promise<void>;
+};
 
 const serializeInvitation = (
   invitation: typeof staffInvitationsTable.$inferSelect,
@@ -42,6 +49,15 @@ const serializeInvitation = (
   expiresAt: invitation.expiresAt.toISOString(),
   createdAt: invitation.createdAt.toISOString(),
 });
+
+export function createAccessRouter(
+  dependencies: AccessRouterDependencies = {
+    createClerkInvitation: clerkClient.invitations.createInvitation.bind(clerkClient.invitations),
+    revokeClerkInvitation: clerkClient.invitations.revokeInvitation.bind(clerkClient.invitations),
+  },
+  hooks: AccessPersistenceHooks = {},
+): IRouter {
+const router: IRouter = Router();
 
 router.get("/me", (req, res) => {
   res.json(GetCurrentUserResponse.parse(req.access));
@@ -105,13 +121,14 @@ router.post("/access/invitations", async (req, res) => {
     if (existing.some((invite) => invite.expiresAt > new Date())) return { conflict: true } as const;
     await tx.update(staffInvitationsTable).set({ status: "EXPIRED" })
       .where(and(eq(staffInvitationsTable.email, email), eq(staffInvitationsTable.status, "PENDING")));
-    const clerkInvitation = await clerkClient.invitations.createInvitation({
+    const clerkInvitation = await dependencies.createClerkInvitation({
       emailAddress: email,
       expiresInDays: 30,
       ignoreExisting: true,
       publicMetadata: { source: "construction-erp" },
     });
     createdClerkInvitationId = clerkInvitation.id;
+    await hooks.beforeInvitationInsert?.(clerkInvitation.id);
     const id = randomUUID();
     const createdAt = new Date(clerkInvitation.createdAt);
     const expiresAt = new Date(createdAt.getTime() + 30 * 86_400_000);
@@ -131,7 +148,7 @@ router.post("/access/invitations", async (req, res) => {
     return { conflict: false, id, createdAt, expiresAt } as const;
   }).catch(async (error) => {
     if (createdClerkInvitationId) {
-      await clerkClient.invitations.revokeInvitation(createdClerkInvitationId).catch(() => undefined);
+      await dependencies.revokeClerkInvitation(createdClerkInvitationId).catch(() => undefined);
     }
     throw error;
   });
@@ -164,7 +181,7 @@ router.post("/access/invitations/:invitationId/revoke", async (req, res) => {
     if (invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
       return { outcome: "not-pending" } as const;
     }
-    await clerkClient.invitations.revokeInvitation(invitation.clerkInvitationId);
+    await dependencies.revokeClerkInvitation(invitation.clerkInvitationId);
     const [updated] = await tx.update(staffInvitationsTable).set({ status: "REVOKED" })
       .where(and(
         eq(staffInvitationsTable.id, invitation.id),
@@ -211,7 +228,7 @@ router.post("/access/invitations/:invitationId/resend", async (req, res) => {
     if (invitation.status !== "EXPIRED" && !(invitation.status === "PENDING" && invitation.expiresAt <= new Date())) {
       return { outcome: "not-expired" } as const;
     }
-    const clerkInvitation = await clerkClient.invitations.createInvitation({
+    const clerkInvitation = await dependencies.createClerkInvitation({
       emailAddress: invitation.email,
       expiresInDays: 30,
       ignoreExisting: true,
@@ -248,7 +265,7 @@ router.post("/access/invitations/:invitationId/resend", async (req, res) => {
     return { outcome: "resent", invitation: updated, projectIds: projects.map(({ projectId }) => projectId) } as const;
   }).catch(async (error) => {
     if (createdClerkInvitationId) {
-      await clerkClient.invitations.revokeInvitation(createdClerkInvitationId).catch(() => undefined);
+      await dependencies.revokeClerkInvitation(createdClerkInvitationId).catch(() => undefined);
     }
     throw error;
   });
@@ -347,4 +364,7 @@ router.post("/invoices/:invoiceId/decision", requirePermission("invoices:approve
   res.json(DecideInvoiceResponse.parse(updated));
 });
 
-export default router;
+return router;
+}
+
+export default createAccessRouter();

@@ -26,8 +26,27 @@ function displayNameFromClaims(claims: Record<string, unknown> | null | undefine
   return `${first} ${last}`.trim() || "Pengguna ERP";
 }
 
-export async function requireAccess(req: Request, res: Response, next: NextFunction) {
-  const auth = getAuth(req);
+export type AccessProvisioningDependencies = {
+  getAuth: typeof getAuth;
+  getUser: typeof clerkClient.users.getUser;
+};
+
+type AccessTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export type AccessProvisioningHooks = {
+  beforeProjectAssignmentsInsert?: (userId: string) => Promise<void>;
+  countProvisionedUsers?: (tx: AccessTransaction) => Promise<number>;
+};
+
+export function createRequireAccess(
+  dependencies: AccessProvisioningDependencies = {
+    getAuth,
+    getUser: clerkClient.users.getUser.bind(clerkClient.users),
+  },
+  hooks: AccessProvisioningHooks = {},
+) {
+  return async function requireAccessMiddleware(req: Request, res: Response, next: NextFunction) {
+  const auth = dependencies.getAuth(req);
   const userId = auth.userId;
   if (!userId) {
     res.status(401).json({ error: "Silakan masuk untuk mengakses data ERP" });
@@ -35,7 +54,7 @@ export async function requireAccess(req: Request, res: Response, next: NextFunct
   }
   let [user] = await db.select().from(userRolesTable).where(eq(userRolesTable.userId, userId)).limit(1);
   if (!user) {
-    const clerkUser = await clerkClient.users.getUser(userId);
+    const clerkUser = await dependencies.getUser(userId);
     const clerkDisplayName = `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim()
       || clerkUser.primaryEmailAddress?.emailAddress
       || displayNameFromClaims(auth.sessionClaims as Record<string, unknown>);
@@ -46,7 +65,9 @@ export async function requireAccess(req: Request, res: Response, next: NextFunct
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext('erp-access-provisioning'))`);
       const [existing] = await tx.select().from(userRolesTable).where(eq(userRolesTable.userId, userId)).limit(1);
       if (existing) return [existing];
-      const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` }).from(userRolesTable);
+      const count = hooks.countProvisionedUsers
+        ? await hooks.countProvisionedUsers(tx)
+        : (await tx.select({ count: sql<number>`count(*)::int` }).from(userRolesTable))[0].count;
       const fallbackRole = count === 0 ? "DIRECTOR" : "UNASSIGNED";
       const [invitation] = verifiedEmails.length ? await tx.select().from(staffInvitationsTable)
         .where(and(
@@ -70,7 +91,10 @@ export async function requireAccess(req: Request, res: Response, next: NextFunct
         if (!claimed) throw new Error("Undangan tidak dapat diklaim");
         const prepared = await tx.select({ projectId: staffInvitationProjectsTable.projectId })
           .from(staffInvitationProjectsTable).where(eq(staffInvitationProjectsTable.invitationId, invitation.id));
-        if (prepared.length) await tx.insert(projectAssignmentsTable).values(prepared.map(({ projectId }) => ({ userId, projectId })));
+        if (prepared.length) {
+          await hooks.beforeProjectAssignmentsInsert?.(userId);
+          await tx.insert(projectAssignmentsTable).values(prepared.map(({ projectId }) => ({ userId, projectId })));
+        }
       }
       return [created];
     });
@@ -86,7 +110,10 @@ export async function requireAccess(req: Request, res: Response, next: NextFunct
   const role = user.role;
   req.access = { userId, displayName: user.displayName, role, assignedProjectIds: assigned.map((item) => item.projectId), permissions: [...rolePermissions[role]] };
   next();
+  };
 }
+
+export const requireAccess = createRequireAccess();
 
 export function requirePermission(permission: string) {
   return (req: Request, res: Response, next: NextFunction) => {
