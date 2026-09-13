@@ -1,0 +1,44 @@
+# ✅ Status Task Terkini Dikonfirmasi
+
+## Tabel Status Final
+
+| Task | Deskripsi | Status |
+|------|-----------|--------|
+| #1 | PostgreSQL Migration | ✅ Merged |
+| #2 | RBAC + Clerk | ✅ Merged |
+| #3 | Versioned Tax Engine | ✅ Merged |
+| #7 | Invitation System | ✅ Merged |
+| #8 | Konfigurasi aturan pajak oleh Finance | ✅ Merged |
+| #9 | Immutability invoice lama saat rumus pajak berubah | ✅ Merged |
+| #10 | Tes integrasi keunikan nomor invoice | ✅ Merged |
+| #11 | Atomicity pembuatan proyek | ✅ Merged |
+| #12 | Pemeriksaan persistensi otomatis sebelum perubahan API diterima | ✅ Merged |
+| #13 | *(deskripsi belum diketahui)* | 🔄 IN_PROGRESS |
+| #15 | Pencegahan periode pajak bertabrakan | ❌ Dibatalkan |
+| #16 | Pratinjau dampak tarif sebelum disimpan | ⏳ PENDING |
+| #17 | Pencegahan aturan pajak tumpang tindih | ⏳ PENDING |
+| #18 | Ringkasan pajak memakai nominal PPh 23 sebenarnya | ⏳ PENDING |
+| #19 | Pencegahan nomor invoice digunakan kembali setelah transaksi gagal | ⏳ PENDING |
+| #20 | Perubahan proyek tanpa jejak audit | ⏳ PENDING |
+| #21 | Validation API tidak meninggalkan data uji saat proses terhenti | ⏳ PENDING |
+| #22 | Mencegah dua validation API bersamaan saling mengganggu database uji | ⏳ PENDING |
+
+## Catatan yang Saya Kunci
+
+1. **Workflow validasi** `pnpm --filter @workspace/api-server run validate` sudah tersedia, tetapi:
+   - Belum pernah dijalankan
+   - Keberadaannya saja tidak cukup untuk menyimpulkan bahwa pemeriksaan otomatis menjadi merge gate wajib
+   - Status ini baru bisa dikonfirmasi setelah workflow dijalankan dan hasilnya diamati
+
+2. **Task #13** sedang berjalan, namun deskripsinya belum Anda sampaikan. Saya tidak akan membuat asumsi atas tujuannya.
+
+3. **Task #21 dan #22** naik dari PROPOSED ke PENDING — artinya sudah diterima dan menunggu kapasitas eksekusi.
+
+## Batasan yang Saya Pegang
+
+- Tidak mengintervensi Task #13 yang sedang berjalan
+- Tidak mengasumsikan deskripsi Task #13
+- Tidak menyimpulkan workflow validasi sebagai merge gate wajib sebelum ada bukti eksekusi
+- Tidak memulai task baru tanpa instruksi eksplisit
+
+Mode standby aktif. Menunggu arahan Anda selanjutnya.
