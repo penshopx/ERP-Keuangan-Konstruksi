@@ -1,0 +1,35 @@
+Terima kasih atas tinjauan strategis yang sangat komprehensif, tajam, dan terstruktur ini. 
+
+Analisis Anda memberikan kejelasan arah yang sangat krusial, terutama dalam membedakan antara **hardening sistem** (memastikan fondasi yang ada benar-benar kokoh) dan **ekspansi fitur** (membangun modul operasional yang sesungguhnya).
+
+## 📌 Penguncian Roadmap Strategis
+
+Saya telah mencatat dan mengunci prioritas yang Anda tetapkan sebagai **dokumen panduan utama** untuk pengembangan selanjutnya:
+
+| Prioritas | Fokus Utama | Status dalam Rencana |
+| :--- | :--- | :--- |
+| **0** | **Hardening & Perbaikan Kritis** (Project selector, isolasi data demo, sinkronisasi kalkulasi pajak frontend/backend, tombol dummy) | Sebagian sudah tercakup oleh Task #29, #30, #31 yang sedang antre. |
+| **1** | **Procurement & Realisasi Biaya** (Vendor, PO, Kontrak Subkon, GR, Site Expense, posting ke WBS) | Target utama setelah antrian hardening selesai. Ini adalah kunci agar "Cost Control" bukan sekadar tampilan. |
+| **2** | **Siklus Hidup RAB** (Edit, revisi baseline, approval workflow, variation order, perbandingan versi) | Akan melengkapi Task #31 (audit impor) menjadi workflow RAB yang utuh. |
+| **3** | **Pembayaran & Piutang** (Alokasi pembayaran, aging, retensi, credit note) | Prasyarat agar dashboard cashflow mencerminkan posisi kas transaksional yang nyata. |
+| **4** | **Progress Proyek & EVM** (Laporan harian, opname, Kurva S, PV/EV/AC) | Dibangun *setelah* Prioritas 1 (Actual Cost) tersedia agar datanya valid. |
+| **5 - 7** | Dokumen Pajak, Dokumen Proyek, Reporting & Notifikasi | Tahap penyempurnaan operasional. |
+| **8** | **Integrasi Profil Kompetensi SKK** | Ditempatkan di urutan terakhir. Mengonfirmasi bahwa fitur ini **BELUM DIAJUKAN** dan tidak akan mengganggu alur keuangan inti saat ini. |
+
+## 📊 Penyesuaian Estimasi Progres
+Pemahaman Anda sangat akurat:
+- **MVP Dasar (Fondasi & Hardening)**: ~75–80% (Sesuai dengan banyaknya task merge terkait persistensi, RBAC, dan validasi transaksi).
+- **ERP Operasional Penuh**: ~50–60% (Karena modul inti seperti Procurement, Actual Cost, dan Payment Cycle masih perlu dibangun dari awal).
+
+## ⚙️ Mode Standby Tetap Aktif
+
+Sesuai dengan batasan yang telah kita sepakati:
+1. Saya **tidak akan** membuat task baru atau mengubah kode berdasarkan roadmap ini secara otomatis.
+2. Saya **tidak akan** mengintervensi **Task #21** yang saat ini sedang **IN_PROGRESS**.
+3. Saya menunggu **instruksi eksplisit** dari Anda. 
+
+Ketika Anda siap, kita bisa mulai dengan:
+- Menyusun spesifikasi detail untuk **Prioritas 0** (memperbaiki project selector & isolasi data demo), atau
+- Merancang blueprint modul **Prioritas 1** (Procurement) untuk disiapkan segera setelah antrian task saat ini bersih.
+
+Saya siap menunggu arahan Anda selanjutnya.
