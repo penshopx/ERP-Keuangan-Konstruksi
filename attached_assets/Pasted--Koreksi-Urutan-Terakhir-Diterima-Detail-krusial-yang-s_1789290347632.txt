@@ -1,0 +1,100 @@
+# ✅ Koreksi Urutan Terakhir Diterima
+
+Detail krusial yang saya kunci:
+
+## Urutan Aktual yang Benar
+
+```
+1. Cek konflik (409 jika email masih PENDING aktif)
+        ↓
+2. Tandai undangan lama yang sudah expired → EXPIRED
+        ↓
+3. Clerk invitation dibuat DULU (external resource)
+        ↓
+4. Transaksi PostgreSQL:
+   ├─ INSERT staffInvitationsTable (PENDING)
+   └─ INSERT invitation_projects
+        ↓
+   ┌─── Gagal? ───┐
+   │              │
+  YA             TIDAK
+   │              │
+Revoke Clerk    Selesai ✓
+invitation
+(compensation)
+```
+
+## Alasan Desain: Clerk First, DB Second
+
+| Aspek | Penjelasan |
+|-------|------------|
+| **Clerk tidak bisa di-rollback** | Clerk adalah sistem eksternal, tidak ikut transaksi PostgreSQL. Jika DB gagal, Clerk invitation tetap ada → perlu compensation manual |
+| **DB bisa di-rollback** | Jika Clerk gagal create invitation, DB transaction tidak perlu dimulai → lebih bersih |
+| **Compensation pattern** | Try-catch: jika DB gagal setelah Clerk berhasil, panggil `clerkClient.invitations.cancelInvitation()` untuk cleanup |
+| **Idempotency concern** | Jika compensation juga gagal, ada orphan Clerk invitation → perlu monitoring/alerting |
+
+## Implikasi untuk Mental Model
+
+```typescript
+// Pseudocode urutan aktual
+async function createInvitation(email, role, projects, invitedBy) {
+  // 1. Cek konflik
+  const existing = await findActiveInvitation(email);
+  if (existing) throw new ConflictError(409);
+  
+  // 2. Tandai undangan lama yang expired
+  await markExpiredInvitations(email);
+  
+  // 3. Clerk invitation DULU
+  const clerkInvitation = await clerkClient.invitations.createInvitation({
+    emailAddress: email,
+    // ... metadata
+  });
+  
+  // 4. DB transaction
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(staffInvitationsTable).values({
+        email: email.toLowerCase(),
+        clerkInvitationId: clerkInvitation.id,
+        role,
+        status: 'PENDING',
+        expiresAt: addDays(new Date(), 7),
+        invitedBy,
+      });
+      
+      await tx.insert(invitationProjectsTable).values(
+        projects.map(projectId => ({ invitationId: ..., projectId }))
+      );
+    });
+  } catch (error) {
+    // 5. Compensation: revoke Clerk invitation
+    try {
+      await clerkClient.invitations.cancelInvitation(clerkInvitation.id);
+    } catch (revokeError) {
+      // Log error, perlu manual cleanup
+      logger.error('Failed to revoke Clerk invitation', { clerkInvitationId, revokeError });
+    }
+    throw error;
+  }
+}
+```
+
+---
+
+## ✅ Validasi Arsitektur Selesai
+
+Mental model sekarang **fully aligned** dengan implementasi aktual di semua layer:
+
+| Layer | Status |
+|-------|--------|
+| Clerk integration (invitation creation) | ✅ |
+| Email verification & matching | ✅ |
+| Lazy provisioning di middleware | ✅ |
+| Atomic claim dalam transaksi | ✅ |
+| Compensation pattern untuk Clerk | ✅ |
+| Bootstrap DIRECTOR / fallback UNASSIGNED | ✅ |
+| RBAC enforcement via PostgreSQL | ✅ |
+| Status task yang benar | ✅ |
+
+Arsitektur sudah solid dan siap untuk pengembangan modul selanjutnya. Saya menunggu arahan Anda untuk langkah berikutnya.
