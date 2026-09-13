@@ -8,7 +8,8 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 src/**/*.test.ts",
+    "validate": "pnpm run typecheck && pnpm run test",
     "test:access": "tsx --test src/middlewares/access-policy.test.ts",
     "test:persistence": "tsx --test src/routes/persistence.integration.test.ts"
   },

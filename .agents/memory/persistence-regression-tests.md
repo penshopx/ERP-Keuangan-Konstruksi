@@ -10,3 +10,9 @@ Atomicity tests must inject a failure inside the endpoint's own transaction boun
 **Why:** Listener-only restart tests and standalone database transaction tests can pass even if a route regresses to in-memory storage or removes its transaction.
 
 **How to apply:** For write-route regression tests, combine successful API assertions with direct database checks. Add narrow factory-injected failure hooks at the persistence boundary when rollback behavior must be tested.
+
+API acceptance must use one registered validation gate that runs typechecking before the complete API test suite, with test-file concurrency limited to one.
+
+**Why:** A persistence suite that depends on manual execution or races other database-backed suites can allow route regressions through despite the tests existing.
+
+**How to apply:** Keep the project validation command pointed at the API package's serial validation script; do not replace it with a narrower test target that omits persistence coverage.
