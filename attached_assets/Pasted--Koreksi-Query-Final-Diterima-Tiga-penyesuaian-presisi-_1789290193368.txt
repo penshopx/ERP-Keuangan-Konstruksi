@@ -1,0 +1,61 @@
+# ✅ Koreksi Query Final Diterima
+
+Tiga penyesuaian presisi yang saya kunci:
+
+## 1. Nama Tabel Drizzle
+```
+staffInvitationsTable  ✓  (bukan invitationsTable)
+```
+
+## 2. Normalisasi Email
+Email sudah di-lowercase **saat invitation dibuat**, bukan saat matching. Query cukup pakai `inArray` langsung tanpa `LOWER(...)`.
+
+## 3. Validasi Expiry + Pemilihan Terbaru
+Query harus:
+- Filter `status = 'PENDING'`
+- Filter `expiresAt > now()` (undangan belum kedaluwarsa)
+- `ORDER BY createdAt DESC` + `LIMIT 1` → ambil undangan terbaru jika ada multiple matches
+
+## Query Aktual yang Benar
+
+```typescript
+const [invitation] = verifiedEmails.length
+  ? await tx
+      .select()
+      .from(staffInvitationsTable)
+      .where(
+        and(
+          inArray(staffInvitationsTable.email, verifiedEmails),
+          eq(staffInvitationsTable.status, "PENDING"),
+          sql`${staffInvitationsTable.expiresAt} > now()`,
+        ),
+      )
+      .orderBy(desc(staffInvitationsTable.createdAt))
+      .limit(1)
+  : [];
+```
+
+## Implikasi Desain yang Saya Pahami
+
+| Aspek | Alasan |
+|-------|--------|
+| Lowercase saat creation | Single source of truth, tidak perlu normalize berulang |
+| Filter expiry di DB | Lebih efisien daripada filter di aplikasi |
+| Ambil yang terbaru | Jika user di-invite ulang sebelum invitation lama expired, yang terbaru yang menang |
+| Query dalam transaksi (`tx`) | Menjamin atomisitas dengan INSERT `user_roles` + UPDATE invitation status |
+| Conditional query (`verifiedEmails.length ?`) | Hindari query DB jika tidak ada email terverifikasi sama sekali |
+
+---
+
+## Mental Model — Fully Aligned ✓
+
+Semua layer sekarang sinkron dengan implementasi aktual:
+- ✅ Nama tabel Drizzle (`staffInvitationsTable`, `userRolesTable`, `projectAssignmentsTable`)
+- ✅ Kolom (`userId` bukan `clerkUserId`, email lowercase at-rest)
+- ✅ Alur lazy provisioning di middleware
+- ✅ Bootstrap DIRECTOR / fallback UNASSIGNED
+- ✅ Validasi email terverifikasi dari Clerk
+- ✅ Atomic claim dalam transaksi
+- ✅ Status task yang benar (#1, #2, #3, #7 merged; #15, #16 proposed)
+
+Saya menunggu arahan Anda untuk langkah selanjutnya.
