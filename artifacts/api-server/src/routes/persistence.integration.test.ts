@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type Express } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -23,6 +23,7 @@ const runId = randomUUID();
 const projectCode = `TST-${runId.slice(0, 8)}`;
 const testProjectCodes = [projectCode];
 const taxRuleId = "tax-2022-construction-TANPA_KUALIFIKASI-true-false-false";
+const continuedTaxRuleId = "tax-2022-construction-TANPA_KUALIFIKASI-true-false-true-continuation-2027-01-01";
 const createdEntityIds: string[] = [];
 const createdTaxRuleIds: string[] = [];
 const constructionQualifications = [
@@ -424,7 +425,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         }),
       });
       createdEntityIds.push(String(current.id));
-      assert.equal(current.taxRuleVersionId, "tax-2022-construction-TANPA_KUALIFIKASI-true-false-true");
+      assert.equal(current.taxRuleVersionId, continuedTaxRuleId);
 
       const invalidCases = [
         {
@@ -479,7 +480,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
   });
 
   await t.test("concurrent supersession cannot leave a new invoice on the old rule", async () => {
-    const raceRuleId = "tax-2022-construction-TANPA_KUALIFIKASI-true-false-true";
+    const raceRuleId = continuedTaxRuleId;
     let signalSelected!: () => void;
     let releaseSelection!: () => void;
     const selected = new Promise<void>((resolve) => { signalSelected = resolve; });
@@ -693,6 +694,92 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     assert.equal(historicalInvoiceAfter.total, 102_000_400);
     assert.equal(previous.effectiveTo, "2099-12-31");
     assert.ok(audit);
+  });
+
+  await t.test("database and API both reject overlapping tax rules while allowing adjacent periods", async () => {
+    const directRuleIds = [
+      `test-direct-base-${runId}`,
+      `test-direct-adjacent-${runId}`,
+      `test-direct-overlap-${runId}`,
+    ];
+    createdTaxRuleIds.push(...directRuleIds);
+    const baseRule = {
+      regulatorySource: "Direct database overlap regression test",
+      serviceType: `TEST_SERVICE_${runId}`,
+      qualification: null,
+      requiresSbu: false,
+      supplierPkp: false,
+      governmentCollector: false,
+      integrated: false,
+      dppRateBasisPoints: 10_000,
+      ppnRateBasisPoints: 0,
+      pphFinalRateBasisPoints: 0,
+      pph23RateBasisPoints: 200,
+    };
+
+    await db.insert(taxRuleVersionsTable).values({
+      id: directRuleIds[0],
+      version: `TEST-DIRECT-BASE-${runId}`,
+      effectiveFrom: "2300-01-01",
+      effectiveTo: "2300-01-31",
+      ...baseRule,
+    });
+    await db.insert(taxRuleVersionsTable).values({
+      id: directRuleIds[1],
+      version: `TEST-DIRECT-ADJACENT-${runId}`,
+      effectiveFrom: "2300-02-01",
+      effectiveTo: "2300-02-28",
+      ...baseRule,
+    });
+    await assert.rejects(
+      db.insert(taxRuleVersionsTable).values({
+        id: directRuleIds[2],
+        version: `TEST-DIRECT-OVERLAP-${runId}`,
+        effectiveFrom: "2300-01-31",
+        effectiveTo: "2300-02-15",
+        ...baseRule,
+      }),
+      (error: unknown) => {
+        const candidate = error as { cause?: { code?: string; constraint?: string } };
+        return candidate.cause?.code === "23P01"
+          && candidate.cause.constraint === "tax_rule_versions_no_overlapping_periods";
+      },
+    );
+
+    const server = await startTestServer();
+    try {
+      const response = await fetch(`${server.baseUrl}/tax/rules`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          version: `TEST-API-OVERLAP-${runId}`,
+          effectiveFrom: "2026-06-15",
+          effectiveTo: "2026-06-20",
+          regulatorySource: "API overlap regression test",
+          serviceType: "KONSTRUKSI",
+          qualification: "TANPA_KUALIFIKASI",
+          requiresSbu: false,
+          supplierPkp: true,
+          governmentCollector: false,
+          integrated: true,
+          dppRateBasisPoints: 10_000,
+          ppnRateBasisPoints: 1_200,
+          pphFinalRateBasisPoints: 300,
+          pph23RateBasisPoints: 0,
+        }),
+      });
+      assert.equal(response.status, 409);
+      assert.deepEqual(await response.json(), {
+        error: "Periode berlaku tumpang tindih dengan aturan berkriteria sama.",
+      });
+    } finally {
+      await server.close();
+    }
+
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(taxRuleVersionsTable)
+      .where(inArray(taxRuleVersionsTable.id, directRuleIds));
+    assert.equal(count, 2);
   });
 
   await t.test("tax rule endpoints reject roles without management permission", async () => {

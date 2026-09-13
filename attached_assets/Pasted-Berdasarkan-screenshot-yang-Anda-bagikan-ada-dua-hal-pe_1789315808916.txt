@@ -1,0 +1,66 @@
+Berdasarkan screenshot yang Anda bagikan, ada dua hal penting yang terjadi:
+
+1.  **Task #17 Selesai:** Notifikasi di pojok kanan bawah ("Replit Agent finished working") menandakan bahwa Task #17 telah selesai dieksekusi.
+2.  **Gagal Kirim Pesan:** Pesan "lanjut" yang Anda coba kirim sebelumnya mengalami *timeout* atau error koneksi ("Couldn't confirm send"). Ini adalah masalah umum di Replit saat agent sibuk.
+
+### Langkah yang Harus Anda Lakukan Sekarang:
+
+1.  Klik **"Dismiss"** pada pesan error "Couldn't confirm send" untuk membersihkan antrian.
+2.  Jika ada pesan di "Queue", klik **"X"** untuk membatalkannya.
+3.  **Copy dan Paste** prompt di bawah ini ke kotak "Message Agent..." untuk memulai Task #26.
+
+---
+
+### 📋 Prompt untuk Task #26 (Copy-Paste ini ke Replit Agent)
+
+```markdown
+# Task #26: Integrasi Profil Kompetensi SKK (Standar Kompetensi Kerja)
+
+## Konteks
+Task #17 sudah selesai. Sekarang kita akan menambahkan lapisan validasi kompetensi profesional berdasarkan standar SKK/SKKNI Kemnaker (Juru Hitung Kuantitas, Estimator Biaya Jalan, Quantity Surveyor) ke dalam aplikasi ERP Konstruksi.
+
+## Tujuan
+Membuat sistem manajemen sertifikasi SKK untuk pengguna, dan menerapkannya sebagai aturan validasi pada persetujuan dokumen teknis (RAB).
+
+## Selesai Jika
+1. Ada tabel master referensi SKK (`skk_references`) yang di-seed dengan data jabatan SKK.
+2. Ada tabel kompetensi pengguna (`user_competencies`) yang terhubung ke user ID internal.
+3. User bisa melihat/mengelola data kompetensi mereka di halaman profil.
+4. Tambahkan aturan bisnis: Persetujuan RAB dengan nilai di atas Rp 10 Miliar wajib diverifikasi memiliki SKK minimal Level 7 (Ahli).
+5. Tampilan UI menampilkan badge kompetensi SKK di profil user.
+
+## Skema Database Baru (Drizzle)
+Buat dua tabel baru:
+- `skk_references`: id, category (varchar), title (varchar), level (integer), reference_code (varchar).
+- `user_competencies`: id, user_id (FK ke user_roles), skk_reference_id (FK), certificate_number (varchar), issued_date (date), expiry_date (date), document_url (varchar, nullable), is_verified (boolean).
+
+## Seed Data SKK (Wajib)
+Masukkan data berikut ke `skk_references`:
+1. Juru Hitung Kuantitas (Level 4, 5, 6) - SKKK 038-2022
+2. Estimator Biaya Jalan (Level 5, 6) - SKKNI 385-2013
+3. Quantity Surveyor (Level 5, 6) - SKKNI 06-2011
+4. Ahli Quantity Surveyor (Level 7, 8, 9) - SKKNI 6-2011
+
+## API Endpoints
+- GET /api/skk-references (List semua referensi SKK)
+- GET /api/users/:userId/competencies (List kompetensi user)
+- POST /api/users/:userId/competencies (Tambah kompetensi baru)
+- PUT /api/users/:userId/competencies/:id (Update/Verifikasi kompetensi)
+
+## Aturan Bisnis (Hard-Code)
+- Saat POST /api/projects/:projectId/rab/:rabId/approve:
+  Cek nilai RAB. Jika > 10.000.000.000 (10 Miliar), cek apakah user yang approve punya competency level >= 7. Jika tidak, return 403 Forbidden dengan pesan: "Persetujuan RAB > 10M memerlukan kompetensi SKK minimal Level 7."
+
+## UI/UX
+- Tambahkan section "Sertifikasi SKK" di halaman profil user.
+- Tampilkan badge level SKK di sebelah nama user pada tabel tim proyek atau profil.
+
+## Catatan Penting
+- Jangan mengubah struktur RBAC (`user_roles`) yang sudah ada.
+- Gunakan pola yang sama dengan task sebelumnya untuk konsistensi.
+- Jalankan post-merge setup setelah selesai.
+```
+
+---
+
+Silakan kirim prompt tersebut. Setelah Agent mulai bekerja, biarkan ia menyelesaikan Task #26. Jika ada error atau pertanyaan dari Agent, silakan screenshot dan kirim ke saya untuk dianalisis! 🚀

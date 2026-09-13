@@ -14,6 +14,17 @@ import { requirePermission } from "../middlewares/access";
 
 const router: IRouter = Router();
 
+function isTaxRuleOverlapConstraint(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as {
+    code?: string;
+    constraint?: string;
+    cause?: { code?: string; constraint?: string };
+  };
+  return (candidate.code === "23P01" && candidate.constraint === "tax_rule_versions_no_overlapping_periods")
+    || (candidate.cause?.code === "23P01" && candidate.cause.constraint === "tax_rule_versions_no_overlapping_periods");
+}
+
 function previousCalendarDate(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -94,65 +105,71 @@ router.post("/tax/rules", requirePermission("tax-rules:manage"), async (req, res
     return;
   }
 
-  const result = await db.transaction(async (tx) => {
-    const criteriaKey = taxRuleLockKey(data);
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`tax-rule:${criteriaKey}`}))`);
-    const [sameVersion] = await tx.select({ id: taxRuleVersionsTable.id }).from(taxRuleVersionsTable)
-      .where(eq(taxRuleVersionsTable.version, data.version)).limit(1);
-    if (sameVersion) return { conflict: "version" as const };
-    const overlaps = await tx.select({
-      id: taxRuleVersionsTable.id,
-      effectiveFrom: taxRuleVersionsTable.effectiveFrom,
-      effectiveTo: taxRuleVersionsTable.effectiveTo,
-    }).from(taxRuleVersionsTable)
-      .where(and(
-        eq(taxRuleVersionsTable.serviceType, data.serviceType),
-        data.qualification === null
-          ? isNull(taxRuleVersionsTable.qualification)
-          : eq(taxRuleVersionsTable.qualification, data.qualification),
-        eq(taxRuleVersionsTable.requiresSbu, data.requiresSbu),
-        eq(taxRuleVersionsTable.supplierPkp, data.supplierPkp),
-        eq(taxRuleVersionsTable.governmentCollector, data.governmentCollector),
-        eq(taxRuleVersionsTable.integrated, data.integrated),
-        or(isNull(taxRuleVersionsTable.effectiveTo), gte(taxRuleVersionsTable.effectiveTo, data.effectiveFrom)),
-        data.effectiveTo ? lte(taxRuleVersionsTable.effectiveFrom, data.effectiveTo) : undefined,
-      ));
-    let supersededRuleId: string | undefined;
-    if (overlaps.length > 0) {
-      const [openEnded] = overlaps;
-      const canSupersede = overlaps.length === 1
-        && openEnded.effectiveTo === null
-        && openEnded.effectiveFrom < data.effectiveFrom;
-      if (!canSupersede) return { conflict: "period" as const };
-      const [affectedInvoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable)
+  let result;
+  try {
+    result = await db.transaction(async (tx) => {
+      const criteriaKey = taxRuleLockKey(data);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`tax-rule:${criteriaKey}`}))`);
+      const [sameVersion] = await tx.select({ id: taxRuleVersionsTable.id }).from(taxRuleVersionsTable)
+        .where(eq(taxRuleVersionsTable.version, data.version)).limit(1);
+      if (sameVersion) return { conflict: "version" as const };
+      const overlaps = await tx.select({
+        id: taxRuleVersionsTable.id,
+        effectiveFrom: taxRuleVersionsTable.effectiveFrom,
+        effectiveTo: taxRuleVersionsTable.effectiveTo,
+      }).from(taxRuleVersionsTable)
         .where(and(
-          eq(invoicesTable.taxRuleVersionId, openEnded.id),
-          gte(invoicesTable.issuedAt, data.effectiveFrom),
-        )).limit(1);
-      if (affectedInvoice) return { conflict: "historical" as const };
-      await tx.update(taxRuleVersionsTable)
-        .set({ effectiveTo: previousCalendarDate(data.effectiveFrom) })
-        .where(eq(taxRuleVersionsTable.id, openEnded.id));
-      supersededRuleId = openEnded.id;
-    }
-    const [created] = await tx.insert(taxRuleVersionsTable).values({
-      id: randomUUID(),
-      ...data,
-    }).returning();
-    await tx.insert(auditLogsTable).values({
-      id: randomUUID(),
-      action: "ATURAN PAJAK DITAMBAHKAN",
-      entity: "Aturan Pajak",
-      entityId: created.id,
-      detail: `${created.version} · berlaku ${created.effectiveFrom}${created.effectiveTo ? ` s.d. ${created.effectiveTo}` : " dan seterusnya"}`,
-      user: req.access!.displayName,
-      actorUserId: req.access!.userId,
-      actorRole: req.access!.role,
-      tone: "info",
-      metadata: { regulatorySource: created.regulatorySource },
+          eq(taxRuleVersionsTable.serviceType, data.serviceType),
+          data.qualification === null
+            ? isNull(taxRuleVersionsTable.qualification)
+            : eq(taxRuleVersionsTable.qualification, data.qualification),
+          eq(taxRuleVersionsTable.requiresSbu, data.requiresSbu),
+          eq(taxRuleVersionsTable.supplierPkp, data.supplierPkp),
+          eq(taxRuleVersionsTable.governmentCollector, data.governmentCollector),
+          eq(taxRuleVersionsTable.integrated, data.integrated),
+          or(isNull(taxRuleVersionsTable.effectiveTo), gte(taxRuleVersionsTable.effectiveTo, data.effectiveFrom)),
+          data.effectiveTo ? lte(taxRuleVersionsTable.effectiveFrom, data.effectiveTo) : undefined,
+        ));
+      let supersededRuleId: string | undefined;
+      if (overlaps.length > 0) {
+        const [openEnded] = overlaps;
+        const canSupersede = overlaps.length === 1
+          && openEnded.effectiveTo === null
+          && openEnded.effectiveFrom < data.effectiveFrom;
+        if (!canSupersede) return { conflict: "period" as const };
+        const [affectedInvoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable)
+          .where(and(
+            eq(invoicesTable.taxRuleVersionId, openEnded.id),
+            gte(invoicesTable.issuedAt, data.effectiveFrom),
+          )).limit(1);
+        if (affectedInvoice) return { conflict: "historical" as const };
+        await tx.update(taxRuleVersionsTable)
+          .set({ effectiveTo: previousCalendarDate(data.effectiveFrom) })
+          .where(eq(taxRuleVersionsTable.id, openEnded.id));
+        supersededRuleId = openEnded.id;
+      }
+      const [created] = await tx.insert(taxRuleVersionsTable).values({
+        id: randomUUID(),
+        ...data,
+      }).returning();
+      await tx.insert(auditLogsTable).values({
+        id: randomUUID(),
+        action: "ATURAN PAJAK DITAMBAHKAN",
+        entity: "Aturan Pajak",
+        entityId: created.id,
+        detail: `${created.version} · berlaku ${created.effectiveFrom}${created.effectiveTo ? ` s.d. ${created.effectiveTo}` : " dan seterusnya"}`,
+        user: req.access!.displayName,
+        actorUserId: req.access!.userId,
+        actorRole: req.access!.role,
+        tone: "info",
+        metadata: { regulatorySource: created.regulatorySource },
+      });
+      return { created, supersededRuleId };
     });
-    return { created, supersededRuleId };
-  });
+  } catch (error) {
+    if (!isTaxRuleOverlapConstraint(error)) throw error;
+    result = { conflict: "period" as const };
+  }
   if ("conflict" in result) {
     res.status(409).json({
       error: result.conflict === "version"
