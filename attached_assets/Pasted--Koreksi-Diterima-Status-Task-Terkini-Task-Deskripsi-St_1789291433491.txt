@@ -1,0 +1,87 @@
+# ✅ Koreksi Diterima
+
+## Status Task Terkini
+
+| Task | Deskripsi | Status |
+|------|-----------|--------|
+| #1 | PostgreSQL Migration | ✅ Merged |
+| #2 | RBAC + Clerk | ✅ Merged |
+| #3 | Versioned Tax Engine | ✅ Merged |
+| #7 | Invitation System | ✅ Merged |
+| #8 | Konfigurasi aturan pajak oleh Finance | ✅ Merged |
+| #9 | Immutability invoice lama saat rumus pajak berubah | ✅ Merged |
+| #10 | Tes integrasi keunikan nomor invoice | ✅ **Merged** |
+| #11 | Atomicity pembuatan proyek | 🔄 IN_PROGRESS |
+| #15 | Pencegahan periode pajak bertabrakan | ❌ Dibatalkan |
+| #16 | Pratinjau dampak tarif sebelum disimpan | ⏳ PENDING |
+| #17 | Pencegahan aturan pajak tumpang tindih | ⏳ PENDING |
+| #18 | Ringkasan pajak memakai nominal PPh 23 sebenarnya | ⏳ PENDING |
+| #19 | Pencegahan nomor invoice digunakan kembali setelah transaksi gagal | ⏳ PENDING |
+| #20 | Perubahan proyek tanpa jejak audit | 📝 PROPOSED |
+
+## Koreksi Kritis: Audit Log dalam Transaksi
+
+Saya mengakui kesalahan konseptual pada catatan sebelumnya. Prinsip ACID yang benar:
+
+### Yang Salah di Catatan Saya
+```
+❌ "audit log mencatat kegagalan" dalam transaksi yang sama
+```
+
+### Yang Benar
+Jika audit log berada dalam transaksi yang sama dengan operasi bisnis, maka **ketika transaksi di-rollback, audit log juga ikut ter-rollback**. Ini konsekuensi langsung dari properti *Atomicity* dalam ACID.
+
+### Implikasi untuk Pencatatan Kegagalan
+
+Pencatatan kegagalan transaksi hanya mungkin melalui dua pola:
+
+**Pola A — Transaksi Terpisah (Out-of-Transaction Audit)**
+```typescript
+try {
+  await db.transaction(async (tx) => {
+    await tx.insert(projects).values(...);
+    await tx.insert(rabHeaders).values(...);
+    // jika gagal di sini → rollback
+  });
+} catch (error) {
+  // Transaksi baru, terpisah
+  await db.insert(auditLog).values({
+    action: 'project_creation_failed',
+    error: error.message,
+    // ...
+  });
+  throw error;
+}
+```
+
+**Pola B — Observability Eksternal (Non-DB Logging)**
+```typescript
+try {
+  await db.transaction(async (tx) => {
+    // ... operasi bisnis
+  });
+} catch (error) {
+  // Logger eksternal (file, APM, structured logging)
+  logger.error('project_creation_failed', { error, context });
+  throw error;
+}
+```
+
+### Trade-off
+
+| Aspek | Pola A (DB terpisah) | Pola B (Logger eksternal) |
+|-------|----------------------|---------------------------|
+| Queryable via SQL | ✅ Ya | ❌ Tidak langsung |
+| Atomic dengan bisnis | ❌ Tidak (bisa gagal sendiri) | ❌ Tidak |
+| Overhead performa | Sedang (1 query tambahan) | Rendah |
+| Konsistensi dengan data | Bisa inkonsisten jika logger gagal | Tidak ada inkonsistensi |
+| Observability terpusat | ❌ Terpisah | ✅ Bisa integrasi dengan APM |
+
+## Batasan yang Saya Pegang untuk Task #11
+
+- Tidak mengasumsikan pola audit mana yang dipilih (A atau B)
+- Tidak mengasumsikan nama tabel, titik injeksi, atau response code
+- Tidak mengasumsikan jumlah skenario tes
+- Tidak mengganggu implementasi yang sedang berjalan
+
+Mode standby aktif. Menunggu instruksi eksplisit Anda selanjutnya.
