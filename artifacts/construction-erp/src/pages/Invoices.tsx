@@ -35,12 +35,20 @@ export default function Invoices() {
   const canApprove = hasPermission(access, "invoices:approve")
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [newInv, setNewInv] = useState({
+  const [newInv, setNewInv] = useState<{
+    projectId: string
+    period: string
+    dpp: string
+    retentionPercent: string
+    issuedAt: string
+    qualification: "KECIL" | "MENENGAH" | "BESAR"
+  }>({
     projectId: "",
     period: "",
     dpp: "",
     retentionPercent: "5",
-    pphRate: "2" // Construction final tax typically 2%
+    issuedAt: new Date().toISOString().slice(0, 10),
+    qualification: "KECIL",
   })
 
   const filteredInvoices = invoices?.filter(i => 
@@ -56,13 +64,18 @@ export default function Invoices() {
         period: newInv.period,
         dpp: Number(newInv.dpp),
         retentionPercent: Number(newInv.retentionPercent),
+        issuedAt: newInv.issuedAt,
         integrated: true,
-        pphRate: Number(newInv.pphRate)
+        serviceType: "KONSTRUKSI",
+        qualification: newInv.qualification,
+        hasSbu: true,
+        supplierPkp: true,
+        governmentCollector: false,
       }
     }, {
       onSuccess: () => {
         setIsDialogOpen(false)
-        setNewInv({ projectId: "", period: "", dpp: "", retentionPercent: "5", pphRate: "2" })
+        setNewInv({ projectId: "", period: "", dpp: "", retentionPercent: "5", issuedAt: new Date().toISOString().slice(0, 10), qualification: "KECIL" })
         queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() })
       }
     })
@@ -77,9 +90,10 @@ export default function Invoices() {
   // Calculate live preview
   const dppVal = Number(newInv.dpp) || 0
   const retentionVal = dppVal * (Number(newInv.retentionPercent) / 100)
-  const baseDpp = dppVal - retentionVal
+  const baseDpp = dppVal
   const ppnVal = baseDpp * 0.11
-  const pphVal = baseDpp * (Number(newInv.pphRate) / 100)
+  const pphRates = { KECIL: 0.0175, MENENGAH: 0.0265, BESAR: 0.0265 } as const
+  const pphVal = baseDpp * pphRates[newInv.qualification]
   const totalVal = baseDpp + ppnVal - pphVal
 
   return (
@@ -132,9 +146,20 @@ export default function Invoices() {
                       <Input id="retention" type="number" step="0.1" required value={newInv.retentionPercent} onChange={e => setNewInv({...newInv, retentionPercent: e.target.value})} />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="pph">PPh Final Rate (%)</Label>
-                      <Input id="pph" type="number" step="0.1" required value={newInv.pphRate} onChange={e => setNewInv({...newInv, pphRate: e.target.value})} />
+                      <Label htmlFor="issuedAt">Invoice Date</Label>
+                      <Input id="issuedAt" type="date" required value={newInv.issuedAt} onChange={e => setNewInv({...newInv, issuedAt: e.target.value})} />
                     </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Construction Qualification</Label>
+                    <Select value={newInv.qualification} onValueChange={(qualification: "KECIL" | "MENENGAH" | "BESAR") => setNewInv({...newInv, qualification})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="KECIL">Small — SBU verified</SelectItem>
+                        <SelectItem value="MENENGAH">Medium — SBU verified</SelectItem>
+                        <SelectItem value="BESAR">Large — SBU verified</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
@@ -151,7 +176,7 @@ export default function Invoices() {
                     <span>- {formatRupiah(retentionVal)}</span>
                   </div>
                   <div className="border-t border-border/50 my-1 pt-2 flex justify-between text-sm font-medium">
-                    <span>Net DPP</span>
+                    <span>Tax Base</span>
                     <span>{formatRupiah(baseDpp)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-emerald-500">
@@ -159,7 +184,7 @@ export default function Invoices() {
                     <span>+ {formatRupiah(ppnVal)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-destructive">
-                    <span>PPh Final ({newInv.pphRate || 0}%)</span>
+                    <span>PPh Final ({(pphRates[newInv.qualification] * 100).toFixed(2)}%)</span>
                     <span>- {formatRupiah(pphVal)}</span>
                   </div>
                   <div className="border-t-2 border-border mt-2 pt-3 flex justify-between text-lg font-bold">

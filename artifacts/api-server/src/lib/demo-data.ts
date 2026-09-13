@@ -36,7 +36,79 @@ import {
   rabBaselinesTable,
   rabItemsTable,
   taxCalculationSnapshotsTable,
+  taxRuleVersionsTable,
 } from "@workspace/db";
+import { isNull } from "drizzle-orm";
+
+const booleanVariants = [false, true] as const;
+const constructionQualifications = [
+  { qualification: "KECIL", hasSbu: true, pphFinalRateBasisPoints: 175 },
+  { qualification: "MENENGAH", hasSbu: true, pphFinalRateBasisPoints: 265 },
+  { qualification: "BESAR", hasSbu: true, pphFinalRateBasisPoints: 265 },
+  { qualification: "TANPA_KUALIFIKASI", hasSbu: false, pphFinalRateBasisPoints: 400 },
+] as const;
+
+const demoTaxRules = [
+  {
+    id: "tax-legacy-demo-2026",
+    version: "LEGACY-DEMO-2026",
+    effectiveFrom: "2026-01-01",
+    effectiveTo: "2026-12-31",
+    regulatorySource: "Migrasi formula demo historis; sumber regulasi tidak tercatat pada transaksi asal",
+    serviceType: "KONSTRUKSI",
+    qualification: "TANPA_KUALIFIKASI",
+    requiresSbu: false,
+    supplierPkp: true,
+    governmentCollector: false,
+    integrated: true,
+    dppRateBasisPoints: 2750,
+    ppnRateBasisPoints: 1100,
+    pphFinalRateBasisPoints: 250,
+    pph23RateBasisPoints: 0,
+  },
+  ...constructionQualifications.flatMap((item) =>
+    booleanVariants.flatMap((supplierPkp) =>
+      booleanVariants.flatMap((governmentCollector) =>
+        booleanVariants.map((integrated) => ({
+          id: `tax-2022-construction-${item.qualification}-${supplierPkp}-${governmentCollector}-${integrated}`,
+          version: `PP9-2022-KONSTRUKSI-${item.qualification}-${supplierPkp ? "PKP" : "NONPKP"}-${governmentCollector ? "PEMUNGUT" : "NONPEMUNGUT"}-${integrated ? "TERINTEGRASI" : "NONTERINTEGRASI"}`,
+          effectiveFrom: "2022-02-21",
+          effectiveTo: null,
+          regulatorySource: "PP Nomor 9 Tahun 2022; UU HPP dan PMK 131/2024 untuk perlakuan PPN",
+          serviceType: "KONSTRUKSI",
+          qualification: item.qualification,
+          requiresSbu: item.hasSbu,
+          supplierPkp,
+          governmentCollector,
+          integrated,
+          dppRateBasisPoints: supplierPkp ? 9167 : 0,
+          ppnRateBasisPoints: supplierPkp ? 1200 : 0,
+          pphFinalRateBasisPoints: item.pphFinalRateBasisPoints,
+          pph23RateBasisPoints: 0,
+        })),
+      ),
+    ),
+  ),
+  ...booleanVariants.flatMap((supplierPkp) =>
+    booleanVariants.map((governmentCollector) => ({
+      id: `tax-2022-other-${supplierPkp}-${governmentCollector}`,
+      version: `UUHPP-JASA-LAIN-${supplierPkp ? "PKP" : "NONPKP"}-${governmentCollector ? "PEMUNGUT" : "NONPEMUNGUT"}`,
+      effectiveFrom: "2022-04-01",
+      effectiveTo: null,
+      regulatorySource: "UU PPh Pasal 23; UU HPP dan PMK 131/2024 untuk perlakuan PPN",
+      serviceType: "JASA_LAIN",
+      qualification: null,
+      requiresSbu: false,
+      supplierPkp,
+      governmentCollector,
+      integrated: false,
+      dppRateBasisPoints: supplierPkp ? 9167 : 0,
+      ppnRateBasisPoints: supplierPkp ? 1200 : 0,
+      pphFinalRateBasisPoints: 0,
+      pph23RateBasisPoints: 200,
+    })),
+  ),
+];
 
 export const demoProjects: ProjectRecord[] = [
   {
@@ -159,6 +231,7 @@ export const demoActivity = [
 
 export async function seedDemoData() {
   await db.transaction(async (tx) => {
+    await tx.insert(taxRuleVersionsTable).values(demoTaxRules).onConflictDoNothing();
     await tx.insert(projectsTable).values(demoProjects.map((project) => ({
       ...project,
       wbsCount: project.id === "prj-001" ? 34 : 22,
@@ -181,11 +254,24 @@ export async function seedDemoData() {
       })),
     )).onConflictDoNothing();
 
-    await tx.insert(invoicesTable).values(demoInvoices).onConflictDoNothing();
+    await tx.insert(invoicesTable).values(demoInvoices.map((invoice) => ({
+      ...invoice,
+      pph23: 0,
+      taxRuleVersionId: "tax-legacy-demo-2026",
+    }))).onConflictDoNothing();
     await tx.insert(taxCalculationSnapshotsTable).values(demoInvoices.map((invoice) => ({
       id: `tax-${invoice.id}`,
       invoiceId: invoice.id,
+      taxRuleVersionId: "tax-legacy-demo-2026",
+      ruleVersion: "LEGACY-DEMO-2026",
+      regulatorySource: "Migrasi formula demo historis; sumber regulasi tidak tercatat pada transaksi asal",
+      ruleSnapshot: demoTaxRules[0],
       dpp: invoice.dpp,
+      serviceType: "KONSTRUKSI",
+      qualification: "TANPA_KUALIFIKASI",
+      hasSbu: false,
+      supplierPkp: true,
+      governmentCollector: false,
       integrated: true,
       dppLainRateBasisPoints: 2750,
       ppnRateBasisPoints: 1100,
@@ -193,8 +279,20 @@ export async function seedDemoData() {
       retentionPercentBasisPoints: 500,
       ppn: invoice.ppn,
       pphFinal: invoice.pphFinal,
+      pph23: 0,
       retention: invoice.retention,
     }))).onConflictDoNothing();
+    await tx.update(invoicesTable)
+      .set({ taxRuleVersionId: "tax-legacy-demo-2026" })
+      .where(isNull(invoicesTable.taxRuleVersionId));
+    await tx.update(taxCalculationSnapshotsTable)
+      .set({
+        taxRuleVersionId: "tax-legacy-demo-2026",
+        ruleVersion: "LEGACY-DEMO-2026",
+        regulatorySource: "Migrasi formula demo historis; sumber regulasi tidak tercatat pada transaksi asal",
+        ruleSnapshot: demoTaxRules[0],
+      })
+      .where(isNull(taxCalculationSnapshotsTable.taxRuleVersionId));
     await tx.insert(auditLogsTable).values(demoActivity.map((item) => ({
       ...item,
       timestamp: new Date(item.timestamp),

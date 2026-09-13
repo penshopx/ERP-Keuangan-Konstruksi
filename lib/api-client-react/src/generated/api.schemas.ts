@@ -72,10 +72,13 @@ export interface Invoice {
   dpp: number;
   ppn: number;
   pphFinal: number;
+  pph23: number;
   retention: number;
   total: number;
   status: string;
   issuedAt: string;
+  /** @nullable */
+  taxRuleVersionId: string | null;
 }
 
 export type ProjectDetail = Project & {
@@ -118,6 +121,8 @@ export interface RabSummary {
   items: RabItem[];
 }
 
+export type InvoiceInputServiceType = typeof InvoiceInputServiceType[keyof typeof InvoiceInputServiceType];
+
 export interface RabTemplateItem {
   code: string;
   /** @nullable */
@@ -158,10 +163,16 @@ export interface RabTemplateImportInput {
 export interface InvoiceInput {
   projectId: string;
   period: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  issuedAt: string;
   dpp: number;
   retentionPercent: number;
   integrated: boolean;
-  pphRate: number;
+  serviceType: InvoiceInputServiceType;
+  qualification: InvoiceInputQualification;
+  hasSbu: boolean;
+  supplierPkp: boolean;
+  governmentCollector: boolean;
 }
 
 export interface TaxSummary {
@@ -271,3 +282,18 @@ export type GetTaxSummaryParams = {
 period?: string;
 };
 
+
+export const InvoiceInputServiceType = {
+  KONSTRUKSI: 'KONSTRUKSI',
+  JASA_LAIN: 'JASA_LAIN',
+} as const;
+
+export const InvoiceInputQualification = {
+  KECIL: 'KECIL',
+  MENENGAH: 'MENENGAH',
+  BESAR: 'BESAR',
+  TANPA_KUALIFIKASI: 'TANPA_KUALIFIKASI',
+  TIDAK_BERLAKU: 'TIDAK_BERLAKU',
+} as const;
+
+export type InvoiceInputQualification = typeof InvoiceInputQualification[keyof typeof InvoiceInputQualification];

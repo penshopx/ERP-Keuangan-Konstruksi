@@ -16,8 +16,11 @@ export interface Invoice {
   dpp: number;
   ppn: number;
   pphFinal: number;
+  pph23: number;
   retention: number;
   total: number;
   status: string;
   issuedAt: string;
+  /** @nullable */
+  taxRuleVersionId: string | null;
 }

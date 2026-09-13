@@ -7,4 +7,4 @@ Construction tax rates, DPP treatments, and document formats must be modeled as 
 
 **Why:** Indonesian tax rules change, and the source documents supplied for this project contain inconsistent formulas. Historical invoices must remain reproducible after future rule changes.
 
-**How to apply:** Use configurable rule records for PPh Final, PPN/DPP treatment, and PPh 23. Require explicit effective dates and preserve the applied rule metadata on posted transactions.
+**How to apply:** Use configurable rule records for PPh Final, PPN/DPP treatment, and PPh 23. Require explicit effective dates and preserve the applied rule metadata on posted transactions. When migrating historical transactions whose source was not recorded, preserve their original amounts and formula as an explicitly labeled historical rule; never silently map them to a newer regulation or recalculate them.

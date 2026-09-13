@@ -22,6 +22,8 @@ export * from './getTaxSummaryParams';
 export * from './healthStatus';
 export * from './invoice';
 export * from './invoiceInput';
+export * from './invoiceInputQualification';
+export * from './invoiceInputServiceType';
 export * from './listInvoicesParams';
 export * from './listProjectsParams';
 export * from './project';

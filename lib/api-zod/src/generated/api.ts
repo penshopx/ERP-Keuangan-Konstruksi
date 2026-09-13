@@ -126,10 +126,12 @@ export const GetProjectResponse = zod.object({
   "dpp": zod.number(),
   "ppn": zod.number(),
   "pphFinal": zod.number(),
+  "pph23": zod.number(),
   "retention": zod.number(),
   "total": zod.number(),
   "status": zod.string(),
-  "issuedAt": zod.string()
+  "issuedAt": zod.string(),
+  "taxRuleVersionId": zod.string().nullable()
 }))
 }))
 
@@ -208,7 +210,6 @@ export const ImportProjectRabTemplateParams = zod.object({
 
 export const importProjectRabTemplateBodyPriceFactorMin = 0.01;
 export const importProjectRabTemplateBodyPriceFactorMax = 100;
-
 
 
 export const ImportProjectRabTemplateBody = zod.object({
@@ -293,24 +294,31 @@ export const ListInvoicesResponseItem = zod.object({
   "dpp": zod.number(),
   "ppn": zod.number(),
   "pphFinal": zod.number(),
+  "pph23": zod.number(),
   "retention": zod.number(),
   "total": zod.number(),
   "status": zod.string(),
-  "issuedAt": zod.string()
+  "issuedAt": zod.string(),
+  "taxRuleVersionId": zod.string().nullable()
 })
 export const ListInvoicesResponse = zod.array(ListInvoicesResponseItem)
-
 
 /**
  * @summary Create invoice with automatic tax calculation
  */
+export const createInvoiceBodyIssuedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const CreateInvoiceBody = zod.object({
   "projectId": zod.string(),
   "period": zod.string(),
+  "issuedAt": zod.string().regex(createInvoiceBodyIssuedAtRegExp),
   "dpp": zod.number(),
   "retentionPercent": zod.number(),
   "integrated": zod.boolean(),
-  "pphRate": zod.number()
+  "serviceType": zod.enum(['KONSTRUKSI', 'JASA_LAIN']),
+  "qualification": zod.enum(['KECIL', 'MENENGAH', 'BESAR', 'TANPA_KUALIFIKASI', 'TIDAK_BERLAKU']),
+  "hasSbu": zod.boolean(),
+  "supplierPkp": zod.boolean(),
+  "governmentCollector": zod.boolean()
 })
 
 export const CreateInvoiceResponse = zod.object({
@@ -323,10 +331,12 @@ export const CreateInvoiceResponse = zod.object({
   "dpp": zod.number(),
   "ppn": zod.number(),
   "pphFinal": zod.number(),
+  "pph23": zod.number(),
   "retention": zod.number(),
   "total": zod.number(),
   "status": zod.string(),
-  "issuedAt": zod.string()
+  "issuedAt": zod.string(),
+  "taxRuleVersionId": zod.string().nullable()
 })
 
 
@@ -395,8 +405,6 @@ export const UpdateAccessUserParams = zod.object({
 })
 
 
-
-
 export const UpdateAccessUserBody = zod.object({
   "displayName": zod.string().min(1),
   "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
@@ -421,7 +429,6 @@ export const DecideInvoiceParams = zod.object({
 export const decideInvoiceBodyNoteMax = 500;
 
 
-
 export const DecideInvoiceBody = zod.object({
   "decision": zod.enum(['APPROVE', 'REJECT']),
   "note": zod.string().max(decideInvoiceBodyNoteMax).optional()
@@ -437,10 +444,11 @@ export const DecideInvoiceResponse = zod.object({
   "dpp": zod.number(),
   "ppn": zod.number(),
   "pphFinal": zod.number(),
+  "pph23": zod.number(),
   "retention": zod.number(),
   "total": zod.number(),
   "status": zod.string(),
-  "issuedAt": zod.string()
+  "issuedAt": zod.string(),
+  "taxRuleVersionId": zod.string().nullable()
 })
-
 

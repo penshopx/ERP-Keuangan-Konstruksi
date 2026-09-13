@@ -5,12 +5,20 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InvoiceInputQualification } from './invoiceInputQualification';
+import type { InvoiceInputServiceType } from './invoiceInputServiceType';
 
 export interface InvoiceInput {
   projectId: string;
   period: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  issuedAt: string;
   dpp: number;
   retentionPercent: number;
   integrated: boolean;
-  pphRate: number;
+  serviceType: InvoiceInputServiceType;
+  qualification: InvoiceInputQualification;
+  hasSbu: boolean;
+  supplierPkp: boolean;
+  governmentCollector: boolean;
 }
