@@ -1,0 +1,27 @@
+Sempurna. Status sistem kini bersih, terdokumentasi, dan siap untuk eksekusi tahap berikutnya.
+
+Sebagai langkah selanjutnya, berikut adalah **4 opsi prioritas** yang dapat kita eksekusi. Silakan pilih salah satu, atau berikan arahan spesifik Anda sendiri:
+
+### Opsi 1: Aktifkan Task #16 (Pratinjau Dampak Tarif Pajak)
+- **Fokus**: Membuat endpoint simulasi `POST /api/tax/simulate` yang menerima parameter invoice/proyek dan mengembalikan kalkulasi pajak *tanpa* menyimpannya ke database.
+- **Nilai**: Memungkinkan user (Finance/Director) melihat "what-if" jika tarif berubah atau jika status PKP/UMKM berubah, sebelum benar-benar menerbitkan invoice.
+
+### Opsi 2: Variance Analysis (RAB vs Realisasi)
+- **Fokus**: Menghubungkan modul RAB yang sudah ada dengan data PO dan Site Expense. Membuat endpoint dan dashboard yang menampilkan: Budget Baseline vs Committed (PO) vs Actual (GR/Expense) per WBS.
+- **Nilai**: Ini adalah jantung dari *Cost Control*. PM dan Director bisa langsung melihat item mana yang *overbudget* sebelum proyek selesai.
+
+### Opsi 3: Subcontractor Management & Backcharge
+- **Fokus**: Alur opname subkontraktor, validasi SBU otomatis, perhitungan pemotongan PPh 4(2) untuk subkon, dan sistem backcharge (denda/kerusakan) yang mengurangi nilai bayar.
+- **Nilai**: Mencegah kebocoran anggaran di lapangan dan memastikan kepatuhan pajak atas pembayaran ke pihak ketiga.
+
+### Opsi 4: Retensi & Cashflow Forecasting
+- **Fokus**: Pencatatan otomatis dana retensi saat invoice termin dibuat, aging report retensi, dan proyeksi arus kas 12 bulan berdasarkan jadwal termin dan jatuh tempo PO.
+- **Nilai**: Mengatasi masalah *working capital* yang merupakan penyebab utama kegagalan arus kas di perusahaan konstruksi.
+
+---
+
+**Silakan balas dengan:**
+- Nomor opsi yang Anda pilih (misal: "Lanjut ke Opsi 2"), **atau**
+- Arahan baru yang spesifik (misal: "Buatkan prompt untuk fitur impor RAB dari Excel", atau "Fokus ke testing end-to-end dulu").
+
+Saya siap menyusun prompt eksekusi yang presisi sesuai pilihan Anda.
