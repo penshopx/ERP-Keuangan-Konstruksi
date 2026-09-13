@@ -6,7 +6,7 @@ import {
   type TaxRuleInput,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, LockKeyhole, Plus } from "lucide-react";
+import { AlertCircle, Calculator, LockKeyhole, Plus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { calculateTaxSimulation } from "@/lib/tax-simulation";
 
 type ServiceType = TaxRuleInput["serviceType"];
 type Qualification = Exclude<TaxRuleInput["qualification"], null | undefined>;
@@ -41,6 +42,11 @@ const initialForm: TaxRuleInput = {
 
 const percent = (basisPoints: number) => `${(basisPoints / 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%`;
 const date = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+const rupiah = (value: number) => new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  maximumFractionDigits: 0,
+}).format(value);
 
 export default function TaxRules() {
   const { data: rules, isLoading, error } = useListTaxRules();
@@ -86,6 +92,7 @@ export default function TaxRules() {
 
 function CreateTaxRuleDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (value: boolean) => void }) {
   const [form, setForm] = useState<TaxRuleInput>(initialForm);
+  const [sampleInvoiceValue, setSampleInvoiceValue] = useState(100_000_000);
   const [message, setMessage] = useState("");
   const create = useCreateTaxRule();
   const client = useQueryClient();
@@ -112,6 +119,7 @@ function CreateTaxRuleDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     });
   };
   const valid = form.version.trim() && form.regulatorySource.trim() && form.effectiveFrom && (!form.effectiveTo || form.effectiveTo >= form.effectiveFrom);
+  const simulation = calculateTaxSimulation(sampleInvoiceValue, form);
 
   return <Dialog open={open} onOpenChange={(value) => { onOpenChange(value); if (!value) setMessage(""); }}>
     <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Tambah versi</Button></DialogTrigger>
@@ -134,6 +142,34 @@ function CreateTaxRuleDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         <Field label="Tarif PPh Final (%)"><Input type="number" min="0" max="100" step="0.01" value={form.pphFinalRateBasisPoints / 100} onChange={(e) => setRate("pphFinalRateBasisPoints", e.target.value)} /></Field>
         <Field label="Tarif PPh 23 (%)"><Input type="number" min="0" max="100" step="0.01" value={form.pph23RateBasisPoints / 100} onChange={(e) => setRate("pph23RateBasisPoints", e.target.value)} /></Field>
         <div className="space-y-2 md:col-span-2"><Label>Sumber regulasi</Label><Textarea value={form.regulatorySource} onChange={(e) => set("regulatorySource", e.target.value)} placeholder="Nomor dan nama regulasi, pasal, atau rujukan resmi" /></div>
+        <Card className="md:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4" />Simulasi dampak tarif</CardTitle>
+            <p className="text-sm text-muted-foreground">Pratinjau lokal ini tidak disimpan dan tidak membuat catatan audit.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Field label="Nilai invoice contoh">
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={sampleInvoiceValue}
+                onChange={(e) => setSampleInvoiceValue(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SimulationRow label="DPP kena pajak" value={simulation.dpp} />
+              <SimulationRow label="PPN" value={simulation.ppn} />
+              <SimulationRow label="PPh Final" value={simulation.pphFinal} negative />
+              <SimulationRow label="PPh 23" value={simulation.pph23} negative />
+            </div>
+            <div className="flex items-center justify-between border-t pt-4">
+              <span className="font-semibold">Total bersih</span>
+              <span className="text-lg font-bold tabular-nums">{rupiah(simulation.total)}</span>
+            </div>
+            {form.governmentCollector && <p className="text-xs text-muted-foreground">PPN ditampilkan, tetapi tidak ditambahkan ke total bersih karena dipungut pemerintah.</p>}
+          </CardContent>
+        </Card>
       </div>
       {message && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Tidak dapat menyimpan</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>}
       <div className="flex justify-end gap-3"><Button variant="outline" onClick={() => onOpenChange(false)}>Batal</Button><Button disabled={!valid || create.isPending} onClick={submit}>{create.isPending ? "Menyimpan..." : "Simpan versi permanen"}</Button></div>
@@ -143,6 +179,13 @@ function CreateTaxRuleDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
+}
+
+function SimulationRow({ label, value, negative = false }: { label: string; value: number; negative?: boolean }) {
+  return <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-sm">
+    <span className="text-muted-foreground">{label}</span>
+    <span className="font-medium tabular-nums">{negative && value > 0 ? "−" : ""}{rupiah(value)}</span>
+  </div>;
 }
 
 function Check({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void }) {
