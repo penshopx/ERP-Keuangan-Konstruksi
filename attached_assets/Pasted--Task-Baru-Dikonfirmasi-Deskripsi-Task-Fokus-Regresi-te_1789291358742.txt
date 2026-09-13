@@ -1,0 +1,73 @@
+# ✅ Task Baru Dikonfirmasi
+
+## Deskripsi Task
+
+**Fokus:** Regresi test untuk atomicity pembuatan proyek.
+
+**Masalah yang dicegah:**
+```
+Skenario gagal yang TIDAK boleh terjadi:
+  ✅ INSERT projects → berhasil
+  ❌ INSERT rab_headers (baseline) → gagal
+  ❌ INSERT audit_log → tidak tercapai
+  
+  Hasil: proyek tersimpan TANPA baseline RAB dan audit → data setengah jadi
+```
+
+**Yang diharapkan:**
+```
+Skenario yang benar (atomic):
+  ✅ INSERT projects
+  ❌ INSERT rab_headers → gagal
+  
+  → ROLLBACK seluruh transaksi
+  → projects TIDAK tersimpan
+  → audit log mencatat kegagalan
+  → Response: 500 dengan pesan yang jelas
+```
+
+## Tiga Operasi yang Harus Atomic
+
+| # | Operasi | Tabel | Wajib? |
+|---|---------|-------|--------|
+| 1 | Insert proyek | `projects` | ✅ Ya |
+| 2 | Insert baseline RAB | `rab_headers` + `rab_items` | ✅ Ya |
+| 3 | Insert audit log | `audit_log` | ✅ Ya |
+
+## Pendekatan Test yang Tepat
+
+```typescript
+// Pseudocode regression test
+describe("Project creation atomicity", () => {
+  
+  test("rollback jika insert baseline RAB gagal", async () => {
+    // 1. Mock/spy insert rab_headers agar throw error
+    // 2. Panggil endpoint POST /api/projects
+    // 3. Assert: response 500
+    // 4. Assert: SELECT projects WHERE code = '...' → 0 rows
+    // 5. Assert: SELECT rab_headers WHERE project_id = '...' → 0 rows
+  });
+
+  test("rollback jika insert audit log gagal", async () => {
+    // 1. Mock/spy insert audit_log agar throw error
+    // 2. Panggil endpoint POST /api/projects
+    // 3. Assert: response 500
+    // 4. Assert: tidak ada data proyek maupun RAB yang tersimpan
+  });
+
+  test("sukses jika semua operasi berhasil", async () => {
+    // 1. Panggil endpoint POST /api/projects dengan data valid
+    // 2. Assert: response 201
+    // 3. Assert: proyek, baseline RAB, dan audit log semuanya ada
+  });
+});
+```
+
+## Status
+
+| Task | Status |
+|------|--------|
+| #10 | 🔄 IN_PROGRESS (keunikan nomor invoice) |
+| *(baru)* | 🔄 IN_PROGRESS (atomicity pembuatan proyek) |
+
+Saya tidak mengganggu kedua task yang sedang berjalan. Menunggu instruksi Anda selanjutnya.
