@@ -1,0 +1,64 @@
+# ✅ Mental Model Final Dikunci
+
+Koreksi Anda diterima. Saya kunci pemahaman akhir sebagai berikut:
+
+## Istilah Aktual vs Konsep
+
+| Konsep | Istilah Aktual di Kode |
+|--------|------------------------|
+| Record akses pengguna | `user_roles` (bukan junction, 1 record = 1 role + displayName) |
+| Penugasan proyek | `project_assignments` |
+| First-login provisioning | Lazy provisioning di middleware (bukan webhook) |
+| Bootstrap user pertama | Role `DIRECTOR` otomatis |
+| User tanpa undangan valid | Role `UNASSIGNED` → 403 |
+
+## Implikasi Konkret untuk Coding Selanjutnya
+
+```typescript
+// Query user yang benar:
+const access = await db.query.user_roles.findFirst({
+  where: eq(user_roles.clerkUserId, clerkUserId)
+});
+// access.role, access.displayName
+
+// Query project access yang benar:
+const assignments = await db.query.project_assignments.findMany({
+  where: eq(project_assignments.userId, access.userId)
+});
+```
+
+Middleware provisioning akan:
+1. Extract Clerk identity dari request
+2. Cari `user_roles` by `clerkUserId`
+3. Jika tidak ada → cari invitation PENDING by email terverifikasi
+4. Dalam 1 transaksi atomik: create `user_roles` + copy `project_assignments` + mark invitation `ACCEPTED`
+5. Jika tidak ada invitation valid → create `user_roles` dengan role `UNASSIGNED`
+
+---
+
+## 🎯 Pertanyaan Strategis untuk Langkah Selanjutnya
+
+Karena fondasi RAB (baseline, detail item, template, impor template) **sudah ada**, saya perlu Anda arahkan: **fitur RAB mana yang perlu diperluas?**
+
+Berikut beberapa kandidat yang biasanya menjadi kelanjutan natural dari fondasi RAB yang sudah ada:
+
+| Opsi | Deskripsi | Nilai Bisnis |
+|------|-----------|--------------|
+| **A. Variance Analysis (RAB vs Realisasi)** | Bandingkan baseline RAB dengan PO/Site Expense aktual per WBS. Highlight over/under budget. | 🔴 Tinggi — ini jantung cost control |
+| **B. Revision/Amendment Workflow** | Alur revisi RAB yang ter-audit: draft → review → approve → jadi baseline baru. Versi lama tetap bisa dilihat. | 🟡 Sedang — penting untuk proyek dengan VO |
+| **C. Kurva S Rencana** | Hitung distribusi bobot per periode dari RAB → jadi baseline progress. Input untuk EVM. | 🟡 Sedang — dasar untuk earned value |
+| **D. Import RAB dari Excel/Alewa** | Parser untuk format RAB umum di Indonesia (export dari software estimasi). | 🟢 Opsional — convenience feature |
+| **E. HSP (Harga Satuan Pokok) Library** | Database harga satuan yang bisa dipakai ulang antar proyek. Update berkala. | 🟢 Opsional — efisiensi estimasi |
+
+**Rekomendasi saya: Opsi A (Variance Analysis)**, karena:
+- Fondasi RAB sudah ada, PO & Site Expense juga sudah mulai terbentuk
+- Ini fitur yang paling sering ditanyakan oleh Director & PM
+- Menjadi prasyarat untuk EVM di fase berikutnya
+
+---
+
+**Mohon konfirmasi:**
+1. Apakah Opsi A sesuai prioritas Anda, atau ada opsi lain yang lebih urgent?
+2. Atau ada fitur RAB spesifik lain yang sudah Anda rencanakan?
+
+Setelah Anda arahkan, saya akan susun prompt yang presisi untuk Replit Agent — fokus memperluas, bukan membangun ulang.
