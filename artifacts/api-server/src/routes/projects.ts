@@ -30,6 +30,7 @@ import { canAccessProject, requirePermission } from "../middlewares/access";
 export type ProjectPersistenceHooks = {
   beforeBaselineInsert?: (projectId: string) => Promise<void>;
   beforeAuditInsert?: (projectId: string) => Promise<void>;
+  beforeUpdateAuditInsert?: (projectId: string) => Promise<void>;
 };
 
 export function createProjectsRouter(hooks: ProjectPersistenceHooks = {}): IRouter {
@@ -161,6 +162,7 @@ router.patch("/projects/:projectId", requirePermission("projects:write"), async 
   }
   const [updated] = await db.transaction(async (tx) => {
     const rows = await tx.update(projectsTable).set(body.data).where(eq(projectsTable.id, project.id)).returning();
+    await hooks.beforeUpdateAuditInsert?.(project.id);
     await tx.insert(auditLogsTable).values({
       id: randomUUID(),
       action: "DIPERBARUI",

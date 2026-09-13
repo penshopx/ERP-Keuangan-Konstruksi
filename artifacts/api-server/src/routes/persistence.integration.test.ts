@@ -197,6 +197,57 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     });
   }
 
+  await t.test("project update rolls back when its audit insert fails", async () => {
+    const [before] = await db.select().from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+    assert.ok(before);
+
+    const auditsBefore = await db.select({ id: auditLogsTable.id }).from(auditLogsTable)
+      .where(and(
+        eq(auditLogsTable.entity, "Proyek"),
+        eq(auditLogsTable.entityId, projectId),
+        eq(auditLogsTable.action, "DIPERBARUI"),
+      ));
+    let injectedForProjectId = "";
+    const server = await startTestServer({}, access, {
+      beforeUpdateAuditInsert: async (hookProjectId) => {
+        injectedForProjectId = hookProjectId;
+        throw new Error("Injected project update audit insert failure");
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.baseUrl}/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Perubahan yang wajib dibatalkan",
+          progress: 88,
+          contractValue: before.contractValue + 123_456,
+        }),
+      });
+      assert.equal(response.status, 500);
+    } finally {
+      await server.close();
+    }
+
+    assert.equal(injectedForProjectId, projectId);
+    const [after] = await db.select().from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+    assert.ok(after);
+    assert.equal(after.name, before.name);
+    assert.equal(after.progress, before.progress);
+    assert.equal(after.contractValue, before.contractValue);
+
+    const auditsAfter = await db.select({ id: auditLogsTable.id }).from(auditLogsTable)
+      .where(and(
+        eq(auditLogsTable.entity, "Proyek"),
+        eq(auditLogsTable.entityId, projectId),
+        eq(auditLogsTable.action, "DIPERBARUI"),
+      ));
+    assert.deepEqual(auditsAfter, auditsBefore);
+  });
+
   await t.test("invoice, tax snapshot, and audit are committed together", async () => {
     const server = await startTestServer();
     let invoiceId = "";
