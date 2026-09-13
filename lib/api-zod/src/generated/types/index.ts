@@ -6,9 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accessUser';
+export * from './accessUserRole';
+export * from './accessUserUpdate';
+export * from './accessUserUpdateRole';
 export * from './activity';
 export * from './alert';
+export * from './approvalDecisionInput';
+export * from './approvalDecisionInputDecision';
 export * from './cashflowPoint';
+export * from './currentUser';
+export * from './currentUserRole';
 export * from './dashboardSummary';
 export * from './getTaxSummaryParams';
 export * from './healthStatus';

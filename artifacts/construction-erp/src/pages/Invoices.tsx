@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useListInvoices, useCreateInvoice, getListInvoicesQueryKey, useListProjects } from "@workspace/api-client-react"
+import { useListInvoices, useCreateInvoice, getListInvoicesQueryKey, useListProjects, useDecideInvoice } from "@workspace/api-client-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { hasPermission, useAccess } from "@/lib/access"
+import { Check, X } from "lucide-react"
 
 export default function Invoices() {
   const [search, setSearch] = useState("")
@@ -27,6 +29,10 @@ export default function Invoices() {
   
   const queryClient = useQueryClient()
   const createInvoice = useCreateInvoice()
+  const decideInvoice = useDecideInvoice()
+  const access = useAccess()
+  const canCreate = hasPermission(access, "invoices:write")
+  const canApprove = hasPermission(access, "invoices:approve")
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newInv, setNewInv] = useState({
@@ -62,6 +68,12 @@ export default function Invoices() {
     })
   }
 
+  const decide = (invoiceId: string, decision: "APPROVE" | "REJECT") => {
+    decideInvoice.mutate({ invoiceId, data: { decision } }, {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() }),
+    })
+  }
+
   // Calculate live preview
   const dppVal = Number(newInv.dpp) || 0
   const retentionVal = dppVal * (Number(newInv.retentionPercent) / 100)
@@ -78,7 +90,7 @@ export default function Invoices() {
           <p className="text-muted-foreground">Manage project termin billings with automatic tax breakdown.</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        {canCreate && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <FilePlus className="mr-2 h-4 w-4" />
@@ -163,7 +175,7 @@ export default function Invoices() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       <div className="flex items-center gap-2">
@@ -191,16 +203,17 @@ export default function Invoices() {
               <TableHead className="text-right">Total Net</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Issued</TableHead>
+              {canApprove && <TableHead className="text-right">Approval</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">Loading invoices...</TableCell>
+                <TableCell colSpan={canApprove ? 9 : 8} className="h-24 text-center">Loading invoices...</TableCell>
               </TableRow>
             ) : !filteredInvoices?.length ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">No invoices found.</TableCell>
+                <TableCell colSpan={canApprove ? 9 : 8} className="h-24 text-center">No invoices found.</TableCell>
               </TableRow>
             ) : (
               filteredInvoices.map((inv) => (
@@ -230,6 +243,12 @@ export default function Invoices() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(inv.issuedAt)}</TableCell>
+                  {canApprove && <TableCell>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" disabled={decideInvoice.isPending} onClick={() => decide(inv.id, "REJECT")}><X className="mr-1 h-3.5 w-3.5" />Tolak</Button>
+                      <Button size="sm" disabled={decideInvoice.isPending} onClick={() => decide(inv.id, "APPROVE")}><Check className="mr-1 h-3.5 w-3.5" />Setujui</Button>
+                    </div>
+                  </TableCell>}
                 </TableRow>
               ))
             )}

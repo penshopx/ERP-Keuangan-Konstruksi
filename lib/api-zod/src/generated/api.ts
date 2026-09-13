@@ -279,3 +279,84 @@ export const ListActivityResponseItem = zod.object({
 export const ListActivityResponse = zod.array(ListActivityResponseItem)
 
 
+/**
+ * @summary Get the authenticated user's role and permissions
+ */
+export const GetCurrentUserResponse = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string()),
+  "permissions": zod.array(zod.string())
+})
+
+
+/**
+ * @summary List users and their project assignments
+ */
+export const ListAccessUsersResponseItem = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "role": zod.enum(['UNASSIGNED', 'DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string())
+})
+export const ListAccessUsersResponse = zod.array(ListAccessUsersResponseItem)
+
+
+/**
+ * @summary Assign a role and projects to a user
+ */
+export const UpdateAccessUserParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+
+
+
+export const UpdateAccessUserBody = zod.object({
+  "displayName": zod.string().min(1),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string())
+})
+
+export const UpdateAccessUserResponse = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "role": zod.enum(['UNASSIGNED', 'DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "assignedProjectIds": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Approve or reject an invoice
+ */
+export const DecideInvoiceParams = zod.object({
+  "invoiceId": zod.coerce.string()
+})
+
+export const decideInvoiceBodyNoteMax = 500;
+
+
+
+export const DecideInvoiceBody = zod.object({
+  "decision": zod.enum(['APPROVE', 'REJECT']),
+  "note": zod.string().max(decideInvoiceBodyNoteMax).optional()
+})
+
+export const DecideInvoiceResponse = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "projectId": zod.string(),
+  "projectCode": zod.string(),
+  "projectName": zod.string(),
+  "period": zod.string(),
+  "dpp": zod.number(),
+  "ppn": zod.number(),
+  "pphFinal": zod.number(),
+  "retention": zod.number(),
+  "total": zod.number(),
+  "status": zod.string(),
+  "issuedAt": zod.string()
+})
+
+

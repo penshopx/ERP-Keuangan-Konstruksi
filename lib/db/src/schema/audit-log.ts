@@ -9,6 +9,8 @@ export const auditLogsTable = pgTable("audit_logs", {
   entityId: text("entity_id"),
   detail: text("detail").notNull(),
   user: text("user").notNull(),
+  actorUserId: text("actor_user_id"),
+  actorRole: text("actor_role"),
   tone: text("tone").notNull(),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),

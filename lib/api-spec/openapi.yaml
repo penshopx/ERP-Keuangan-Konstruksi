@@ -20,6 +20,8 @@ tags:
     description: Tax compliance summaries
   - name: activity
     description: Immutable audit activity
+  - name: access
+    description: Authenticated user access and approvals
 paths:
   /healthz:
     get:
@@ -206,6 +208,78 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Activity"
+  /me:
+    get:
+      operationId: getCurrentUser
+      tags: [access]
+      summary: Get the authenticated user's role and permissions
+      responses:
+        "200":
+          description: Current user access profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+  /access/users:
+    get:
+      operationId: listAccessUsers
+      tags: [access]
+      summary: List users and their project assignments
+      responses:
+        "200":
+          description: Access user list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccessUser"
+  /access/users/{userId}:
+    put:
+      operationId: updateAccessUser
+      tags: [access]
+      summary: Assign a role and projects to a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessUserUpdate"
+      responses:
+        "200":
+          description: Updated access user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessUser"
+  /invoices/{invoiceId}/decision:
+    post:
+      operationId: decideInvoice
+      tags: [invoices, access]
+      summary: Approve or reject an invoice
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecisionInput"
+      responses:
+        "200":
+          description: Updated invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
 components:
   parameters:
     ProjectId:
@@ -377,4 +451,52 @@ components:
         user: { type: string }
         timestamp: { type: string }
         tone: { type: string }
+    CurrentUser:
+      type: object
+      required: [userId, displayName, role, assignedProjectIds, permissions]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        role:
+          type: string
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+        assignedProjectIds:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+    ApprovalDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        note:
+          type: string
+          maxLength: 500
+    AccessUser:
+      type: object
+      required: [userId, displayName, role, assignedProjectIds]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        role:
+          type: string
+          enum: [UNASSIGNED, DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+        assignedProjectIds:
+          type: array
+          items: { type: string }
+    AccessUserUpdate:
+      type: object
+      required: [displayName, role, assignedProjectIds]
+      properties:
+        displayName: { type: string, minLength: 1 }
+        role:
+          type: string
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+        assignedProjectIds:
+          type: array
+          items: { type: string }
 

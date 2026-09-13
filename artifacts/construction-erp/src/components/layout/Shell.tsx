@@ -9,17 +9,24 @@ import {
   Bell
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useClerk } from "@clerk/react"
+import { hasPermission, useAccess } from "@/lib/access"
+import { LogOut } from "lucide-react"
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Projects", href: "/projects", icon: Building2 },
-  { name: "Invoices", href: "/invoices", icon: ReceiptText },
-  { name: "Tax & Recon", href: "/tax", icon: Calculator },
-  { name: "Audit Trail", href: "/audit", icon: History },
+  { name: "Dashboard", href: "/portal", icon: LayoutDashboard },
+  { name: "Projects", href: "/portal/projects", icon: Building2, permission: "projects:view" },
+  { name: "Invoices", href: "/portal/invoices", icon: ReceiptText, permission: "invoices:view" },
+  { name: "Tax & Recon", href: "/portal/tax", icon: Calculator, permission: "tax:view" },
+  { name: "Audit Trail", href: "/portal/audit", icon: History, permission: "audit:view" },
+  { name: "Hak Akses", href: "/portal/access", icon: Settings, role: "DIRECTOR" },
 ]
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
+  const access = useAccess()
+  const { signOut } = useClerk()
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -34,8 +41,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex-1 overflow-auto py-4">
           <nav className="grid items-start px-4 text-sm font-medium gap-1">
-            {navigation.map((item) => {
-              const isActive = item.href === "/" ? location === "/" : location.startsWith(item.href)
+            {navigation.filter((item) => (!item.permission || hasPermission(access, item.permission)) && (!item.role || item.role === access.role)).map((item) => {
+              const isActive = item.href === "/portal" ? location === "/portal" : location.startsWith(item.href)
               return (
                 <Link
                   key={item.name}
@@ -55,9 +62,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
         <div className="border-t p-4">
-          <button className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <Settings className="h-4 w-4" />
-            Settings
+          <button onClick={() => signOut({ redirectUrl: basePath || "/" })} className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <LogOut className="h-4 w-4" />
+            Keluar
           </button>
         </div>
       </aside>
@@ -73,7 +80,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <Bell className="h-4 w-4" />
                 <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-primary" />
               </button>
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-blue-500 to-emerald-500 border-2 border-background" />
+               <div className="text-right"><div className="text-sm font-semibold">{access.displayName}</div><div className="text-xs text-muted-foreground">{access.role.replaceAll("_", " ")}</div></div>
             </div>
           </div>
         </header>

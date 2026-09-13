@@ -22,6 +22,7 @@ import {
   UpdateProjectParams,
   UpdateProjectResponse,
 } from "@workspace/api-zod";
+import { canAccessProject, requirePermission } from "../middlewares/access";
 const router: IRouter = Router();
 
 function projectResponse(project: typeof projectsTable.$inferSelect) {
@@ -29,13 +30,20 @@ function projectResponse(project: typeof projectsTable.$inferSelect) {
   return response;
 }
 
-router.get("/projects", async (req, res) => {
+router.get("/projects", requirePermission("projects:view"), async (req, res) => {
   const parsed = ListProjectsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
   const filters = [];
+  if (req.access?.role === "PROJECT_MANAGER") {
+    if (req.access.assignedProjectIds.length === 0) {
+      res.json(ListProjectsResponse.parse([]));
+      return;
+    }
+    filters.push(or(...req.access.assignedProjectIds.map((id) => eq(projectsTable.id, id)))!);
+  }
   if (parsed.data.status) filters.push(eq(projectsTable.status, parsed.data.status));
   if (parsed.data.search) {
     const searchFilter = or(
@@ -51,7 +59,7 @@ router.get("/projects", async (req, res) => {
   res.json(ListProjectsResponse.parse(data.map(projectResponse)));
 });
 
-router.post("/projects", async (req, res) => {
+router.post("/projects", requirePermission("projects:write"), async (req, res) => {
   const parsed = CreateProjectBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -85,14 +93,16 @@ router.post("/projects", async (req, res) => {
       entity: "Proyek",
       entityId: projectId,
       detail: `${project.code} · ${project.name}`,
-      user: "Admin Demo",
+      user: req.access!.displayName,
+      actorUserId: req.access!.userId,
+      actorRole: req.access!.role,
       tone: "success",
     });
   });
   res.status(201).json(CreateProjectResponse.parse(project));
 });
 
-router.get("/projects/:projectId", async (req, res) => {
+router.get("/projects/:projectId", requirePermission("projects:view"), async (req, res) => {
   const parsed = GetProjectParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -101,6 +111,10 @@ router.get("/projects/:projectId", async (req, res) => {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parsed.data.projectId)).limit(1);
   if (!project) {
     res.status(404).json({ error: "Proyek tidak ditemukan" });
+    return;
+  }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
     return;
   }
   const recentInvoices = await db.select().from(invoicesTable)
@@ -117,7 +131,7 @@ router.get("/projects/:projectId", async (req, res) => {
   }));
 });
 
-router.patch("/projects/:projectId", async (req, res) => {
+router.patch("/projects/:projectId", requirePermission("projects:write"), async (req, res) => {
   const params = UpdateProjectParams.safeParse(req.params);
   const body = UpdateProjectBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -129,6 +143,10 @@ router.patch("/projects/:projectId", async (req, res) => {
     res.status(404).json({ error: "Proyek tidak ditemukan" });
     return;
   }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
+    return;
+  }
   const [updated] = await db.transaction(async (tx) => {
     const rows = await tx.update(projectsTable).set(body.data).where(eq(projectsTable.id, project.id)).returning();
     await tx.insert(auditLogsTable).values({
@@ -137,7 +155,9 @@ router.patch("/projects/:projectId", async (req, res) => {
       entity: "Proyek",
       entityId: project.id,
       detail: `${project.code} · ${project.name}`,
-      user: "Admin Demo",
+      user: req.access!.displayName,
+      actorUserId: req.access!.userId,
+      actorRole: req.access!.role,
       tone: "info",
       metadata: body.data,
     });
@@ -146,7 +166,7 @@ router.patch("/projects/:projectId", async (req, res) => {
   res.json(UpdateProjectResponse.parse(projectResponse(updated)));
 });
 
-router.get("/projects/:projectId/rab", async (req, res) => {
+router.get("/projects/:projectId/rab", requirePermission("projects:view"), async (req, res) => {
   const parsed = GetProjectRabParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -155,6 +175,10 @@ router.get("/projects/:projectId/rab", async (req, res) => {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parsed.data.projectId)).limit(1);
   if (!project) {
     res.status(404).json({ error: "Proyek tidak ditemukan" });
+    return;
+  }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
     return;
   }
   const [baseline] = await db.select().from(rabBaselinesTable)

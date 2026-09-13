@@ -1,11 +1,17 @@
 import { Router, type IRouter } from "express";
 import { GetDashboardSummaryResponse } from "@workspace/api-zod";
 import { db, projectsTable } from "@workspace/db";
+import { inArray } from "drizzle-orm";
+import { requirePermission } from "../middlewares/access";
 
 const router: IRouter = Router();
 
-router.get("/dashboard/summary", async (_req, res) => {
-  const projects = await db.select().from(projectsTable);
+router.get("/dashboard/summary", requirePermission("projects:view"), async (req, res) => {
+  const projects = await db.select().from(projectsTable).where(
+    req.access?.role === "PROJECT_MANAGER"
+      ? inArray(projectsTable.id, req.access.assignedProjectIds)
+      : undefined,
+  );
   const portfolioValue = projects.reduce((sum, item) => sum + item.contractValue, 0);
   const committedCost = 63_760_000_000;
   const data = {

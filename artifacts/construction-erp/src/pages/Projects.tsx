@@ -20,12 +20,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { hasPermission, useAccess } from "@/lib/access"
 
 export default function Projects() {
   const [search, setSearch] = useState("")
   const { data: projects, isLoading } = useListProjects({ search: search || undefined })
   const queryClient = useQueryClient()
   const createProject = useCreateProject()
+  const access = useAccess()
+  const canCreate = hasPermission(access, "projects:write")
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newProject, setNewProject] = useState({ code: "", name: "", owner: "", contractValue: "", endDate: "" })
@@ -56,7 +59,7 @@ export default function Projects() {
           <h1 className="text-3xl font-bold tracking-tight">Project Portfolio</h1>
           <p className="text-muted-foreground">Manage active construction projects and monitor performance.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        {canCreate && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -98,7 +101,7 @@ export default function Projects() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -14,9 +14,10 @@ import {
   ListInvoicesQueryParams,
   ListInvoicesResponse,
 } from "@workspace/api-zod";
+import { canAccessProject, requirePermission } from "../middlewares/access";
 const router: IRouter = Router();
 
-router.get("/invoices", async (req, res) => {
+router.get("/invoices", requirePermission("invoices:view"), async (req, res) => {
   const parsed = ListInvoicesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -26,13 +27,20 @@ router.get("/invoices", async (req, res) => {
     parsed.data.status ? eq(invoicesTable.status, parsed.data.status) : undefined,
     parsed.data.projectId ? eq(invoicesTable.projectId, parsed.data.projectId) : undefined,
   ].filter((filter) => filter !== undefined);
+  if (req.access?.role === "PROJECT_MANAGER") {
+    if (req.access.assignedProjectIds.length === 0) {
+      res.json(ListInvoicesResponse.parse([]));
+      return;
+    }
+    filters.push(or(...req.access.assignedProjectIds.map((id) => eq(invoicesTable.projectId, id)))!);
+  }
   const data = await db.select().from(invoicesTable)
     .where(filters.length > 0 ? and(...filters) : undefined)
     .orderBy(desc(invoicesTable.createdAt));
   res.json(ListInvoicesResponse.parse(data));
 });
 
-router.post("/invoices", async (req, res) => {
+router.post("/invoices", requirePermission("invoices:write"), async (req, res) => {
   const parsed = CreateInvoiceBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -52,6 +60,10 @@ router.post("/invoices", async (req, res) => {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parsed.data.projectId)).limit(1);
   if (!project) {
     res.status(400).json({ error: "Proyek tidak ditemukan" });
+    return;
+  }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
     return;
   }
   const dppLainRate = parsed.data.integrated ? 0.275 : 0.325;
@@ -101,7 +113,9 @@ router.post("/invoices", async (req, res) => {
       entity: "Invoice",
       entityId: invoiceId,
       detail: `${number} · Pajak dihitung otomatis`,
-      user: "Admin Demo",
+      user: req.access!.displayName,
+      actorUserId: req.access!.userId,
+      actorRole: req.access!.role,
       tone: "info",
     });
     return stored;

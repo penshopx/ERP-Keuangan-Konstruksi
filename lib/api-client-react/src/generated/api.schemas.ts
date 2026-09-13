@@ -138,6 +138,79 @@ export interface Activity {
   tone: string;
 }
 
+export type CurrentUserRole = typeof CurrentUserRole[keyof typeof CurrentUserRole];
+
+
+export const CurrentUserRole = {
+  DIRECTOR: 'DIRECTOR',
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  SITE_MANAGER: 'SITE_MANAGER',
+  FINANCE: 'FINANCE',
+  TAX_STAFF: 'TAX_STAFF',
+  PROCUREMENT: 'PROCUREMENT',
+} as const;
+
+export interface CurrentUser {
+  userId: string;
+  displayName: string;
+  role: CurrentUserRole;
+  assignedProjectIds: string[];
+  permissions: string[];
+}
+
+export type ApprovalDecisionInputDecision = typeof ApprovalDecisionInputDecision[keyof typeof ApprovalDecisionInputDecision];
+
+
+export const ApprovalDecisionInputDecision = {
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT',
+} as const;
+
+export interface ApprovalDecisionInput {
+  decision: ApprovalDecisionInputDecision;
+  /** @maxLength 500 */
+  note?: string;
+}
+
+export type AccessUserRole = typeof AccessUserRole[keyof typeof AccessUserRole];
+
+
+export const AccessUserRole = {
+  UNASSIGNED: 'UNASSIGNED',
+  DIRECTOR: 'DIRECTOR',
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  SITE_MANAGER: 'SITE_MANAGER',
+  FINANCE: 'FINANCE',
+  TAX_STAFF: 'TAX_STAFF',
+  PROCUREMENT: 'PROCUREMENT',
+} as const;
+
+export interface AccessUser {
+  userId: string;
+  displayName: string;
+  role: AccessUserRole;
+  assignedProjectIds: string[];
+}
+
+export type AccessUserUpdateRole = typeof AccessUserUpdateRole[keyof typeof AccessUserUpdateRole];
+
+
+export const AccessUserUpdateRole = {
+  DIRECTOR: 'DIRECTOR',
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  SITE_MANAGER: 'SITE_MANAGER',
+  FINANCE: 'FINANCE',
+  TAX_STAFF: 'TAX_STAFF',
+  PROCUREMENT: 'PROCUREMENT',
+} as const;
+
+export interface AccessUserUpdate {
+  /** @minLength 1 */
+  displayName: string;
+  role: AccessUserUpdateRole;
+  assignedProjectIds: string[];
+}
+
 export type ListProjectsParams = {
 status?: string;
 search?: string;

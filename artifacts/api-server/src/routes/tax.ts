@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { GetTaxSummaryQueryParams, GetTaxSummaryResponse } from "@workspace/api-zod";
 import { db, invoicesTable } from "@workspace/db";
+import { requirePermission } from "../middlewares/access";
 
 const router: IRouter = Router();
 
-router.get("/tax/summary", async (req, res) => {
+router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
   const parsed = GetTaxSummaryQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

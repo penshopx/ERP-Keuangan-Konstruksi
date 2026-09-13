@@ -20,7 +20,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccessUser,
+  AccessUserUpdate,
   Activity,
+  ApprovalDecisionInput,
+  CurrentUser,
   DashboardSummary,
   GetTaxSummaryParams,
   HealthStatus,
@@ -965,4 +969,336 @@ export function useListActivity<TData = Awaited<ReturnType<typeof listActivity>>
 
 
 
+
+export const getGetCurrentUserUrl = () => {
+
+
+
+
+  return `/api/me`
+}
+
+/**
+ * @summary Get the authenticated user's role and permissions
+ */
+export const getCurrentUser = async ( options?: Parameters<typeof customFetch>[1]): Promise<CurrentUser> => {
+
+  return customFetch<CurrentUser>(getGetCurrentUserUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentUserQueryKey = () => {
+    return [
+    `/api/me`
+    ] as const;
+    }
+
+
+export const getGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentUserQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentUser>>> = ({ signal }) => getCurrentUser({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
+export type GetCurrentUserQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the authenticated user's role and permissions
+ */
+
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentUserQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListAccessUsersUrl = () => {
+
+
+
+
+  return `/api/access/users`
+}
+
+/**
+ * @summary List users and their project assignments
+ */
+export const listAccessUsers = async ( options?: Parameters<typeof customFetch>[1]): Promise<AccessUser[]> => {
+
+  return customFetch<AccessUser[]>(getListAccessUsersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAccessUsersQueryKey = () => {
+    return [
+    `/api/access/users`
+    ] as const;
+    }
+
+
+export const getListAccessUsersQueryOptions = <TData = Awaited<ReturnType<typeof listAccessUsers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccessUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAccessUsersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAccessUsers>>> = ({ signal }) => listAccessUsers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAccessUsers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAccessUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listAccessUsers>>>
+export type ListAccessUsersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List users and their project assignments
+ */
+
+export function useListAccessUsers<TData = Awaited<ReturnType<typeof listAccessUsers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccessUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAccessUsersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAccessUserUrl = (userId: string,) => {
+
+
+
+
+  return `/api/access/users/${userId}`
+}
+
+/**
+ * @summary Assign a role and projects to a user
+ */
+export const updateAccessUser = async (userId: string,
+    accessUserUpdate: AccessUserUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AccessUser> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AccessUser>(getUpdateAccessUserUrl(userId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accessUserUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAccessUserMutationKey = () => ['updateAccessUser'] as const;
+
+export const getUpdateAccessUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccessUser>>, TError,UpdateAccessUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAccessUser>>, TError,UpdateAccessUserMutationVariables, TContext> => {
+
+const mutationKey = getUpdateAccessUserMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAccessUser>>, UpdateAccessUserMutationVariables> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  updateAccessUser(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAccessUserMutationResult = NonNullable<Awaited<ReturnType<typeof updateAccessUser>>>
+    export type UpdateAccessUserMutationBody = BodyType<AccessUserUpdate>
+    export type UpdateAccessUserMutationError = ErrorType<unknown>
+    export type UpdateAccessUserMutationVariables = {userId: string;data: BodyType<AccessUserUpdate>}
+
+    /**
+ * @summary Assign a role and projects to a user
+ */
+export const useUpdateAccessUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccessUser>>, TError,UpdateAccessUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAccessUser>>,
+        TError,
+        UpdateAccessUserMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateAccessUserMutationOptions(options));
+    }
+
+export const getDecideInvoiceUrl = (invoiceId: string,) => {
+
+
+
+
+  return `/api/invoices/${invoiceId}/decision`
+}
+
+/**
+ * @summary Approve or reject an invoice
+ */
+export const decideInvoice = async (invoiceId: string,
+    approvalDecisionInput: ApprovalDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<Invoice> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Invoice>(getDecideInvoiceUrl(invoiceId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(approvalDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getDecideInvoiceMutationKey = () => ['decideInvoice'] as const;
+
+export const getDecideInvoiceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideInvoice>>, TError,DecideInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideInvoice>>, TError,DecideInvoiceMutationVariables, TContext> => {
+
+const mutationKey = getDecideInvoiceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideInvoice>>, DecideInvoiceMutationVariables> = (props) => {
+          const {invoiceId,data} = props ?? {};
+
+          return  decideInvoice(invoiceId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof decideInvoice>>>
+    export type DecideInvoiceMutationBody = BodyType<ApprovalDecisionInput>
+    export type DecideInvoiceMutationError = ErrorType<unknown>
+    export type DecideInvoiceMutationVariables = {invoiceId: string;data: BodyType<ApprovalDecisionInput>}
+
+    /**
+ * @summary Approve or reject an invoice
+ */
+export const useDecideInvoice = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideInvoice>>, TError,DecideInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideInvoice>>,
+        TError,
+        DecideInvoiceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDecideInvoiceMutationOptions(options));
+    }
 
