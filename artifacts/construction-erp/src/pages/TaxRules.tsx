@@ -137,10 +137,10 @@ function CreateTaxRuleDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <Check label="Penyedia PKP" checked={form.supplierPkp} onChange={(value) => set("supplierPkp", value)} />
           <Check label="Pemungut pemerintah" checked={form.governmentCollector} onChange={(value) => set("governmentCollector", value)} />
         </div>
-        <Field label="Basis DPP (%)"><Input type="number" min="0" max="100" step="0.01" value={form.dppRateBasisPoints / 100} onChange={(e) => setRate("dppRateBasisPoints", e.target.value)} /></Field>
-        <Field label="Tarif PPN (%)"><Input type="number" min="0" max="100" step="0.01" value={form.ppnRateBasisPoints / 100} onChange={(e) => setRate("ppnRateBasisPoints", e.target.value)} /></Field>
-        <Field label="Tarif PPh Final (%)"><Input type="number" min="0" max="100" step="0.01" value={form.pphFinalRateBasisPoints / 100} onChange={(e) => setRate("pphFinalRateBasisPoints", e.target.value)} /></Field>
-        <Field label="Tarif PPh 23 (%)"><Input type="number" min="0" max="100" step="0.01" value={form.pph23RateBasisPoints / 100} onChange={(e) => setRate("pph23RateBasisPoints", e.target.value)} /></Field>
+        <Field label="Basis DPP (%)"><Input aria-label="Basis DPP (%)" type="number" min="0" max="100" step="0.01" value={form.dppRateBasisPoints / 100} onChange={(e) => setRate("dppRateBasisPoints", e.target.value)} /></Field>
+        <Field label="Tarif PPN (%)"><Input aria-label="Tarif PPN (%)" type="number" min="0" max="100" step="0.01" value={form.ppnRateBasisPoints / 100} onChange={(e) => setRate("ppnRateBasisPoints", e.target.value)} /></Field>
+        <Field label="Tarif PPh Final (%)"><Input aria-label="Tarif PPh Final (%)" type="number" min="0" max="100" step="0.01" value={form.pphFinalRateBasisPoints / 100} onChange={(e) => setRate("pphFinalRateBasisPoints", e.target.value)} /></Field>
+        <Field label="Tarif PPh 23 (%)"><Input aria-label="Tarif PPh 23 (%)" type="number" min="0" max="100" step="0.01" value={form.pph23RateBasisPoints / 100} onChange={(e) => setRate("pph23RateBasisPoints", e.target.value)} /></Field>
         <div className="space-y-2 md:col-span-2"><Label>Sumber regulasi</Label><Textarea value={form.regulatorySource} onChange={(e) => set("regulatorySource", e.target.value)} placeholder="Nomor dan nama regulasi, pasal, atau rujukan resmi" /></div>
         <Card className="md:col-span-2">
           <CardHeader className="pb-3">
@@ -150,6 +150,7 @@ function CreateTaxRuleDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <CardContent className="space-y-4">
             <Field label="Nilai invoice contoh">
               <Input
+                aria-label="Nilai invoice contoh"
                 type="number"
                 min="0"
                 step="1"
