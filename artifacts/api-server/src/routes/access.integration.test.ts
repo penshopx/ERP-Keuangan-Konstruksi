@@ -28,6 +28,7 @@ const directorId = `${prefix}-director`;
 const projectId = `${prefix}-project`;
 const createdClerkIds: string[] = [];
 const revokedClerkIds: string[] = [];
+const clerkStatuses = new Map<string, string>();
 let clerkSequence = 0;
 
 const directorAccess: AccessContext = {
@@ -42,12 +43,15 @@ const clerkDependencies: AccessRouterDependencies = {
   createClerkInvitation: async () => {
     const id = `${prefix}-clerk-${++clerkSequence}`;
     createdClerkIds.push(id);
+    clerkStatuses.set(id, "pending");
     return { id, createdAt: Date.now() } as Awaited<ReturnType<AccessRouterDependencies["createClerkInvitation"]>>;
   },
   revokeClerkInvitation: async (id) => {
     revokedClerkIds.push(id);
+    clerkStatuses.set(id, "revoked");
     return {} as Awaited<ReturnType<AccessRouterDependencies["revokeClerkInvitation"]>>;
   },
+  getClerkInvitation: async (id) => ({ status: clerkStatuses.get(id) ?? "pending" }),
 };
 
 function staticAccessMiddleware(): RequestHandler {
@@ -254,6 +258,67 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     } finally {
       await server.close();
     }
+  });
+
+  await t.test("partial revoke failure is reconciled and audited", async () => {
+    const email = `${prefix}-reconcile@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    const failing = await startServer(staticAccessMiddleware(), {
+      afterClerkInvitationRevoked: async () => {
+        throw new Error("Injected ERP persistence failure after Clerk revoke");
+      },
+    });
+    try {
+      const response = await fetch(`${failing.baseUrl}/access/invitations/${invitation.id}/revoke`, {
+        method: "POST",
+      });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json() as { status: string }).status, "REVOKED");
+    } finally {
+      await failing.close();
+    }
+
+    const [stored] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(stored.status, "REVOKED");
+    const audits = await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id));
+    assert.ok(audits.some(({ action, metadata }) =>
+      action === "KEGAGALAN PARSIAL PEMBATALAN UNDANGAN"
+      && metadata?.clerkOutcome === "REVOKED"
+      && metadata?.erpOutcome === "FAILED"));
+    assert.ok(audits.some(({ action, metadata }) =>
+      action === "STATUS UNDANGAN DIREKONSILIASI"
+      && metadata?.sourceOfTruth === "CLERK"
+      && metadata?.outcome === "UPDATED"));
+  });
+
+  await t.test("listing reconciles a Clerk-revoked pending invitation before Director sees it", async () => {
+    const email = `${prefix}-list-reconcile@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    const invitation = await created.json() as { id: string };
+    const [storedBefore] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    clerkStatuses.set(storedBefore.clerkInvitationId, "revoked");
+
+    try {
+      const response = await fetch(`${creator.baseUrl}/access/invitations`);
+      assert.equal(response.status, 200);
+      const listed = await response.json() as Array<{ id: string; status: string }>;
+      assert.equal(listed.find(({ id }) => id === invitation.id)?.status, "REVOKED");
+    } finally {
+      await creator.close();
+    }
+
+    const [storedAfter] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(storedAfter.status, "REVOKED");
   });
 
   await t.test("invited role and projects are applied atomically on first login", async () => {

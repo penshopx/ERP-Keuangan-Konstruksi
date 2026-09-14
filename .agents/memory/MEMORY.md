@@ -2,3 +2,4 @@
 - [RAB reference templates](rab-reference-templates.md) — Uploaded learning materials define structure and terminology, not authoritative current market prices.
 - [Persistence regression tests](persistence-regression-tests.md) — prove database writes directly and inject failures inside the API transaction boundary.
 - [Shared database test isolation](shared-database-test-isolation.md) — serialize suites that mutate shared fixtures with a database-scoped lock held through cleanup.
+- [Invitation status authority](invitation-status-authority.md) — Clerk is authoritative for whether an invitation link remains usable; ERP lists must reconcile before reporting it active.

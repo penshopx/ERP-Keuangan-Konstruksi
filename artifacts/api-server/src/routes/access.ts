@@ -21,14 +21,21 @@ import {
   UpdateAccessUserResponse,
 } from "@workspace/api-zod";
 import { canAccessProject, requirePermission } from "../middlewares/access";
+import {
+  reconcileInvitationFromClerk,
+  recordInvitationPartialFailure,
+  type ClerkInvitationState,
+} from "../lib/invitation-reconciliation";
 
 export type AccessRouterDependencies = {
   createClerkInvitation: typeof clerkClient.invitations.createInvitation;
   revokeClerkInvitation: typeof clerkClient.invitations.revokeInvitation;
+  getClerkInvitation: (invitationId: string) => Promise<ClerkInvitationState>;
 };
 
 export type AccessPersistenceHooks = {
   beforeInvitationInsert?: (clerkInvitationId: string) => Promise<void>;
+  afterClerkInvitationRevoked?: (clerkInvitationId: string) => Promise<void>;
 };
 
 const serializeInvitation = (
@@ -54,6 +61,18 @@ export function createAccessRouter(
   dependencies: AccessRouterDependencies = {
     createClerkInvitation: clerkClient.invitations.createInvitation.bind(clerkClient.invitations),
     revokeClerkInvitation: clerkClient.invitations.revokeInvitation.bind(clerkClient.invitations),
+    getClerkInvitation: async (invitationId) => {
+      for (const status of ["pending", "accepted", "revoked", "expired"] as const) {
+        const result = await clerkClient.invitations.getInvitationList({
+          query: invitationId,
+          status,
+          limit: 1,
+        });
+        const invitation = result.data.find(({ id }) => id === invitationId);
+        if (invitation) return { status: invitation.status };
+      }
+      throw new Error(`Undangan Clerk ${invitationId} tidak ditemukan`);
+    },
   },
   hooks: AccessPersistenceHooks = {},
 ): IRouter {
@@ -83,8 +102,18 @@ router.get("/access/invitations", async (req, res) => {
     res.status(403).json({ error: "Hanya Director yang dapat melihat undangan" });
     return;
   }
-  const invitations = (await db.select().from(staffInvitationsTable))
+  const storedInvitations = (await db.select().from(staffInvitationsTable))
     .filter((invite) => invite.status !== "ACCEPTED");
+  const actor = {
+    userId: req.access!.userId,
+    displayName: req.access!.displayName,
+    role: req.access!.role,
+  };
+  const invitations = await Promise.all(storedInvitations.map(async (invitation) => {
+    if (invitation.status !== "PENDING") return invitation;
+    const clerkState = await dependencies.getClerkInvitation(invitation.clerkInvitationId);
+    return reconcileInvitationFromClerk(invitation, clerkState, actor, "LIST_REFRESH");
+  }));
   const projects = await db.select().from(staffInvitationProjectsTable);
   const now = new Date();
   res.json(ListAccessInvitationsResponse.parse(invitations.map((invite) => serializeInvitation(
@@ -173,6 +202,8 @@ router.post("/access/invitations/:invitationId/revoke", async (req, res) => {
     res.status(400).json({ error: "Undangan tidak valid" });
     return;
   }
+  let revokedInvitation: typeof staffInvitationsTable.$inferSelect | undefined;
+  let clerkRevoked = false;
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`erp-staff-invite-id:${params.data.invitationId}`}))`);
     const [invitation] = await tx.select().from(staffInvitationsTable)
@@ -182,6 +213,9 @@ router.post("/access/invitations/:invitationId/revoke", async (req, res) => {
       return { outcome: "not-pending" } as const;
     }
     await dependencies.revokeClerkInvitation(invitation.clerkInvitationId);
+    clerkRevoked = true;
+    revokedInvitation = invitation;
+    await hooks.afterClerkInvitationRevoked?.(invitation.clerkInvitationId);
     const [updated] = await tx.update(staffInvitationsTable).set({ status: "REVOKED" })
       .where(and(
         eq(staffInvitationsTable.id, invitation.id),
@@ -197,6 +231,24 @@ router.post("/access/invitations/:invitationId/revoke", async (req, res) => {
     const projects = await tx.select({ projectId: staffInvitationProjectsTable.projectId })
       .from(staffInvitationProjectsTable).where(eq(staffInvitationProjectsTable.invitationId, invitation.id));
     return { outcome: "revoked", invitation: updated, projectIds: projects.map(({ projectId }) => projectId) } as const;
+  }).catch(async (error) => {
+    if (!clerkRevoked || !revokedInvitation) throw error;
+    const actor = {
+      userId: req.access!.userId,
+      displayName: req.access!.displayName,
+      role: req.access!.role,
+    };
+    await recordInvitationPartialFailure(revokedInvitation, actor, error);
+    const reconciled = await reconcileInvitationFromClerk(
+      revokedInvitation,
+      { status: "revoked" },
+      actor,
+      "PARTIAL_REVOKE_FAILURE",
+    );
+    const projects = await db.select({ projectId: staffInvitationProjectsTable.projectId })
+      .from(staffInvitationProjectsTable)
+      .where(eq(staffInvitationProjectsTable.invitationId, revokedInvitation.id));
+    return { outcome: "revoked", invitation: reconciled, projectIds: projects.map(({ projectId }) => projectId) } as const;
   });
   if (result.outcome === "not-found") {
     res.status(404).json({ error: "Undangan tidak ditemukan" });
