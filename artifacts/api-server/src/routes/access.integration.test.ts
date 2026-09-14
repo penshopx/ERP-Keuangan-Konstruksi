@@ -62,7 +62,7 @@ function staticAccessMiddleware(): RequestHandler {
 }
 
 function clerkAccessMiddleware(
-  users: Record<string, { email: string; name: string }>,
+  users: Record<string, { email: string; name: string; verified?: boolean }>,
   hooks: AccessProvisioningHooks = {},
 ) {
   return createRequireAccess({
@@ -80,7 +80,7 @@ function clerkAccessMiddleware(
         primaryEmailAddress: { emailAddress: user.email },
         emailAddresses: [{
           emailAddress: user.email,
-          verification: { status: "verified" },
+          verification: { status: user.verified === false ? "unverified" : "verified" },
         }],
       };
     }) as never,
@@ -238,6 +238,70 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     } finally {
       await server.close();
     }
+  });
+
+  await t.test("an unverified Clerk email cannot claim an active invitation", async () => {
+    const email = `${prefix}-unverified@example.test`;
+    const userId = `${prefix}-unverified-user`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email, [projectId]);
+    assert.equal(created.status, 201);
+    await creator.close();
+
+    const server = await startServer(clerkAccessMiddleware({
+      [userId]: { email, name: "Unverified User", verified: false },
+    }));
+    try {
+      const response = await getMe(server.baseUrl, userId);
+      assert.equal(response.status, 403);
+    } finally {
+      await server.close();
+    }
+
+    const [user] = await db.select().from(userRolesTable)
+      .where(eq(userRolesTable.userId, userId));
+    assert.equal(user.role, "UNASSIGNED");
+    assert.equal((await db.select().from(projectAssignmentsTable)
+      .where(eq(projectAssignmentsTable.userId, userId))).length, 0);
+    const [invitation] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.email, email));
+    assert.equal(invitation.status, "PENDING");
+    assert.equal(invitation.acceptedUserId, null);
+  });
+
+  await t.test("an expired invitation cannot be claimed by a verified Clerk email", async () => {
+    const email = `${prefix}-expired@example.test`;
+    const userId = `${prefix}-expired-user`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email, [projectId]);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    await db.update(staffInvitationsTable).set({
+      status: "EXPIRED",
+      expiresAt: new Date(Date.now() - 1_000),
+    }).where(eq(staffInvitationsTable.id, invitation.id));
+
+    const server = await startServer(clerkAccessMiddleware({
+      [userId]: { email, name: "Expired User" },
+    }));
+    try {
+      const response = await getMe(server.baseUrl, userId);
+      assert.equal(response.status, 403);
+    } finally {
+      await server.close();
+    }
+
+    const [user] = await db.select().from(userRolesTable)
+      .where(eq(userRolesTable.userId, userId));
+    assert.equal(user.role, "UNASSIGNED");
+    assert.equal((await db.select().from(projectAssignmentsTable)
+      .where(eq(projectAssignmentsTable.userId, userId))).length, 0);
+    const [storedInvitation] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(storedInvitation.status, "EXPIRED");
+    assert.equal(storedInvitation.acceptedUserId, null);
   });
 
   await t.test("database failure revokes the newly-created Clerk invitation", async () => {
