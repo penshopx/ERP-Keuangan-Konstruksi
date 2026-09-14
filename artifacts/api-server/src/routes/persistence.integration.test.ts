@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { after, test } from "node:test";
+import { after, before, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type Express } from "express";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -21,11 +21,12 @@ import type { ProjectPersistenceHooks } from "./projects";
 
 const runId = randomUUID();
 const projectCode = `TST-${runId.slice(0, 8)}`;
-const testProjectCodes = [projectCode];
 const taxRuleId = "tax-2022-construction-TANPA_KUALIFIKASI-true-false-false";
 const continuedTaxRuleId = "tax-2022-construction-TANPA_KUALIFIKASI-true-false-true-continuation-2027-01-01";
-const createdEntityIds: string[] = [];
-const createdTaxRuleIds: string[] = [];
+const regressionProjectCodePattern = "^TST-([0-9a-f]{8}|RB-(baseline|audit)-[0-9a-f]{8})$";
+const regressionUserIdPattern = "^test-user-[0-9a-f-]{36}$";
+const regressionTaxRuleVersionPattern = "^TEST-(SUCCESSOR|CONCURRENT)-[0-9a-f-]{36}$";
+const regressionDirectTaxRuleIdPattern = "^test-direct-(base|adjacent|overlap)-[0-9a-f-]{36}$";
 const constructionQualifications = [
   { qualification: "KECIL", hasSbu: true, pphFinal: 2_100_000 },
   { qualification: "MENENGAH", hasSbu: true, pphFinal: 3_180_000 },
@@ -85,23 +86,56 @@ async function requestJson(baseUrl: string, path: string, init?: RequestInit) {
   return body as Record<string, unknown>;
 }
 
-after(async () => {
+async function cleanupRegressionData() {
   await db.transaction(async (tx) => {
-    if (createdEntityIds.length > 0) {
-      await tx.delete(auditLogsTable).where(inArray(auditLogsTable.entityId, createdEntityIds));
-    }
     const testProjects = await tx.select({ id: projectsTable.id })
       .from(projectsTable)
-      .where(inArray(projectsTable.code, testProjectCodes));
-    if (testProjects.length > 0) {
-      await tx.delete(invoicesTable).where(inArray(invoicesTable.projectId, testProjects.map(({ id }) => id)));
+      .where(sql`${projectsTable.code} ~ ${regressionProjectCodePattern}`);
+    const testProjectIds = testProjects.map(({ id }) => id);
+    const testInvoices = testProjectIds.length > 0
+      ? await tx.select({ id: invoicesTable.id })
+        .from(invoicesTable)
+        .where(inArray(invoicesTable.projectId, testProjectIds))
+      : [];
+    const testTaxRules = await tx.select({ id: taxRuleVersionsTable.id })
+      .from(taxRuleVersionsTable)
+      .where(sql`
+        ${taxRuleVersionsTable.version} ~ ${regressionTaxRuleVersionPattern}
+        OR ${taxRuleVersionsTable.id} ~ ${regressionDirectTaxRuleIdPattern}
+      `);
+    const testEntityIds = [
+      ...testProjectIds,
+      ...testInvoices.map(({ id }) => id),
+      ...testTaxRules.map(({ id }) => id),
+    ];
+
+    if (testEntityIds.length > 0) {
+      await tx.delete(auditLogsTable).where(sql`
+        ${auditLogsTable.entityId} IN (${sql.join(testEntityIds.map((id) => sql`${id}`), sql`, `)})
+        OR ${auditLogsTable.actorUserId} ~ ${regressionUserIdPattern}
+      `);
+    } else {
+      await tx.delete(auditLogsTable)
+        .where(sql`${auditLogsTable.actorUserId} ~ ${regressionUserIdPattern}`);
     }
-    await tx.delete(projectsTable).where(inArray(projectsTable.code, testProjectCodes));
-    if (createdTaxRuleIds.length > 0) {
-      await tx.delete(taxRuleVersionsTable).where(inArray(taxRuleVersionsTable.id, createdTaxRuleIds));
+    if (testProjects.length > 0) {
+      await tx.delete(invoicesTable).where(inArray(invoicesTable.projectId, testProjectIds));
+      await tx.delete(projectsTable).where(inArray(projectsTable.id, testProjectIds));
+    }
+    if (testTaxRules.length > 0) {
+      await tx.delete(taxRuleVersionsTable).where(inArray(
+        taxRuleVersionsTable.id,
+        testTaxRules.map(({ id }) => id),
+      ));
     }
     await tx.update(taxRuleVersionsTable).set({ effectiveTo: null }).where(eq(taxRuleVersionsTable.id, taxRuleId));
   });
+}
+
+before(cleanupRegressionData);
+
+after(async () => {
+  await cleanupRegressionData();
   await pool.end();
 });
 
@@ -122,7 +156,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         }),
       });
       projectId = String(created.id);
-      createdEntityIds.push(projectId);
 
       await requestJson(firstServer.baseUrl, `/projects/${projectId}`, {
         method: "PATCH",
@@ -153,11 +186,9 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
   for (const failurePoint of ["baseline", "audit"] as const) {
     await t.test(`project creation rolls back project, baseline, and audit when ${failurePoint} insert fails`, async () => {
       const rollbackCode = `TST-RB-${failurePoint}-${runId.slice(0, 8)}`;
-      testProjectCodes.push(rollbackCode);
       let rollbackProjectId = "";
       const fail = async (projectId: string) => {
         rollbackProjectId = projectId;
-        createdEntityIds.push(projectId);
         throw new Error(`Injected project ${failurePoint} insert failure`);
       };
       const projectHooks: ProjectPersistenceHooks = failurePoint === "baseline"
@@ -269,7 +300,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         }),
       });
       invoiceId = String(invoice.id);
-      createdEntityIds.push(invoiceId);
     } finally {
       await server.close();
     }
@@ -334,7 +364,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         })
       ));
       const invoiceIds = createdInvoices.map(({ id }) => String(id));
-      createdEntityIds.push(...invoiceIds);
 
       const storedInvoices = await db.select().from(invoicesTable)
         .where(inArray(invoicesTable.id, invoiceIds));
@@ -405,7 +434,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         method: "POST",
         body: JSON.stringify({ ...invoiceBody, period: "Termin Setelah Sequence Rollback" }),
       });
-      createdEntityIds.push(String(succeeded.id));
 
       const [stored] = await db.select().from(invoicesTable)
         .where(eq(invoicesTable.id, String(succeeded.id)));
@@ -444,7 +472,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
                   governmentCollector,
                 }),
               });
-              createdEntityIds.push(String(invoice.id));
               assert.equal(invoice.ppn, supplierPkp ? ppn : 0);
               assert.equal(invoice.pphFinal, item.pphFinal);
               assert.equal(invoice.pph23, 0);
@@ -484,7 +511,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
               governmentCollector,
             }),
           });
-          createdEntityIds.push(String(invoice.id));
           assert.equal(invoice.ppn, supplierPkp ? ppn : 0);
           assert.equal(invoice.pphFinal, 0);
           assert.equal(invoice.pph23, 2_400_000);
@@ -512,7 +538,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           governmentCollector: false,
         }),
       });
-      createdEntityIds.push(String(legacy.id));
       assert.equal(legacy.taxRuleVersionId, "tax-legacy-demo-2026");
       assert.equal(legacy.ppn, 3_025_000);
       assert.equal(legacy.pphFinal, 2_500_000);
@@ -534,7 +559,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           governmentCollector: false,
         }),
       });
-      createdEntityIds.push(String(current.id));
       assert.equal(current.taxRuleVersionId, continuedTaxRuleId);
 
       const invalidCases = [
@@ -624,7 +648,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           governmentCollector: false,
         }),
       });
-      createdEntityIds.push(String(construction.id), String(otherService.id));
 
       const summary = await requestJson(server.baseUrl, "/tax/summary?period=2098-05");
       assert.equal(summary.period, "2098-05");
@@ -702,7 +725,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       const invoice = await invoiceResponse.json() as Record<string, unknown>;
       assert.equal(invoiceResponse.status, 201, JSON.stringify(invoice));
       assert.equal(invoice.taxRuleVersionId, raceRuleId);
-      createdEntityIds.push(String(invoice.id));
       assert.equal(successorResponse.status, 409);
       const [unexpectedSuccessor] = await db.select().from(taxRuleVersionsTable)
         .where(eq(taxRuleVersionsTable.version, `TEST-CONCURRENT-${runId}`));
@@ -737,7 +759,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         }),
       });
       historicalInvoiceId = String(historicalInvoice.id);
-      createdEntityIds.push(historicalInvoiceId);
       await requestJson(server.baseUrl, `/invoices/${historicalInvoiceId}/decision`, {
         method: "POST",
         body: JSON.stringify({ decision: "APPROVE", note: "Posted untuk pengujian historis" }),
@@ -772,8 +793,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       const created = await response.json() as Record<string, unknown>;
       assert.equal(response.status, 201, JSON.stringify(created));
       successorId = String(created.id);
-      createdTaxRuleIds.push(successorId);
-      createdEntityIds.push(successorId);
 
       const invoice = await requestJson(server.baseUrl, "/invoices", {
         method: "POST",
@@ -791,7 +810,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           governmentCollector: false,
         }),
       });
-      createdEntityIds.push(String(invoice.id));
       assert.equal(invoice.taxRuleVersionId, successorId);
 
       const overlap = await fetch(`${server.baseUrl}/tax/rules`, {
@@ -866,7 +884,6 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       `test-direct-adjacent-${runId}`,
       `test-direct-overlap-${runId}`,
     ];
-    createdTaxRuleIds.push(...directRuleIds);
     const baseRule = {
       regulatorySource: "Direct database overlap regression test",
       serviceType: `TEST_SERVICE_${runId}`,
