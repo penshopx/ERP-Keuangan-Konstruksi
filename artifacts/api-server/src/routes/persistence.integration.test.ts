@@ -27,6 +27,13 @@ const regressionProjectCodePattern = "^TST-([0-9a-f]{8}|RB-(baseline|audit)-[0-9
 const regressionUserIdPattern = "^test-user-[0-9a-f-]{36}$";
 const regressionTaxRuleVersionPattern = "^TEST-(SUCCESSOR|CONCURRENT)-[0-9a-f-]{36}$";
 const regressionDirectTaxRuleIdPattern = "^test-direct-(base|adjacent|overlap)-[0-9a-f-]{36}$";
+const databaseSuiteLockName = "api-server:persistence-integration-shared-fixtures";
+const databaseSuiteLockTimeoutMs = Number(process.env.PERSISTENCE_TEST_LOCK_TIMEOUT_MS ?? 120_000);
+const databaseSuiteLockPollMs = 250;
+let databaseSuiteLockClient: {
+  query: typeof pool.query;
+  release: () => void;
+} | undefined;
 const constructionQualifications = [
   { qualification: "KECIL", hasSbu: true, pphFinal: 2_100_000 },
   { qualification: "MENENGAH", hasSbu: true, pphFinal: 3_180_000 },
@@ -132,11 +139,71 @@ async function cleanupRegressionData() {
   });
 }
 
-before(cleanupRegressionData);
+async function acquireDatabaseSuiteLock() {
+  if (!Number.isFinite(databaseSuiteLockTimeoutMs) || databaseSuiteLockTimeoutMs <= 0) {
+    throw new Error(
+      `PERSISTENCE_TEST_LOCK_TIMEOUT_MS must be a positive number; received ${process.env.PERSISTENCE_TEST_LOCK_TIMEOUT_MS}`,
+    );
+  }
+
+  const client = await pool.connect();
+  const deadline = Date.now() + databaseSuiteLockTimeoutMs;
+  try {
+    while (Date.now() < deadline) {
+      const result = await client.query<{ acquired: boolean }>(
+        "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
+        [databaseSuiteLockName],
+      );
+      if (result.rows[0]?.acquired) {
+        databaseSuiteLockClient = client;
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, databaseSuiteLockPollMs));
+    }
+  } catch (error) {
+    client.release();
+    throw new Error("Failed while acquiring the persistence integration database lock", { cause: error });
+  }
+
+  client.release();
+  throw new Error(
+    `Could not acquire the persistence integration database lock within ${databaseSuiteLockTimeoutMs}ms; another database-backed validation may still be running`,
+  );
+}
+
+async function releaseDatabaseSuiteLock() {
+  const client = databaseSuiteLockClient;
+  databaseSuiteLockClient = undefined;
+  if (!client) return;
+
+  try {
+    const result = await client.query<{ released: boolean }>(
+      "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS released",
+      [databaseSuiteLockName],
+    );
+    if (!result.rows[0]?.released) {
+      throw new Error("PostgreSQL reported that the persistence integration database lock was not held");
+    }
+  } finally {
+    client.release();
+  }
+}
+
+before(async () => {
+  await acquireDatabaseSuiteLock();
+  await cleanupRegressionData();
+});
 
 after(async () => {
-  await cleanupRegressionData();
-  await pool.end();
+  try {
+    if (databaseSuiteLockClient) await cleanupRegressionData();
+  } finally {
+    try {
+      await releaseDatabaseSuiteLock();
+    } finally {
+      await pool.end();
+    }
+  }
 });
 
 test("API persistence and invoice atomicity survive regressions", async (t) => {
