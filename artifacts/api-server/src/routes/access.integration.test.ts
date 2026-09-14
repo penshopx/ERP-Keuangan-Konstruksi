@@ -90,10 +90,11 @@ function clerkAccessMiddleware(
 async function startServer(
   accessMiddleware: RequestHandler,
   hooks: AccessPersistenceHooks = {},
+  accessDependencies: AccessRouterDependencies = clerkDependencies,
 ) {
   const app = express();
   app.use(express.json());
-  app.use("/api", createApiRouter(accessMiddleware, {}, {}, clerkDependencies, hooks));
+  app.use("/api", createApiRouter(accessMiddleware, {}, {}, accessDependencies, hooks));
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);
@@ -296,6 +297,74 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       action === "STATUS UNDANGAN DIREKONSILIASI"
       && metadata?.sourceOfTruth === "CLERK"
       && metadata?.outcome === "UPDATED"));
+  });
+
+  await t.test("concurrent revoke and resend allow only the winning transition", async () => {
+    const email = `${prefix}-revoke-resend-race@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    const [storedBefore] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    const expiredAt = new Date(Date.now() - 1_000);
+    await db.update(staffInvitationsTable).set({
+      status: "EXPIRED",
+      expiresAt: expiredAt,
+    }).where(eq(staffInvitationsTable.id, invitation.id));
+    clerkStatuses.set(storedBefore.clerkInvitationId, "expired");
+
+    let resendStarted!: () => void;
+    let releaseResend!: () => void;
+    const resendStartedPromise = new Promise<void>((resolve) => {
+      resendStarted = resolve;
+    });
+    const resendCanFinish = new Promise<void>((resolve) => {
+      releaseResend = resolve;
+    });
+    const gatedDependencies: AccessRouterDependencies = {
+      ...clerkDependencies,
+      createClerkInvitation: async (params) => {
+        resendStarted();
+        await resendCanFinish;
+        return clerkDependencies.createClerkInvitation(params);
+      },
+    };
+    const beforeCreatedCount = createdClerkIds.length;
+    const beforeRevokedCount = revokedClerkIds.length;
+    const server = await startServer(staticAccessMiddleware(), {}, gatedDependencies);
+    try {
+      const resendRequest = fetch(`${server.baseUrl}/access/invitations/${invitation.id}/resend`, {
+        method: "POST",
+      });
+      await resendStartedPromise;
+      const revokeRequest = fetch(`${server.baseUrl}/access/invitations/${invitation.id}/revoke`, {
+        method: "POST",
+      });
+      releaseResend();
+
+      const responses = await Promise.all([resendRequest, revokeRequest]);
+      assert.deepEqual(responses.map(({ status }) => status).sort(), [200, 409]);
+    } finally {
+      await server.close();
+    }
+
+    const [storedAfter] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(storedAfter.status, "PENDING");
+    assert.notEqual(storedAfter.clerkInvitationId, storedBefore.clerkInvitationId);
+    assert.equal(createdClerkIds.length - beforeCreatedCount, 1);
+    assert.equal(revokedClerkIds.length - beforeRevokedCount, 0);
+
+    const audits = await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id));
+    const transitionAudits = audits.filter(({ action }) =>
+      action === "UNDANGAN STAF DIKIRIM ULANG" || action === "UNDANGAN STAF DIBATALKAN");
+    assert.equal(transitionAudits.length, 1);
+    assert.equal(transitionAudits[0]?.action, "UNDANGAN STAF DIKIRIM ULANG");
+    assert.equal((transitionAudits[0]?.metadata as { previousStatus?: string } | null)?.previousStatus, "EXPIRED");
   });
 
   await t.test("listing reconciles a Clerk-revoked pending invitation before Director sees it", async () => {

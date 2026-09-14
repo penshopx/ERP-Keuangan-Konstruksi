@@ -202,6 +202,12 @@ router.post("/access/invitations/:invitationId/revoke", async (req, res) => {
     res.status(400).json({ error: "Undangan tidak valid" });
     return;
   }
+  const [requestedInvitation] = await db.select().from(staffInvitationsTable)
+    .where(eq(staffInvitationsTable.id, params.data.invitationId)).limit(1);
+  if (!requestedInvitation) {
+    res.status(404).json({ error: "Undangan tidak ditemukan" });
+    return;
+  }
   let revokedInvitation: typeof staffInvitationsTable.$inferSelect | undefined;
   let clerkRevoked = false;
   const result = await db.transaction(async (tx) => {
@@ -209,7 +215,12 @@ router.post("/access/invitations/:invitationId/revoke", async (req, res) => {
     const [invitation] = await tx.select().from(staffInvitationsTable)
       .where(eq(staffInvitationsTable.id, params.data.invitationId)).limit(1);
     if (!invitation) return { outcome: "not-found" } as const;
-    if (invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+    if (
+      invitation.clerkInvitationId !== requestedInvitation.clerkInvitationId
+      || invitation.status !== requestedInvitation.status
+      || requestedInvitation.status !== "PENDING"
+      || requestedInvitation.expiresAt <= new Date()
+    ) {
       return { outcome: "not-pending" } as const;
     }
     await dependencies.revokeClerkInvitation(invitation.clerkInvitationId);
@@ -271,13 +282,24 @@ router.post("/access/invitations/:invitationId/resend", async (req, res) => {
     res.status(400).json({ error: "Undangan tidak valid" });
     return;
   }
+  const [requestedInvitation] = await db.select().from(staffInvitationsTable)
+    .where(eq(staffInvitationsTable.id, params.data.invitationId)).limit(1);
+  if (!requestedInvitation) {
+    res.status(404).json({ error: "Undangan tidak ditemukan" });
+    return;
+  }
   let createdClerkInvitationId: string | undefined;
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`erp-staff-invite-id:${params.data.invitationId}`}))`);
     const [invitation] = await tx.select().from(staffInvitationsTable)
       .where(eq(staffInvitationsTable.id, params.data.invitationId)).limit(1);
     if (!invitation) return { outcome: "not-found" } as const;
-    if (invitation.status !== "EXPIRED" && !(invitation.status === "PENDING" && invitation.expiresAt <= new Date())) {
+    if (
+      invitation.clerkInvitationId !== requestedInvitation.clerkInvitationId
+      || invitation.status !== requestedInvitation.status
+      || (requestedInvitation.status !== "EXPIRED"
+        && !(requestedInvitation.status === "PENDING" && requestedInvitation.expiresAt <= new Date()))
+    ) {
       return { outcome: "not-expired" } as const;
     }
     const clerkInvitation = await dependencies.createClerkInvitation({
@@ -294,6 +316,7 @@ router.post("/access/invitations/:invitationId/resend", async (req, res) => {
       expiresAt,
     }).where(and(
       eq(staffInvitationsTable.id, invitation.id),
+      eq(staffInvitationsTable.clerkInvitationId, requestedInvitation.clerkInvitationId),
       or(
         eq(staffInvitationsTable.status, "EXPIRED"),
         and(eq(staffInvitationsTable.status, "PENDING"), sql`${staffInvitationsTable.expiresAt} <= now()`),
