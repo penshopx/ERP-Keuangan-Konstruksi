@@ -126,7 +126,7 @@ export default function Invoices() {
                         <SelectValue placeholder="Select Project" />
                       </SelectTrigger>
                       <SelectContent>
-                        {projects?.filter(p => p.status === 'active').map(p => (
+                        {projects?.filter(p => p.status === "BERJALAN").map(p => (
                           <SelectItem key={p.id} value={p.id}>{p.code} - {p.name}</SelectItem>
                         ))}
                       </SelectContent>

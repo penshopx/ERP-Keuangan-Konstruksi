@@ -224,9 +224,36 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       });
       projectId = String(created.id);
 
+      const preparationProjectInvoice = await fetch(`${firstServer.baseUrl}/invoices`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          period: "Termin sebelum proyek berjalan",
+          issuedAt: "2099-01-01",
+          dpp: 10_000_000,
+          retentionPercent: 5,
+          integrated: false,
+          serviceType: "KONSTRUKSI",
+          qualification: "TANPA_KUALIFIKASI",
+          hasSbu: false,
+          supplierPkp: true,
+          governmentCollector: false,
+        }),
+      });
+      assert.equal(preparationProjectInvoice.status, 400);
+      assert.deepEqual(
+        await preparationProjectInvoice.json(),
+        { error: "Invoice hanya dapat dibuat untuk proyek yang sedang berjalan" },
+      );
+
       await requestJson(firstServer.baseUrl, `/projects/${projectId}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: "Proyek Persistensi Diperbarui", progress: 35 }),
+        body: JSON.stringify({
+          name: "Proyek Persistensi Diperbarui",
+          progress: 35,
+          status: "BERJALAN",
+        }),
       });
 
       const [storedInPostgres] = await db.select().from(projectsTable)
@@ -234,6 +261,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.ok(storedInPostgres);
       assert.equal(storedInPostgres.name, "Proyek Persistensi Diperbarui");
       assert.equal(storedInPostgres.progress, 35);
+      assert.equal(storedInPostgres.status, "BERJALAN");
     } finally {
       await firstServer.close();
     }

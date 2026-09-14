@@ -80,6 +80,10 @@ router.post("/invoices", requirePermission("invoices:write"), async (req, res) =
     res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
     return;
   }
+  if (project.status !== "BERJALAN") {
+    res.status(400).json({ error: "Invoice hanya dapat dibuat untuk proyek yang sedang berjalan" });
+    return;
+  }
   if (parsed.data.serviceType === "KONSTRUKSI" && parsed.data.qualification !== "TANPA_KUALIFIKASI" && !parsed.data.hasSbu) {
     res.status(400).json({ error: "SBU wajib untuk jasa konstruksi berkualifikasi" });
     return;
