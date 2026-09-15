@@ -12,6 +12,8 @@ import {
   pool,
   projectsTable,
   rabBaselinesTable,
+  rabItemsTable,
+  rabTemplatesTable,
   taxCalculationSnapshotsTable,
   taxRuleVersionsTable,
 } from "@workspace/db";
@@ -28,6 +30,7 @@ const regressionProjectCodePattern = "^TST-([0-9a-f]{8}|RB-(baseline|audit)-[0-9
 const regressionUserIdPattern = "^test-user-[0-9a-f-]{36}$";
 const regressionTaxRuleVersionPattern = "^TEST-(SUCCESSOR|CONCURRENT)-[0-9a-f-]{36}$";
 const regressionDirectTaxRuleIdPattern = "^test-direct-(base|adjacent|overlap)-[0-9a-f-]{36}$";
+const regressionRabTemplateIdPattern = "^test-rab-import-[0-9a-f-]{36}$";
 const databaseSuiteLockName = "api-server:persistence-integration-shared-fixtures";
 const databaseSuiteLockTimeoutMs = Number(process.env.PERSISTENCE_TEST_LOCK_TIMEOUT_MS ?? 120_000);
 const databaseSuiteLockPollMs = 250;
@@ -115,6 +118,9 @@ async function cleanupRegressionData() {
         ${taxRuleVersionsTable.version} ~ ${regressionTaxRuleVersionPattern}
         OR ${taxRuleVersionsTable.id} ~ ${regressionDirectTaxRuleIdPattern}
       `);
+    const testRabTemplates = await tx.select({ id: rabTemplatesTable.id })
+      .from(rabTemplatesTable)
+      .where(sql`${rabTemplatesTable.id} ~ ${regressionRabTemplateIdPattern}`);
     const testEntityIds = [
       ...testProjectIds,
       ...testInvoices.map(({ id }) => id),
@@ -138,6 +144,12 @@ async function cleanupRegressionData() {
       await tx.delete(taxRuleVersionsTable).where(inArray(
         taxRuleVersionsTable.id,
         testTaxRules.map(({ id }) => id),
+      ));
+    }
+    if (testRabTemplates.length > 0) {
+      await tx.delete(rabTemplatesTable).where(inArray(
+        rabTemplatesTable.id,
+        testRabTemplates.map(({ id }) => id),
       ));
     }
     await tx.update(taxRuleVersionsTable).set({ effectiveTo: null }).where(eq(taxRuleVersionsTable.id, taxRuleId));
@@ -504,6 +516,105 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         eq(auditLogsTable.action, "DIPERBARUI"),
       ));
     assert.deepEqual(auditsAfter, auditsBefore);
+  });
+
+  await t.test("RAB import rolls back baseline, items, project totals, and audit when audit insert fails", async () => {
+    const templateId = `test-rab-import-${runId}`;
+    await db.insert(rabTemplatesTable).values({
+      id: templateId,
+      name: "Template Rollback Impor RAB",
+      projectType: "TEST",
+      description: "Fixture unik untuk menguji atomicity impor RAB",
+      sourceNote: "Regression test",
+      items: [
+        {
+          code: "TEST.1",
+          name: "Item yang wajib dibatalkan",
+          category: "TEST",
+          unit: "ls",
+          quantity: 2,
+          unitPrice: 123_456,
+          materialCost: 100_000,
+          laborCost: 20_000,
+          equipmentCost: 3_456,
+          parentCode: null,
+          level: 1,
+        },
+      ],
+    });
+
+    try {
+      const [projectBefore] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, projectId));
+      assert.ok(projectBefore);
+      const baselinesBefore = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.projectId, projectId));
+      const baselineIdsBefore = baselinesBefore.map(({ id }) => id);
+      const itemsBefore = baselineIdsBefore.length > 0
+        ? await db.select().from(rabItemsTable).where(inArray(rabItemsTable.baselineId, baselineIdsBefore))
+        : [];
+      const auditsBefore = await db.select().from(auditLogsTable)
+        .where(and(
+          eq(auditLogsTable.entity, "RAB"),
+          eq(auditLogsTable.action, "DIIMPOR"),
+        ));
+
+      let failedBaselineId = "";
+      const server = await startTestServer({}, access, {
+        beforeRabImportAuditInsert: async (hookProjectId, baselineId) => {
+          assert.equal(hookProjectId, projectId);
+          failedBaselineId = baselineId;
+          throw new Error("Injected RAB import audit insert failure");
+        },
+      });
+      try {
+        const response = await fetch(`${server.baseUrl}/projects/${projectId}/rab/import`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ templateId, priceFactor: 1.25 }),
+        });
+        assert.equal(response.status, 500);
+      } finally {
+        await server.close();
+      }
+
+      assert.notEqual(failedBaselineId, "");
+      const [projectAfter] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, projectId));
+      const baselinesAfter = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.projectId, projectId));
+      const baselineIdsAfter = baselinesAfter.map(({ id }) => id);
+      const itemsAfter = baselineIdsAfter.length > 0
+        ? await db.select().from(rabItemsTable).where(inArray(rabItemsTable.baselineId, baselineIdsAfter))
+        : [];
+      const [failedBaseline] = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.id, failedBaselineId));
+      const failedItems = await db.select().from(rabItemsTable)
+        .where(eq(rabItemsTable.baselineId, failedBaselineId));
+      const [failedAudit] = await db.select().from(auditLogsTable)
+        .where(and(
+          eq(auditLogsTable.entity, "RAB"),
+          eq(auditLogsTable.entityId, failedBaselineId),
+          eq(auditLogsTable.action, "DIIMPOR"),
+        ));
+      const auditsAfter = await db.select().from(auditLogsTable)
+        .where(and(
+          eq(auditLogsTable.entity, "RAB"),
+          eq(auditLogsTable.action, "DIIMPOR"),
+        ));
+
+      assert.ok(projectAfter);
+      assert.equal(projectAfter.budget, projectBefore.budget);
+      assert.equal(projectAfter.wbsCount, projectBefore.wbsCount);
+      assert.deepEqual(baselinesAfter, baselinesBefore);
+      assert.deepEqual(itemsAfter, itemsBefore);
+      assert.equal(failedBaseline, undefined);
+      assert.deepEqual(failedItems, []);
+      assert.equal(failedAudit, undefined);
+      assert.deepEqual(auditsAfter, auditsBefore);
+    } finally {
+      await db.delete(rabTemplatesTable).where(eq(rabTemplatesTable.id, templateId));
+    }
   });
 
   await t.test("invoice, tax snapshot, and audit are committed together", async () => {
