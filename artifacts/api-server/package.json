@@ -12,7 +12,8 @@
     "test": "tsx --test --test-concurrency=1 src/**/*.test.ts",
     "validate": "pnpm run typecheck && pnpm run test",
     "test:access": "tsx --test src/middlewares/access-policy.test.ts",
-    "test:persistence": "tsx --test src/routes/persistence.integration.test.ts"
+    "test:persistence": "tsx --test src/routes/persistence.integration.test.ts",
+    "test:persistence-lock": "tsx --test src/testing/database-suite-lock.integration.test.ts"
   },
   "dependencies": {
     "@clerk/express": "^2.1.67",
