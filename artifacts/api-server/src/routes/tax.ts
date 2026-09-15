@@ -54,18 +54,19 @@ router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
     pphFinal: sql<number>`coalesce(sum(${invoicesTable.pphFinal}), 0)`.mapWith(Number),
     ppn: sql<number>`coalesce(sum(${invoicesTable.ppn}), 0)`.mapWith(Number),
     pph23: sql<number>`coalesce(sum(${invoicesTable.pph23}), 0)`.mapWith(Number),
+    documents: sql<number>`count(${invoicesTable.id})::int`.mapWith(Number),
   }).from(invoicesTable).where(and(
     gte(invoicesTable.issuedAt, periodStart),
     sql`${invoicesTable.issuedAt} < ${nextPeriodStart}`,
   ));
-  const { pphFinal, ppn, pph23 } = summary;
+  const { pphFinal, ppn, pph23, documents } = summary;
   res.json(GetTaxSummaryResponse.parse({
     period,
     pphFinal,
     ppn,
     pph23,
     total: pphFinal + ppn + pph23,
-    documents: 18,
+    documents,
     reconciliation: 99.8,
   }));
 });

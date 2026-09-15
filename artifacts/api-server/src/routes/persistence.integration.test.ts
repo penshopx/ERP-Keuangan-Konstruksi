@@ -875,6 +875,22 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           governmentCollector: false,
         }),
       });
+      await requestJson(server.baseUrl, "/invoices", {
+        method: "POST",
+        body: JSON.stringify({
+          projectId,
+          period: "Ringkasan di luar periode",
+          issuedAt: "2098-06-01",
+          dpp: 25_000_000,
+          retentionPercent: 0,
+          integrated: false,
+          serviceType: "JASA_LAIN",
+          qualification: "TIDAK_BERLAKU",
+          hasSbu: false,
+          supplierPkp: false,
+          governmentCollector: false,
+        }),
+      });
 
       const summary = await requestJson(server.baseUrl, "/tax/summary?period=2098-05");
       assert.equal(summary.period, "2098-05");
@@ -882,12 +898,14 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.equal(summary.ppn, 5_500_200);
       assert.equal(summary.pph23, 1_000_000);
       assert.equal(summary.total, 8_250_200);
+      assert.equal(summary.documents, 2);
 
-      const emptyMonth = await requestJson(server.baseUrl, "/tax/summary?period=2098-06");
+      const emptyMonth = await requestJson(server.baseUrl, "/tax/summary?period=2098-07");
       assert.equal(emptyMonth.pphFinal, 0);
       assert.equal(emptyMonth.ppn, 0);
       assert.equal(emptyMonth.pph23, 0);
       assert.equal(emptyMonth.total, 0);
+      assert.equal(emptyMonth.documents, 0);
     } finally {
       await server.close();
     }
