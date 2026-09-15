@@ -198,6 +198,7 @@ export interface TaxSummary {
   ppn: number;
   pph23: number;
   total: number;
+  subLedgerTotal: number;
   documents: number;
   reconciliation: number;
 }

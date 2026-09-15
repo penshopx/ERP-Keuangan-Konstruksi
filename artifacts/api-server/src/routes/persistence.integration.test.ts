@@ -875,7 +875,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           governmentCollector: false,
         }),
       });
-      await requestJson(server.baseUrl, "/invoices", {
+      const outsidePeriod = await requestJson(server.baseUrl, "/invoices", {
         method: "POST",
         body: JSON.stringify({
           projectId,
@@ -898,14 +898,38 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.equal(summary.ppn, 5_500_200);
       assert.equal(summary.pph23, 1_000_000);
       assert.equal(summary.total, 8_250_200);
+      assert.equal(summary.subLedgerTotal, 8_250_200);
       assert.equal(summary.documents, 2);
+      assert.equal(summary.reconciliation, 1);
+
+      await db.update(taxCalculationSnapshotsTable)
+        .set({ ppn: Number(otherService.ppn) - 100_000 })
+        .where(eq(taxCalculationSnapshotsTable.invoiceId, String(otherService.id)));
+
+      const summaryWithVariance = await requestJson(server.baseUrl, "/tax/summary?period=2098-05");
+      assert.equal(summaryWithVariance.subLedgerTotal, 8_150_200);
+      assert.equal(summaryWithVariance.reconciliation, 8_150_200 / 8_250_200);
+
+      await db.update(invoicesTable)
+        .set({ ppn: 0, pphFinal: 0, pph23: 0 })
+        .where(eq(invoicesTable.id, String(outsidePeriod.id)));
+      await db.update(taxCalculationSnapshotsTable)
+        .set({ ppn: 100_000, pphFinal: 0, pph23: 0 })
+        .where(eq(taxCalculationSnapshotsTable.invoiceId, String(outsidePeriod.id)));
+
+      const zeroLedgerWithVariance = await requestJson(server.baseUrl, "/tax/summary?period=2098-06");
+      assert.equal(zeroLedgerWithVariance.total, 0);
+      assert.equal(zeroLedgerWithVariance.subLedgerTotal, 100_000);
+      assert.equal(zeroLedgerWithVariance.reconciliation, 0);
 
       const emptyMonth = await requestJson(server.baseUrl, "/tax/summary?period=2098-07");
       assert.equal(emptyMonth.pphFinal, 0);
       assert.equal(emptyMonth.ppn, 0);
       assert.equal(emptyMonth.pph23, 0);
       assert.equal(emptyMonth.total, 0);
+      assert.equal(emptyMonth.subLedgerTotal, 0);
       assert.equal(emptyMonth.documents, 0);
+      assert.equal(emptyMonth.reconciliation, 1);
     } finally {
       await server.close();
     }

@@ -357,6 +357,7 @@ export const GetTaxSummaryResponse = zod.object({
   "ppn": zod.number(),
   "pph23": zod.number(),
   "total": zod.number(),
+  "subLedgerTotal": zod.number(),
   "documents": zod.number().int(),
   "reconciliation": zod.number()
 })

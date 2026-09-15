@@ -8,7 +8,13 @@ import {
   GetTaxSummaryResponse,
   ListTaxRulesResponse,
 } from "@workspace/api-zod";
-import { auditLogsTable, db, invoicesTable, taxRuleVersionsTable } from "@workspace/db";
+import {
+  auditLogsTable,
+  db,
+  invoicesTable,
+  taxCalculationSnapshotsTable,
+  taxRuleVersionsTable,
+} from "@workspace/db";
 import { taxRuleLockKey } from "../domain/tax-rule-lock";
 import { requirePermission } from "../middlewares/access";
 
@@ -54,20 +60,34 @@ router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
     pphFinal: sql<number>`coalesce(sum(${invoicesTable.pphFinal}), 0)`.mapWith(Number),
     ppn: sql<number>`coalesce(sum(${invoicesTable.ppn}), 0)`.mapWith(Number),
     pph23: sql<number>`coalesce(sum(${invoicesTable.pph23}), 0)`.mapWith(Number),
+    subLedgerTotal: sql<number>`coalesce(sum(
+      coalesce(${taxCalculationSnapshotsTable.pphFinal}, 0)
+      + coalesce(${taxCalculationSnapshotsTable.ppn}, 0)
+      + coalesce(${taxCalculationSnapshotsTable.pph23}, 0)
+    ), 0)`.mapWith(Number),
     documents: sql<number>`count(${invoicesTable.id})::int`.mapWith(Number),
-  }).from(invoicesTable).where(and(
+  }).from(invoicesTable)
+    .leftJoin(
+      taxCalculationSnapshotsTable,
+      eq(taxCalculationSnapshotsTable.invoiceId, invoicesTable.id),
+    )
+    .where(and(
     gte(invoicesTable.issuedAt, periodStart),
     sql`${invoicesTable.issuedAt} < ${nextPeriodStart}`,
   ));
-  const { pphFinal, ppn, pph23, documents } = summary;
+  const { pphFinal, ppn, pph23, subLedgerTotal, documents } = summary;
+  const total = pphFinal + ppn + pph23;
   res.json(GetTaxSummaryResponse.parse({
     period,
     pphFinal,
     ppn,
     pph23,
-    total: pphFinal + ppn + pph23,
+    total,
+    subLedgerTotal,
     documents,
-    reconciliation: 99.8,
+    reconciliation: total === 0
+      ? (subLedgerTotal === 0 ? 1 : 0)
+      : subLedgerTotal / total,
   }));
 });
 

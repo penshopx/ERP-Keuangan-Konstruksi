@@ -625,13 +625,14 @@ components:
         governmentCollector: { type: boolean }
     TaxSummary:
       type: object
-      required: [period, pphFinal, ppn, pph23, total, documents, reconciliation]
+      required: [period, pphFinal, ppn, pph23, total, subLedgerTotal, documents, reconciliation]
       properties:
         period: { type: string }
         pphFinal: { type: number }
         ppn: { type: number }
         pph23: { type: number }
         total: { type: number }
+        subLedgerTotal: { type: number }
         documents: { type: integer }
         reconciliation: { type: number }
     TaxRule:

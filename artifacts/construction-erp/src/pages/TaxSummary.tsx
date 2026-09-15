@@ -130,13 +130,13 @@ export default function TaxSummary() {
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Tax Sub-ledger Balance</span>
-                <span className="font-medium">{formatRupiah(tax.total * tax.reconciliation)}</span>
+                <span className="font-medium">{formatRupiah(tax.subLedgerTotal)}</span>
               </div>
               <div className="border-t pt-4 mt-2">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Variance</span>
                   <span className={`font-bold ${isReconciled ? 'text-emerald-500' : 'text-destructive'}`}>
-                    {formatRupiah(tax.total - (tax.total * tax.reconciliation))}
+                    {formatRupiah(tax.total - tax.subLedgerTotal)}
                   </span>
                 </div>
               </div>
