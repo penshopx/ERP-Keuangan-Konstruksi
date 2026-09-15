@@ -5,3 +5,4 @@
 - [Invitation status authority](invitation-status-authority.md) — Clerk is authoritative for whether an invitation link remains usable; ERP lists must reconcile before reporting it active.
 - [Invitation mutation concurrency](invitation-mutation-concurrency.md) — advisory locks serialize invitation actions, but stale requests also need snapshot identity checks to prevent a second transition.
 - [Tracked SQL migrations](tracked-sql-migrations.md) — declare migration-history objects in Drizzle and keep SQL-only constraints protected from schema push.
+- [Composite package declarations](composite-package-declarations.md) — rebuild emitted declarations after merges before consumers run TypeScript validation.
