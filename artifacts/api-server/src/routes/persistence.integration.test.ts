@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type Express } from "express";
@@ -30,6 +31,10 @@ const regressionDirectTaxRuleIdPattern = "^test-direct-(base|adjacent|overlap)-[
 const databaseSuiteLockName = "api-server:persistence-integration-shared-fixtures";
 const databaseSuiteLockTimeoutMs = Number(process.env.PERSISTENCE_TEST_LOCK_TIMEOUT_MS ?? 120_000);
 const databaseSuiteLockPollMs = 250;
+const preventOverlappingTaxRulesMigrationUrl = new URL(
+  "../../../../lib/db/migrations/0001_prevent_overlapping_tax_rule_periods.sql",
+  import.meta.url,
+);
 let databaseSuiteLockClient: {
   query: typeof pool.query;
   release: () => void;
@@ -208,6 +213,133 @@ after(async () => {
 
 test("API persistence and invoice atomicity survive regressions", async (t) => {
   let projectId = "";
+
+  await t.test("legacy bounded override migration preserves rates and is idempotent", async () => {
+    const client = await pool.connect();
+    const schemaName = `test_tax_migration_${runId.replaceAll("-", "")}`;
+    const migrationSql = await readFile(preventOverlappingTaxRulesMigrationUrl, "utf8");
+    try {
+      await client.query(`CREATE SCHEMA ${schemaName}`);
+      await client.query(`SET search_path TO ${schemaName}, public`);
+      await client.query(`
+        CREATE TABLE tax_rule_versions (
+          id text PRIMARY KEY,
+          version text NOT NULL,
+          effective_from date NOT NULL,
+          effective_to date,
+          regulatory_source text NOT NULL,
+          service_type text NOT NULL,
+          qualification text,
+          requires_sbu boolean NOT NULL,
+          supplier_pkp boolean NOT NULL,
+          government_collector boolean NOT NULL,
+          integrated boolean NOT NULL,
+          dpp_rate_basis_points integer NOT NULL,
+          ppn_rate_basis_points integer NOT NULL,
+          pph_final_rate_basis_points integer NOT NULL,
+          pph_23_rate_basis_points integer NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      await client.query(`
+        INSERT INTO tax_rule_versions (
+          id, version, effective_from, effective_to, regulatory_source,
+          service_type, qualification, requires_sbu, supplier_pkp,
+          government_collector, integrated, dpp_rate_basis_points,
+          ppn_rate_basis_points, pph_final_rate_basis_points,
+          pph_23_rate_basis_points
+        ) VALUES
+          (
+            'legacy-open', 'LEGACY-OPEN', '2022-01-01', NULL, 'Legacy regulation',
+            'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
+            false, true, 2750, 1100, 400, 0
+          ),
+          (
+            'temporary-override', 'TEMPORARY-OVERRIDE', '2026-01-01', '2026-12-31',
+            'Temporary exception', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
+            false, true, 2750, 1100, 250, 0
+          )
+      `);
+
+      await client.query(migrationSql);
+
+      const segments = await client.query<{
+        id: string;
+        effective_from: string;
+        effective_to: string | null;
+        pph_final_rate_basis_points: number;
+      }>(`
+        SELECT id, effective_from::text, effective_to::text, pph_final_rate_basis_points
+        FROM tax_rule_versions
+        ORDER BY effective_from
+      `);
+      assert.deepEqual(segments.rows, [
+        {
+          id: "legacy-open",
+          effective_from: "2022-01-01",
+          effective_to: "2025-12-31",
+          pph_final_rate_basis_points: 400,
+        },
+        {
+          id: "temporary-override",
+          effective_from: "2026-01-01",
+          effective_to: "2026-12-31",
+          pph_final_rate_basis_points: 250,
+        },
+        {
+          id: "legacy-open-continuation-2027-01-01",
+          effective_from: "2027-01-01",
+          effective_to: null,
+          pph_final_rate_basis_points: 400,
+        },
+      ]);
+
+      const selectedRates = await client.query<{
+        issued_at: string;
+        id: string;
+        pph_final_rate_basis_points: number;
+      }>(`
+        SELECT dates.issued_at::text, selected.id, selected.pph_final_rate_basis_points
+        FROM (
+          VALUES (DATE '2025-12-31'), (DATE '2026-06-30'), (DATE '2027-01-01')
+        ) AS dates(issued_at)
+        CROSS JOIN LATERAL (
+          SELECT id, pph_final_rate_basis_points
+          FROM tax_rule_versions
+          WHERE service_type = 'KONSTRUKSI'
+            AND qualification = 'TANPA_KUALIFIKASI'
+            AND requires_sbu = false
+            AND supplier_pkp = true
+            AND government_collector = false
+            AND integrated = true
+            AND effective_from <= dates.issued_at
+            AND (effective_to IS NULL OR effective_to >= dates.issued_at)
+          ORDER BY effective_from DESC
+          LIMIT 1
+        ) AS selected
+        ORDER BY dates.issued_at
+      `);
+      assert.deepEqual(selectedRates.rows, [
+        { issued_at: "2025-12-31", id: "legacy-open", pph_final_rate_basis_points: 400 },
+        { issued_at: "2026-06-30", id: "temporary-override", pph_final_rate_basis_points: 250 },
+        {
+          issued_at: "2027-01-01",
+          id: "legacy-open-continuation-2027-01-01",
+          pph_final_rate_basis_points: 400,
+        },
+      ]);
+
+      await client.query(migrationSql);
+      const rerun = await client.query<{ count: number }>(
+        "SELECT count(*)::int AS count FROM tax_rule_versions",
+      );
+      assert.equal(rerun.rows[0]?.count, 3);
+    } finally {
+      await client.query("RESET search_path");
+      await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
+      client.release();
+    }
+  });
 
   await t.test("project create and update remain readable after server restart", async () => {
     const firstServer = await startTestServer();
