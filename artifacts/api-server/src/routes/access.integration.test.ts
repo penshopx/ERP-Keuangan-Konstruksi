@@ -21,6 +21,7 @@ import {
 } from "../middlewares/access";
 import { createApiRouter } from "./index";
 import type { AccessPersistenceHooks, AccessRouterDependencies } from "./access";
+import { reconcilePendingInvitations } from "../lib/invitation-reconciliation";
 
 const runId = randomUUID();
 const prefix = `access-test-${runId}`;
@@ -452,6 +453,57 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     const [storedAfter] = await db.select().from(staffInvitationsTable)
       .where(eq(staffInvitationsTable.id, invitation.id));
     assert.equal(storedAfter.status, "REVOKED");
+  });
+
+  await t.test("scheduled reconciliation retries failures and writes one truthful audit", async () => {
+    const email = `${prefix}-scheduled-reconcile@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    const [storedBefore] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    let attempts = 0;
+    const dependencies = {
+      getClerkInvitation: async (clerkInvitationId: string) => {
+        if (clerkInvitationId !== storedBefore.clerkInvitationId) {
+          return { status: clerkStatuses.get(clerkInvitationId) ?? "pending" };
+        }
+        attempts += 1;
+        if (attempts === 1) throw new Error("Injected transient Clerk failure");
+        return { status: "expired" };
+      },
+    };
+
+    const failedPass = await reconcilePendingInvitations(dependencies);
+    assert.equal(failedPass.failed, 1);
+    const auditsAfterFailure = await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id));
+    assert.equal(auditsAfterFailure.filter(({ action }) =>
+      action === "STATUS UNDANGAN DIREKONSILIASI").length, 0);
+
+    const retryPass = await reconcilePendingInvitations(dependencies);
+    assert.equal(retryPass.updated, 1);
+    const [storedAfter] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(storedAfter.status, "EXPIRED");
+    const auditsAfterRetry = await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id));
+    const reconciliationAudits = auditsAfterRetry.filter(({ action }) =>
+      action === "STATUS UNDANGAN DIREKONSILIASI");
+    assert.equal(reconciliationAudits.length, 1);
+    assert.equal(reconciliationAudits[0]?.metadata?.reason, "SCHEDULED_CHECK");
+    assert.equal(reconciliationAudits[0]?.metadata?.outcome, "UPDATED");
+
+    const idempotentPass = await reconcilePendingInvitations(dependencies);
+    assert.equal(idempotentPass.updated, 0);
+    const finalAudits = await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id));
+    assert.equal(finalAudits.filter(({ action }) =>
+      action === "STATUS UNDANGAN DIREKONSILIASI").length, 1);
+    clerkStatuses.set(storedBefore.clerkInvitationId, "expired");
   });
 
   await t.test("invited role and projects are applied atomically on first login", async () => {

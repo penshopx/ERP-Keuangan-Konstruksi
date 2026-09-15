@@ -33,6 +33,21 @@ export type AccessRouterDependencies = {
   getClerkInvitation: (invitationId: string) => Promise<ClerkInvitationState>;
 };
 
+export async function getClerkInvitationState(
+  invitationId: string,
+): Promise<ClerkInvitationState> {
+  for (const status of ["pending", "accepted", "revoked", "expired"] as const) {
+    const result = await clerkClient.invitations.getInvitationList({
+      query: invitationId,
+      status,
+      limit: 1,
+    });
+    const invitation = result.data.find(({ id }) => id === invitationId);
+    if (invitation) return { status: invitation.status };
+  }
+  throw new Error(`Undangan Clerk ${invitationId} tidak ditemukan`);
+}
+
 export type AccessPersistenceHooks = {
   beforeInvitationInsert?: (clerkInvitationId: string) => Promise<void>;
   afterClerkInvitationRevoked?: (clerkInvitationId: string) => Promise<void>;
@@ -61,18 +76,7 @@ export function createAccessRouter(
   dependencies: AccessRouterDependencies = {
     createClerkInvitation: clerkClient.invitations.createInvitation.bind(clerkClient.invitations),
     revokeClerkInvitation: clerkClient.invitations.revokeInvitation.bind(clerkClient.invitations),
-    getClerkInvitation: async (invitationId) => {
-      for (const status of ["pending", "accepted", "revoked", "expired"] as const) {
-        const result = await clerkClient.invitations.getInvitationList({
-          query: invitationId,
-          status,
-          limit: 1,
-        });
-        const invitation = result.data.find(({ id }) => id === invitationId);
-        if (invitation) return { status: invitation.status };
-      }
-      throw new Error(`Undangan Clerk ${invitationId} tidak ditemukan`);
-    },
+    getClerkInvitation: getClerkInvitationState,
   },
   hooks: AccessPersistenceHooks = {},
 ): IRouter {

@@ -3,6 +3,8 @@ import { assertRequiredDatabaseMigrations } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { seedDemoData } from "./lib/demo-data";
 import { seedRabTemplates } from "./lib/rab-template-data";
+import { schedulePendingInvitationReconciliation } from "./lib/invitation-reconciliation";
+import { getClerkInvitationState } from "./routes/access";
 
 const rawPort = process.env["PORT"];
 
@@ -24,7 +26,7 @@ if (process.env.NODE_ENV === "development") {
   await seedDemoData();
 }
 
-app.listen(port, (err) => {
+const server = app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -32,3 +34,19 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 });
+
+const invitationReconciliation = schedulePendingInvitationReconciliation({
+  getClerkInvitation: getClerkInvitationState,
+  onError: (err, invitation) => {
+    logger.warn({
+      err,
+      invitationId: invitation.id,
+      clerkInvitationId: invitation.clerkInvitationId,
+    }, "Scheduled invitation reconciliation failed; it will be retried");
+  },
+  onRunError: (err) => {
+    logger.warn({ err }, "Scheduled invitation reconciliation pass failed; it will be retried");
+  },
+});
+
+server.on("close", () => invitationReconciliation.stop());

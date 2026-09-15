@@ -10,10 +10,35 @@ export type ClerkInvitationState = {
   status: string;
 };
 
-type ReconciliationActor = {
+export type ReconciliationActor = {
   userId: string;
   displayName: string;
   role: string;
+};
+
+export type InvitationReconciliationReason =
+  | "LIST_REFRESH"
+  | "PARTIAL_REVOKE_FAILURE"
+  | "SCHEDULED_CHECK";
+
+export type ScheduledInvitationReconciliationDependencies = {
+  getClerkInvitation: (invitationId: string) => Promise<ClerkInvitationState>;
+  onError?: (
+    error: unknown,
+    invitation: typeof staffInvitationsTable.$inferSelect,
+  ) => void;
+  onRunError?: (error: unknown) => void;
+};
+
+export type InvitationReconciliationScheduleOptions = {
+  intervalMs?: number;
+  runImmediately?: boolean;
+};
+
+const scheduledActor: ReconciliationActor = {
+  userId: "system:invitation-reconciliation",
+  displayName: "Sistem Rekonsiliasi Undangan",
+  role: "SYSTEM",
 };
 
 const inactiveClerkStatuses = new Set(["revoked", "expired"]);
@@ -22,7 +47,7 @@ export async function reconcileInvitationFromClerk(
   invitation: typeof staffInvitationsTable.$inferSelect,
   clerkState: ClerkInvitationState,
   actor: ReconciliationActor,
-  reason: "LIST_REFRESH" | "PARTIAL_REVOKE_FAILURE",
+  reason: InvitationReconciliationReason,
 ) {
   const clerkStatus = clerkState.status.toLowerCase();
   if (invitation.status !== "PENDING" || !inactiveClerkStatuses.has(clerkStatus)) {
@@ -66,6 +91,64 @@ export async function reconcileInvitationFromClerk(
     await tx.insert(auditLogsTable).values(audit);
     return updated;
   });
+}
+
+export async function reconcilePendingInvitations(
+  dependencies: ScheduledInvitationReconciliationDependencies,
+) {
+  const pendingInvitations = await db.select().from(staffInvitationsTable)
+    .where(eq(staffInvitationsTable.status, "PENDING"));
+  let checked = 0;
+  let updated = 0;
+  let failed = 0;
+
+  for (const invitation of pendingInvitations) {
+    try {
+      const clerkState = await dependencies.getClerkInvitation(invitation.clerkInvitationId);
+      const reconciled = await reconcileInvitationFromClerk(
+        invitation,
+        clerkState,
+        scheduledActor,
+        "SCHEDULED_CHECK",
+      );
+      checked += 1;
+      if (reconciled.status !== invitation.status) updated += 1;
+    } catch (error) {
+      failed += 1;
+      dependencies.onError?.(error, invitation);
+    }
+  }
+
+  return { checked, updated, failed };
+}
+
+export function schedulePendingInvitationReconciliation(
+  dependencies: ScheduledInvitationReconciliationDependencies,
+  options: InvitationReconciliationScheduleOptions = {},
+) {
+  const intervalMs = options.intervalMs ?? 5 * 60_000;
+  let running = false;
+
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try {
+      await reconcilePendingInvitations(dependencies);
+    } catch (error) {
+      dependencies.onRunError?.(error);
+    } finally {
+      running = false;
+    }
+  };
+
+  const timer = setInterval(() => void run(), intervalMs);
+  timer.unref();
+  if (options.runImmediately ?? true) void run();
+
+  return {
+    stop: () => clearInterval(timer),
+    run,
+  };
 }
 
 export async function recordInvitationPartialFailure(
