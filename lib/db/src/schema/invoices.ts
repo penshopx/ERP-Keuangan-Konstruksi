@@ -1,26 +1,38 @@
-import { bigint, boolean, date, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { bigint, boolean, check, date, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { projectsTable } from "./projects";
 
-export const taxRuleVersionsTable = pgTable("tax_rule_versions", {
-  id: text("id").primaryKey(),
-  version: text("version").notNull().unique(),
-  effectiveFrom: date("effective_from", { mode: "string" }).notNull(),
-  effectiveTo: date("effective_to", { mode: "string" }),
-  regulatorySource: text("regulatory_source").notNull(),
-  serviceType: text("service_type").notNull(),
-  qualification: text("qualification"),
-  requiresSbu: boolean("requires_sbu").notNull(),
-  supplierPkp: boolean("supplier_pkp").notNull(),
-  governmentCollector: boolean("government_collector").notNull(),
-  integrated: boolean("integrated").notNull(),
-  dppRateBasisPoints: integer("dpp_rate_basis_points").notNull(),
-  ppnRateBasisPoints: integer("ppn_rate_basis_points").notNull(),
-  pphFinalRateBasisPoints: integer("pph_final_rate_basis_points").notNull(),
-  pph23RateBasisPoints: integer("pph_23_rate_basis_points").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const taxRuleVersionsTable = pgTable(
+  "tax_rule_versions",
+  {
+    id: text("id").primaryKey(),
+    version: text("version").notNull().unique(),
+    effectiveFrom: date("effective_from", { mode: "string" }).notNull(),
+    effectiveTo: date("effective_to", { mode: "string" }),
+    regulatorySource: text("regulatory_source").notNull(),
+    serviceType: text("service_type").notNull(),
+    qualification: text("qualification"),
+    requiresSbu: boolean("requires_sbu").notNull(),
+    supplierPkp: boolean("supplier_pkp").notNull(),
+    governmentCollector: boolean("government_collector").notNull(),
+    integrated: boolean("integrated").notNull(),
+    dppRateBasisPoints: integer("dpp_rate_basis_points").notNull(),
+    ppnRateBasisPoints: integer("ppn_rate_basis_points").notNull(),
+    pphFinalRateBasisPoints: integer("pph_final_rate_basis_points").notNull(),
+    pph23RateBasisPoints: integer("pph_23_rate_basis_points").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "tax_rule_versions_valid_period",
+      sql`${table.effectiveTo} IS NULL OR ${table.effectiveTo} >= ${table.effectiveFrom}`,
+    ),
+  ],
+);
 
 export const invoicesTable = pgTable("invoices", {
   id: text("id").primaryKey(),
