@@ -433,6 +433,24 @@ export interface AccessInvitation {
   createdAt: string;
 }
 
+export type AccessInvitationVerificationStatus = typeof AccessInvitationVerificationStatus[keyof typeof AccessInvitationVerificationStatus];
+
+
+export const AccessInvitationVerificationStatus = {
+  VERIFIED: 'VERIFIED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface AccessInvitationVerification {
+  status: AccessInvitationVerificationStatus;
+  message: string;
+}
+
+export interface AccessInvitationList {
+  invitations: AccessInvitation[];
+  verification: AccessInvitationVerification;
+}
+
 export type AccessInvitationInputRole = typeof AccessInvitationInputRole[keyof typeof AccessInvitationInputRole];
 
 

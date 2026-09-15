@@ -499,7 +499,8 @@ export const ListAccessUsersResponse = zod.array(ListAccessUsersResponseItem)
 /**
  * @summary List pending and expired staff invitations
  */
-export const ListAccessInvitationsResponseItem = zod.object({
+export const ListAccessInvitationsResponse = zod.object({
+  "invitations": zod.array(zod.object({
   "id": zod.string(),
   "email": zod.string().email(),
   "displayName": zod.string(),
@@ -508,8 +509,12 @@ export const ListAccessInvitationsResponseItem = zod.object({
   "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
   "expiresAt": zod.coerce.date(),
   "createdAt": zod.coerce.date()
+})),
+  "verification": zod.object({
+  "status": zod.enum(['VERIFIED', 'DEGRADED']),
+  "message": zod.string()
 })
-export const ListAccessInvitationsResponse = zod.array(ListAccessInvitationsResponseItem)
+})
 
 
 /**

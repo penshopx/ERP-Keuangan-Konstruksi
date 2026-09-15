@@ -444,8 +444,12 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     try {
       const response = await fetch(`${creator.baseUrl}/access/invitations`);
       assert.equal(response.status, 200);
-      const listed = await response.json() as Array<{ id: string; status: string }>;
-      assert.equal(listed.find(({ id }) => id === invitation.id)?.status, "REVOKED");
+      const listed = await response.json() as {
+        invitations: Array<{ id: string; status: string }>;
+        verification: { status: string };
+      };
+      assert.equal(listed.verification.status, "VERIFIED");
+      assert.equal(listed.invitations.find(({ id }) => id === invitation.id)?.status, "REVOKED");
     } finally {
       await creator.close();
     }
@@ -453,6 +457,56 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     const [storedAfter] = await db.select().from(staffInvitationsTable)
       .where(eq(staffInvitationsTable.id, invitation.id));
     assert.equal(storedAfter.status, "REVOKED");
+  });
+
+  await t.test("listing omits unverified pending invitations while Clerk is unavailable", async () => {
+    const email = `${prefix}-list-degraded@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    let clerkUnavailable = true;
+    const unavailableDependencies: AccessRouterDependencies = {
+      ...clerkDependencies,
+      getClerkInvitation: async (id) => {
+        if (clerkUnavailable) throw new Error("Injected transient Clerk outage");
+        return clerkDependencies.getClerkInvitation(id);
+      },
+    };
+    const degradedServer = await startServer(
+      staticAccessMiddleware(),
+      {},
+      unavailableDependencies,
+    );
+    try {
+      const response = await fetch(`${degradedServer.baseUrl}/access/invitations`);
+      assert.equal(response.status, 200);
+      const listed = await response.json() as {
+        invitations: Array<{ id: string; status: string }>;
+        verification: { status: string; message: string };
+      };
+      assert.equal(listed.verification.status, "DEGRADED");
+      assert.match(listed.verification.message, /disembunyikan sementara/);
+      assert.equal(listed.invitations.some(({ id }) => id === invitation.id), false);
+
+      clerkUnavailable = false;
+      const recoveredResponse = await fetch(`${degradedServer.baseUrl}/access/invitations`);
+      assert.equal(recoveredResponse.status, 200);
+      const recovered = await recoveredResponse.json() as {
+        invitations: Array<{ id: string; status: string }>;
+        verification: { status: string };
+      };
+      assert.equal(recovered.verification.status, "VERIFIED");
+      assert.equal(recovered.invitations.some(({ id }) => id === invitation.id), true);
+    } finally {
+      await degradedServer.close();
+    }
+
+    const [storedAfter] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(storedAfter.status, "PENDING");
   });
 
   await t.test("scheduled reconciliation retries failures and writes one truthful audit", async () => {

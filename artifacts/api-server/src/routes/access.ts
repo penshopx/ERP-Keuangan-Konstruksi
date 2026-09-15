@@ -26,6 +26,7 @@ import {
   recordInvitationPartialFailure,
   type ClerkInvitationState,
 } from "../lib/invitation-reconciliation";
+import { logger } from "../lib/logger";
 
 export type AccessRouterDependencies = {
   createClerkInvitation: typeof clerkClient.invitations.createInvitation;
@@ -113,18 +114,60 @@ router.get("/access/invitations", async (req, res) => {
     displayName: req.access!.displayName,
     role: req.access!.role,
   };
-  const invitations = await Promise.all(storedInvitations.map(async (invitation) => {
-    if (invitation.status !== "PENDING") return invitation;
-    const clerkState = await dependencies.getClerkInvitation(invitation.clerkInvitationId);
-    return reconcileInvitationFromClerk(invitation, clerkState, actor, "LIST_REFRESH");
-  }));
+  const requestLogger = req.log ?? logger;
+  const verifiedInvitations: typeof storedInvitations = [];
+  let verificationFailed = false;
+  for (const invitation of storedInvitations) {
+    if (invitation.status !== "PENDING") {
+      verifiedInvitations.push(invitation);
+      continue;
+    }
+    try {
+      const clerkState = await dependencies.getClerkInvitation(invitation.clerkInvitationId);
+      verifiedInvitations.push(await reconcileInvitationFromClerk(
+        invitation,
+        clerkState,
+        actor,
+        "LIST_REFRESH",
+      ));
+    } catch (error) {
+      verificationFailed = true;
+      requestLogger.warn({
+        err: error,
+        invitationId: invitation.id,
+        clerkInvitationId: invitation.clerkInvitationId,
+      }, "Clerk invitation verification failed; unverified invitation omitted");
+    }
+  }
+  const wasVerificationDegraded = req.app.locals.invitationListVerificationDegraded === true;
+  if (verificationFailed && !wasVerificationDegraded) {
+    requestLogger.warn({
+      event: "clerk_invitation_verification_degraded",
+    }, "Clerk invitation verification is degraded");
+  } else if (!verificationFailed && wasVerificationDegraded) {
+    requestLogger.info({
+      event: "clerk_invitation_verification_recovered",
+    }, "Clerk invitation verification recovered");
+  }
+  req.app.locals.invitationListVerificationDegraded = verificationFailed;
   const projects = await db.select().from(staffInvitationProjectsTable);
   const now = new Date();
-  res.json(ListAccessInvitationsResponse.parse(invitations.map((invite) => serializeInvitation(
-    invite,
-    projects.filter((item) => item.invitationId === invite.id).map((item) => item.projectId),
-    now,
-  ))));
+  res.json(ListAccessInvitationsResponse.parse({
+    invitations: verifiedInvitations.map((invite) => serializeInvitation(
+      invite,
+      projects.filter((item) => item.invitationId === invite.id).map((item) => item.projectId),
+      now,
+    )),
+    verification: verificationFailed
+      ? {
+          status: "DEGRADED",
+          message: "Sebagian status undangan tidak dapat diverifikasi. Undangan tersebut disembunyikan sementara agar status aktif yang belum pasti tidak ditampilkan.",
+        }
+      : {
+          status: "VERIFIED",
+          message: "Semua status undangan telah diverifikasi.",
+        },
+  }));
 });
 
 router.post("/access/invitations", async (req, res) => {

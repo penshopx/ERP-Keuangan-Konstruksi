@@ -22,6 +22,7 @@ import type {
 import type {
   AccessInvitation,
   AccessInvitationInput,
+  AccessInvitationList,
   AccessUser,
   AccessUserUpdate,
   Activity,
@@ -1472,9 +1473,9 @@ export const getListAccessInvitationsUrl = () => {
 /**
  * @summary List pending and expired staff invitations
  */
-export const listAccessInvitations = async ( options?: Parameters<typeof customFetch>[1]): Promise<AccessInvitation[]> => {
+export const listAccessInvitations = async ( options?: Parameters<typeof customFetch>[1]): Promise<AccessInvitationList> => {
 
-  return customFetch<AccessInvitation[]>(getListAccessInvitationsUrl(),
+  return customFetch<AccessInvitationList>(getListAccessInvitationsUrl(),
   {
     ...options,
     method: 'GET'

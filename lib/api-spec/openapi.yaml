@@ -314,9 +314,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AccessInvitation"
+                $ref: "#/components/schemas/AccessInvitationList"
     post:
       operationId: createAccessInvitation
       tags: [access]
@@ -759,6 +757,25 @@ components:
           enum: [PENDING, EXPIRED, REVOKED]
         expiresAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
+    AccessInvitationList:
+      type: object
+      required: [invitations, verification]
+      properties:
+        invitations:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccessInvitation"
+        verification:
+          $ref: "#/components/schemas/AccessInvitationVerification"
+    AccessInvitationVerification:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: string
+          enum: [VERIFIED, DEGRADED]
+        message:
+          type: string
     AccessInvitationInput:
       type: object
       required: [email, displayName, role, assignedProjectIds]
