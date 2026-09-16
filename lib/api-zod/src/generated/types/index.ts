@@ -40,6 +40,7 @@ export * from './listProjectsParams';
 export * from './project';
 export * from './projectDetail';
 export * from './projectInput';
+export * from './projectStatus';
 export * from './projectUpdate';
 export * from './rabItem';
 export * from './rabSummary';

@@ -438,6 +438,23 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.equal(storedInPostgres.name, "Proyek Persistensi Diperbarui");
       assert.equal(storedInPostgres.progress, 35);
       assert.equal(storedInPostgres.status, "BERJALAN");
+
+      for (const legacyStatus of ["active", "completed"]) {
+        const rejectedUpdate = await fetch(`${firstServer.baseUrl}/projects/${projectId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status: legacyStatus }),
+        });
+        assert.equal(rejectedUpdate.status, 400);
+        assert.deepEqual(
+          await rejectedUpdate.json(),
+          { error: "Data perubahan tidak valid" },
+        );
+      }
+
+      const [unchangedProject] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, projectId));
+      assert.equal(unchangedProject?.status, "BERJALAN");
     } finally {
       await firstServer.close();
     }

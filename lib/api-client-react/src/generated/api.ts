@@ -521,7 +521,7 @@ return customFetch<Project>(getUpdateProjectUrl(projectId),
 
 export const getUpdateProjectMutationKey = () => ['updateProject'] as const;
 
-export const getUpdateProjectMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateProjectMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProject>>, TError,UpdateProjectMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateProject>>, TError,UpdateProjectMutationVariables, TContext> => {
 
@@ -550,13 +550,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateProjectMutationResult = NonNullable<Awaited<ReturnType<typeof updateProject>>>
     export type UpdateProjectMutationBody = BodyType<ProjectUpdate>
-    export type UpdateProjectMutationError = ErrorType<unknown>
+    export type UpdateProjectMutationError = ErrorType<void>
     export type UpdateProjectMutationVariables = {projectId: string;data: BodyType<ProjectUpdate>}
 
     /**
  * @summary Update project
  */
-export const useUpdateProject = <TError = ErrorType<unknown>,
+export const useUpdateProject = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProject>>, TError,UpdateProjectMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateProject>>,

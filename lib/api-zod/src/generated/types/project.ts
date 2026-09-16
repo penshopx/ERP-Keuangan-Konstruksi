@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectStatus } from './projectStatus';
 
 export interface Project {
   id: string;
@@ -15,7 +16,7 @@ export interface Project {
   budget: number;
   actualCost: number;
   progress: number;
-  status: string;
+  status: ProjectStatus;
   health: string;
   endDate: string;
 }

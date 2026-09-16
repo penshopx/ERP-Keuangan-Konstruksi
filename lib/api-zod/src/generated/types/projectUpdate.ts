@@ -5,9 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectStatus } from './projectStatus';
 
 export interface ProjectUpdate {
   name?: string;
-  status?: string;
+  status?: ProjectStatus;
   progress?: number;
 }

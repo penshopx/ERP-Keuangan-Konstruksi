@@ -61,6 +61,15 @@ export interface DashboardSummary {
   cashflow: CashflowPoint[];
 }
 
+export type ProjectStatus = typeof ProjectStatus[keyof typeof ProjectStatus];
+
+
+export const ProjectStatus = {
+  PERSIAPAN: 'PERSIAPAN',
+  BERJALAN: 'BERJALAN',
+  SELESAI: 'SELESAI',
+} as const;
+
 export interface Project {
   id: string;
   code: string;
@@ -70,7 +79,7 @@ export interface Project {
   budget: number;
   actualCost: number;
   progress: number;
-  status: string;
+  status: ProjectStatus;
   health: string;
   endDate: string;
 }
@@ -85,7 +94,7 @@ export interface ProjectInput {
 
 export interface ProjectUpdate {
   name?: string;
-  status?: string;
+  status?: ProjectStatus;
   progress?: number;
 }
 

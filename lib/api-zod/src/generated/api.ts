@@ -69,7 +69,7 @@ export const ListProjectsResponseItem = zod.object({
   "budget": zod.number(),
   "actualCost": zod.number(),
   "progress": zod.number(),
-  "status": zod.string(),
+  "status": zod.enum(['PERSIAPAN', 'BERJALAN', 'SELESAI']),
   "health": zod.string(),
   "endDate": zod.string()
 })
@@ -96,7 +96,7 @@ export const CreateProjectResponse = zod.object({
   "budget": zod.number(),
   "actualCost": zod.number(),
   "progress": zod.number(),
-  "status": zod.string(),
+  "status": zod.enum(['PERSIAPAN', 'BERJALAN', 'SELESAI']),
   "health": zod.string(),
   "endDate": zod.string()
 })
@@ -118,7 +118,7 @@ export const GetProjectResponse = zod.object({
   "budget": zod.number(),
   "actualCost": zod.number(),
   "progress": zod.number(),
-  "status": zod.string(),
+  "status": zod.enum(['PERSIAPAN', 'BERJALAN', 'SELESAI']),
   "health": zod.string(),
   "endDate": zod.string()
 }).and(zod.object({
@@ -155,7 +155,7 @@ export const UpdateProjectParams = zod.object({
 
 export const UpdateProjectBody = zod.object({
   "name": zod.string().optional(),
-  "status": zod.string().optional(),
+  "status": zod.enum(['PERSIAPAN', 'BERJALAN', 'SELESAI']).optional(),
   "progress": zod.number().optional()
 })
 
@@ -168,7 +168,7 @@ export const UpdateProjectResponse = zod.object({
   "budget": zod.number(),
   "actualCost": zod.number(),
   "progress": zod.number(),
-  "status": zod.string(),
+  "status": zod.enum(['PERSIAPAN', 'BERJALAN', 'SELESAI']),
   "health": zod.string(),
   "endDate": zod.string()
 })

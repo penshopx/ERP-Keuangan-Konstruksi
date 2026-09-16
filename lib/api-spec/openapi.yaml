@@ -125,6 +125,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+        "400":
+          description: Invalid project update
   /projects/{projectId}/rab:
     get:
       operationId: getProjectRab
@@ -496,9 +498,12 @@ components:
         budget: { type: number }
         actualCost: { type: number }
         progress: { type: number }
-        status: { type: string }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
         health: { type: string }
         endDate: { type: string }
+    ProjectStatus:
+      type: string
+      enum: [PERSIAPAN, BERJALAN, SELESAI]
     ProjectInput:
       type: object
       required: [code, name, owner, contractValue, endDate]
@@ -512,7 +517,7 @@ components:
       type: object
       properties:
         name: { type: string }
-        status: { type: string }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
         progress: { type: number }
     ProjectDetail:
       allOf:
