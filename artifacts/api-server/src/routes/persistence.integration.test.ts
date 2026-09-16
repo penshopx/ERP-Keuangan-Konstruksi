@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import type { AddressInfo } from "node:net";
@@ -39,6 +39,10 @@ const regressionRabTemplateIdPattern = "^test-rab-import-[0-9a-f-]{36}$";
 const databaseSuiteLockTimeoutMs = Number(process.env.PERSISTENCE_TEST_LOCK_TIMEOUT_MS ?? 120_000);
 const preventOverlappingTaxRulesMigrationUrl = new URL(
   "../../../../lib/db/migrations/0001_prevent_overlapping_tax_rule_periods.sql",
+  import.meta.url,
+);
+const preserveMultipleBoundedTaxOverridesMigrationUrl = new URL(
+  "../../../../lib/db/migrations/0002_preserve_multiple_bounded_tax_overrides.sql",
   import.meta.url,
 );
 let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
@@ -196,6 +200,22 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     const client = await pool.connect();
     const schemaName = `test_tax_migration_${runId.replaceAll("-", "")}`;
     const migrationSql = await readFile(preventOverlappingTaxRulesMigrationUrl, "utf8");
+    const correctiveMigrationSql = await readFile(
+      preserveMultipleBoundedTaxOverridesMigrationUrl,
+      "utf8",
+    );
+    // @ts-expect-error The migration runner is intentionally plain JavaScript.
+    const { runMigrations } = await import("../../../../lib/db/scripts/migrate.mjs");
+    const originalMigration = {
+      name: "0001_prevent_overlapping_tax_rule_periods.sql",
+      sql: migrationSql,
+      checksum: createHash("sha256").update(migrationSql).digest("hex"),
+    };
+    const correctiveMigration = {
+      name: "0002_preserve_multiple_bounded_tax_overrides.sql",
+      sql: correctiveMigrationSql,
+      checksum: createHash("sha256").update(correctiveMigrationSql).digest("hex"),
+    };
     try {
       await client.query(`CREATE SCHEMA ${schemaName}`);
       await client.query(`SET search_path TO ${schemaName}, public`);
@@ -233,13 +253,21 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
             false, true, 2750, 1100, 400, 0
           ),
           (
-            'temporary-override', 'TEMPORARY-OVERRIDE', '2026-01-01', '2026-12-31',
-            'Temporary exception', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
+            'temporary-override-2024', 'TEMPORARY-OVERRIDE-2024',
+            '2024-01-01', '2024-03-31',
+            'First temporary exception', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
+            false, true, 2750, 1100, 250, 0
+          ),
+          (
+            'temporary-override-2026', 'TEMPORARY-OVERRIDE-2026',
+            '2026-01-01', '2026-12-31',
+            'Second temporary exception', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
             false, true, 2750, 1100, 250, 0
           )
       `);
 
-      await client.query(migrationSql);
+      await runMigrations(client, [originalMigration]);
+      await runMigrations(client, [originalMigration, correctiveMigration]);
 
       const segments = await client.query<{
         id: string;
@@ -255,11 +283,23 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         {
           id: "legacy-open",
           effective_from: "2022-01-01",
+          effective_to: "2023-12-31",
+          pph_final_rate_basis_points: 400,
+        },
+        {
+          id: "temporary-override-2024",
+          effective_from: "2024-01-01",
+          effective_to: "2024-03-31",
+          pph_final_rate_basis_points: 250,
+        },
+        {
+          id: "legacy-open-continuation-2024-04-01",
+          effective_from: "2024-04-01",
           effective_to: "2025-12-31",
           pph_final_rate_basis_points: 400,
         },
         {
-          id: "temporary-override",
+          id: "temporary-override-2026",
           effective_from: "2026-01-01",
           effective_to: "2026-12-31",
           pph_final_rate_basis_points: 250,
@@ -279,7 +319,12 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       }>(`
         SELECT dates.issued_at::text, selected.id, selected.pph_final_rate_basis_points
         FROM (
-          VALUES (DATE '2025-12-31'), (DATE '2026-06-30'), (DATE '2027-01-01')
+          VALUES
+            (DATE '2023-12-31'),
+            (DATE '2024-02-15'),
+            (DATE '2025-06-30'),
+            (DATE '2026-06-30'),
+            (DATE '2027-01-01')
         ) AS dates(issued_at)
         CROSS JOIN LATERAL (
           SELECT id, pph_final_rate_basis_points
@@ -298,8 +343,22 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         ORDER BY dates.issued_at
       `);
       assert.deepEqual(selectedRates.rows, [
-        { issued_at: "2025-12-31", id: "legacy-open", pph_final_rate_basis_points: 400 },
-        { issued_at: "2026-06-30", id: "temporary-override", pph_final_rate_basis_points: 250 },
+        { issued_at: "2023-12-31", id: "legacy-open", pph_final_rate_basis_points: 400 },
+        {
+          issued_at: "2024-02-15",
+          id: "temporary-override-2024",
+          pph_final_rate_basis_points: 250,
+        },
+        {
+          issued_at: "2025-06-30",
+          id: "legacy-open-continuation-2024-04-01",
+          pph_final_rate_basis_points: 400,
+        },
+        {
+          issued_at: "2026-06-30",
+          id: "temporary-override-2026",
+          pph_final_rate_basis_points: 250,
+        },
         {
           issued_at: "2027-01-01",
           id: "legacy-open-continuation-2027-01-01",
@@ -307,11 +366,18 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         },
       ]);
 
-      await client.query(migrationSql);
+      await runMigrations(client, [originalMigration, correctiveMigration]);
       const rerun = await client.query<{ count: number }>(
         "SELECT count(*)::int AS count FROM tax_rule_versions",
       );
-      assert.equal(rerun.rows[0]?.count, 3);
+      assert.equal(rerun.rows[0]?.count, 5);
+      const appliedMigrations = await client.query<{ name: string }>(
+        "SELECT name FROM app_migrations ORDER BY name",
+      );
+      assert.deepEqual(
+        appliedMigrations.rows.map(({ name }) => name),
+        [originalMigration.name, correctiveMigration.name],
+      );
     } finally {
       await client.query("RESET search_path");
       await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);

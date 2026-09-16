@@ -10,7 +10,10 @@ const workspaceRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
 );
-const requiredMigration = "0001_prevent_overlapping_tax_rule_periods.sql";
+const requiredMigrations = [
+  "0001_prevent_overlapping_tax_rule_periods.sql",
+  "0002_preserve_multiple_bounded_tax_overrides.sql",
+];
 const expectedTables = [
   "app_migrations",
   "audit_logs",
@@ -200,7 +203,7 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
   )
     .trim()
     .split("\n");
-  assert.deepEqual(history, [requiredMigration]);
+  assert.deepEqual(history, requiredMigrations);
 
   const constraints = (
     await runPsql(
