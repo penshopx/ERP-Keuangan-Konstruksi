@@ -1,0 +1,49 @@
+Saya telah meninjau ketiga dokumen yang Anda unggah. Berikut ringkasan elemen yang relevan untuk memperkuat aplikasi ERP Konstruksi ini:
+
+## ✅ **Referensi yang Relevan & Dapat Diadopsi**
+
+### 1. **Regulasi & Standar Indonesia**
+- **PPh Final Konstruksi** (PP 9/2022): Tarif 1,75%/2,65%/3,5%/6% berdasarkan kualifikasi
+- **PSAK 71/72/73**: Instrumen keuangan, kontrak dengan pelanggan (bruto-neto), sewa alat berat
+- **Permen PUPR 10/2021**: SMKK (Sistem Manajemen Keselamatan Konstruksi)
+- **AHSP** (Analisa Harga Satuan Pekerjaan): Master item ≥5.000 item dari Permen PUPR
+- **KKNI 1-9**: Sertifikat kompetensi tenaga kerja konstruksi
+- **OSS-RBA/SIKI/SIJK**: Integrasi perizinan dan pelaporan progres
+
+### 2. **Fitur Konstruksi-Spesifik**
+- **WBS Hierarkis**: Project → Sub-project → Task → Sub-task sesuai struktur BoQ
+- **Monthly Certificate (BAKP)**: Auto-generated dari progres
+- **Kurva-S**: Rencana vs aktual
+- **Retensi 5%**: Auto-hold + bank garansi pengganti
+- **Subkontraktor Back-to-Back**: Kontrak induk → SPK dengan termin selaras
+- **Inventory per Proyek**: Stock-on-site vs stock-on-cost
+- **Cashflow Forecast**: Termin masuk vs outflow subkon/gaji/material
+
+### 3. **Integrasi & Compliance**
+- **e-Faktur via Coretax**: Exporter XML/CSV (karena DJP tidak ada REST API publik)
+- **e-Bupot Unifikasi**: Untuk PPh Final
+- **SIJK Webhook**: Pelaporan progres triwulanan
+- **BIM Integration**: IFC/BCF webhook untuk clash detection
+
+## ❌ **Yang Tidak Relevan & Diabaikan**
+
+- Materi promosi/pemasaran Odoo umum
+- Fitur CRM/HR/Manufacturing yang tidak spesifik konstruksi Indonesia
+- Success story Constructora Guiar (Argentina) - konteks berbeda
+- Fitur eCommerce, POS, Social Marketing yang tidak terkait konstruksi
+- General Accounting features tanpa lokalisasi Indonesia
+
+## 📋 **Dokumen Referensi Terkurasi**
+
+Saya akan membuat file referensi terstruktur yang dapat digunakan untuk:
+1. **Validasi fitur** yang sudah ada vs best practice
+2. **Identifikasi gap** yang perlu dikembangkan
+3. **Panduan implementasi** modul konstruksi Indonesia
+4. **Checklist compliance** regulasi PUPR/LKPP
+
+Apakah Anda ingin saya:
+1. **Buat dokumen referensi terstruktur** di folder `/docs/references/`?
+2. **Update task yang relevan** (misalnya Task #28 tentang migrasi aturan pajak, Task #30 tentang rekonsiliasi)?
+3. **Usulkan task baru** berdasarkan gap yang teridentifikasi?
+
+Saya menunggu instruksi Anda.
