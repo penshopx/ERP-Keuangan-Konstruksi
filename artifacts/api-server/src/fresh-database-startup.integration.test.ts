@@ -1,0 +1,226 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { spawn, type ChildProcess } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import net from "node:net";
+import path from "node:path";
+import test from "node:test";
+
+const workspaceRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
+const requiredMigration = "0001_prevent_overlapping_tax_rule_periods.sql";
+const expectedTables = [
+  "app_migrations",
+  "audit_logs",
+  "invoices",
+  "project_assignments",
+  "projects",
+  "rab_baselines",
+  "rab_items",
+  "rab_templates",
+  "staff_invitation_projects",
+  "staff_invitations",
+  "tax_calculation_snapshots",
+  "tax_rule_versions",
+  "user_roles",
+];
+
+function databaseUrlFor(databaseName: string): string {
+  const url = new URL(process.env.DATABASE_URL!);
+  url.pathname = `/${databaseName}`;
+  return url.toString();
+}
+
+async function runCommand(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: workspaceRoot,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (code === 0) {
+        resolve(output);
+      } else {
+        reject(
+          new Error(
+            `${command} ${args.join(" ")} exited with ${code ?? signal}\n${output}`,
+          ),
+        );
+      }
+    });
+  });
+}
+
+async function runPsql(
+  sql: string,
+  databaseName = process.env.PGDATABASE,
+): Promise<string> {
+  return runCommand(
+    "psql",
+    ["-X", "-v", "ON_ERROR_STOP=1", "-At", "-c", sql],
+    { ...process.env, PGDATABASE: databaseName },
+  );
+}
+
+async function reservePort(): Promise<number> {
+  const server = net.createServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
+  return address.port;
+}
+
+async function waitForHealth(
+  child: ChildProcess,
+  url: string,
+  readOutput: () => string,
+): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(`API exited before becoming healthy\n${readOutput()}`);
+    }
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        assert.deepEqual(await response.json(), { status: "ok" });
+        return;
+      }
+    } catch {
+      // Startup has not opened the port yet.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`API health check timed out\n${readOutput()}`);
+}
+
+async function stopProcess(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  child.kill("SIGTERM");
+  await Promise.race([
+    new Promise<void>((resolve) => child.once("exit", () => resolve())),
+    new Promise<void>((resolve) =>
+      setTimeout(() => {
+        child.kill("SIGKILL");
+        resolve();
+      }, 5_000),
+    ),
+  ]);
+}
+
+test("setup prepares an empty PostgreSQL database before API startup", async (t) => {
+  assert.ok(process.env.DATABASE_URL, "DATABASE_URL is required");
+
+  const databaseName = `fresh_startup_${randomUUID().replaceAll("-", "")}`;
+  const freshDatabaseUrl = databaseUrlFor(databaseName);
+  let api: ChildProcess | undefined;
+
+  await runPsql(`CREATE DATABASE "${databaseName}"`);
+
+  t.after(async () => {
+    if (api) await stopProcess(api);
+    await runPsql(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
+  });
+
+  const freshEnv = {
+    ...process.env,
+    DATABASE_URL: freshDatabaseUrl,
+    NODE_ENV: "production",
+  };
+  await runCommand(
+    "pnpm",
+    ["--filter", "@workspace/api-server", "run", "build"],
+    freshEnv,
+  );
+  const port = await reservePort();
+  let apiOutput = "";
+  api = spawn(
+    "pnpm",
+    ["--filter", "@workspace/api-server", "run", "start:with-migrations"],
+    {
+      cwd: workspaceRoot,
+      env: { ...freshEnv, PORT: String(port) },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  api.stdout?.on("data", (chunk) => {
+    apiOutput += chunk;
+  });
+  api.stderr?.on("data", (chunk) => {
+    apiOutput += chunk;
+  });
+
+  await waitForHealth(
+    api,
+    `http://127.0.0.1:${port}/api/healthz`,
+    () => apiOutput,
+  );
+
+  const tables = (
+    await runPsql(
+      `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+      ORDER BY table_name
+      `,
+      databaseName,
+    )
+  )
+    .trim()
+    .split("\n");
+  assert.deepEqual(tables, expectedTables);
+
+  const history = (
+    await runPsql(
+      "SELECT name FROM app_migrations ORDER BY name",
+      databaseName,
+    )
+  )
+    .trim()
+    .split("\n");
+  assert.deepEqual(history, [requiredMigration]);
+
+  const constraints = (
+    await runPsql(
+      `
+      SELECT conname
+      FROM pg_constraint
+      WHERE conrelid = 'tax_rule_versions'::regclass
+        AND conname IN (
+          'tax_rule_versions_valid_period',
+          'tax_rule_versions_no_overlapping_periods'
+        )
+      ORDER BY conname
+      `,
+      databaseName,
+    )
+  )
+    .trim()
+    .split("\n");
+  assert.deepEqual(constraints, [
+    "tax_rule_versions_no_overlapping_periods",
+    "tax_rule_versions_valid_period",
+  ]);
+});
