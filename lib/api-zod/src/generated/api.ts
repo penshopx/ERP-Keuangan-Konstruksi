@@ -534,7 +534,8 @@ export const ListAccessInvitationsResponse = zod.object({
 })),
   "verification": zod.object({
   "status": zod.enum(['VERIFIED', 'DEGRADED']),
-  "message": zod.string()
+  "message": zod.string(),
+  "lastSuccessfulVerificationAt": zod.coerce.date().nullable()
 })
 })
 

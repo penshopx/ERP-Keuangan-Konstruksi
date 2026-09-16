@@ -50,6 +50,8 @@ let reconciliationHealth: InvitationReconciliationHealth = {
   lastSuccessAt: null,
 };
 
+let lastSuccessfulClerkVerificationAt: string | null = null;
+
 function recordReconciliationFailure() {
   reconciliationHealth = {
     ...reconciliationHealth,
@@ -70,6 +72,15 @@ function recordReconciliationSuccess() {
 
 export function getInvitationReconciliationHealth(): InvitationReconciliationHealth {
   return { ...reconciliationHealth };
+}
+
+export function recordSuccessfulClerkVerification(at = new Date()): string {
+  lastSuccessfulClerkVerificationAt = at.toISOString();
+  return lastSuccessfulClerkVerificationAt;
+}
+
+export function getLastSuccessfulClerkVerificationAt(): string | null {
+  return lastSuccessfulClerkVerificationAt;
 }
 
 const scheduledActor: ReconciliationActor = {

@@ -483,6 +483,8 @@ export const AccessInvitationVerificationStatus = {
 export interface AccessInvitationVerification {
   status: AccessInvitationVerificationStatus;
   message: string;
+  /** @nullable */
+  lastSuccessfulVerificationAt: string | null;
 }
 
 export interface AccessInvitationList {

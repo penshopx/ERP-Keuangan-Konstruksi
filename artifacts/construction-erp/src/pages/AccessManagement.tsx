@@ -25,6 +25,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const roles = ["DIRECTOR", "PROJECT_MANAGER", "SITE_MANAGER", "FINANCE", "TAX_STAFF", "PROCUREMENT"] as const;
 
+function formatVerificationTime(value: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 export default function AccessManagement() {
   const { data: users, isLoading } = useListAccessUsers();
   const { data: invitationList, isError: invitationListFailed } = useListAccessInvitations();
@@ -36,6 +43,11 @@ export default function AccessManagement() {
     {invitationList?.verification.status === "DEGRADED" && <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
       <p className="font-semibold">Status undangan belum dapat dipastikan</p>
       <p className="mt-1">{invitationList.verification.message}</p>
+      <p className="mt-2 font-medium">
+        {invitationList.verification.lastSuccessfulVerificationAt
+          ? `Terakhir berhasil diverifikasi melalui Clerk: ${formatVerificationTime(invitationList.verification.lastSuccessfulVerificationAt)}.`
+          : "Belum ada verifikasi Clerk yang berhasil sejak layanan dimulai."}
+      </p>
     </div>}
     {invitationListFailed && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950">
       Daftar undangan tidak dapat dimuat. Coba lagi beberapa saat.

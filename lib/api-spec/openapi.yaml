@@ -806,13 +806,16 @@ components:
           $ref: "#/components/schemas/AccessInvitationVerification"
     AccessInvitationVerification:
       type: object
-      required: [status, message]
+      required: [status, message, lastSuccessfulVerificationAt]
       properties:
         status:
           type: string
           enum: [VERIFIED, DEGRADED]
         message:
           type: string
+        lastSuccessfulVerificationAt:
+          type: ["string", "null"]
+          format: date-time
     AccessInvitationInput:
       type: object
       required: [email, displayName, role, assignedProjectIds]

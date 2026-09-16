@@ -22,8 +22,10 @@ import {
 } from "@workspace/api-zod";
 import { canAccessProject, requirePermission } from "../middlewares/access";
 import {
+  getLastSuccessfulClerkVerificationAt,
   reconcileInvitationFromClerk,
   recordInvitationPartialFailure,
+  recordSuccessfulClerkVerification,
   type ClerkInvitationState,
 } from "../lib/invitation-reconciliation";
 import { logger } from "../lib/logger";
@@ -117,6 +119,7 @@ router.get("/access/invitations", async (req, res) => {
   const requestLogger = req.log ?? logger;
   const verifiedInvitations: typeof storedInvitations = [];
   let verificationFailed = false;
+  let clerkInvitationsChecked = 0;
   for (const invitation of storedInvitations) {
     if (invitation.status !== "PENDING") {
       verifiedInvitations.push(invitation);
@@ -124,6 +127,7 @@ router.get("/access/invitations", async (req, res) => {
     }
     try {
       const clerkState = await dependencies.getClerkInvitation(invitation.clerkInvitationId);
+      clerkInvitationsChecked += 1;
       verifiedInvitations.push(await reconcileInvitationFromClerk(
         invitation,
         clerkState,
@@ -138,6 +142,9 @@ router.get("/access/invitations", async (req, res) => {
         clerkInvitationId: invitation.clerkInvitationId,
       }, "Clerk invitation verification failed; unverified invitation omitted");
     }
+  }
+  if (!verificationFailed && clerkInvitationsChecked > 0) {
+    recordSuccessfulClerkVerification();
   }
   const wasVerificationDegraded = req.app.locals.invitationListVerificationDegraded === true;
   if (verificationFailed && !wasVerificationDegraded) {
@@ -162,10 +169,12 @@ router.get("/access/invitations", async (req, res) => {
       ? {
           status: "DEGRADED",
           message: "Sebagian status undangan tidak dapat diverifikasi. Undangan tersebut disembunyikan sementara agar status aktif yang belum pasti tidak ditampilkan.",
+          lastSuccessfulVerificationAt: getLastSuccessfulClerkVerificationAt(),
         }
       : {
           status: "VERIFIED",
           message: "Semua status undangan telah diverifikasi.",
+          lastSuccessfulVerificationAt: getLastSuccessfulClerkVerificationAt(),
         },
   }));
 });

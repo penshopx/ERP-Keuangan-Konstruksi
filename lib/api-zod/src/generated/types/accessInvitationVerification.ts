@@ -10,4 +10,6 @@ import type { AccessInvitationVerificationStatus } from './accessInvitationVerif
 export interface AccessInvitationVerification {
   status: AccessInvitationVerificationStatus;
   message: string;
+  /** @nullable */
+  lastSuccessfulVerificationAt: Date | null;
 }

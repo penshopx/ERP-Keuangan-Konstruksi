@@ -619,9 +619,10 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       assert.equal(response.status, 200);
       const listed = await response.json() as {
         invitations: Array<{ id: string; status: string }>;
-        verification: { status: string };
+        verification: { status: string; lastSuccessfulVerificationAt: string | null };
       };
       assert.equal(listed.verification.status, "VERIFIED");
+      assert.ok(listed.verification.lastSuccessfulVerificationAt);
       assert.equal(listed.invitations.find(({ id }) => id === invitation.id)?.status, "REVOKED");
     } finally {
       await creator.close();
@@ -640,7 +641,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     const invitation = await created.json() as { id: string };
     await creator.close();
 
-    let clerkUnavailable = true;
+    let clerkUnavailable = false;
     const unavailableDependencies: AccessRouterDependencies = {
       ...clerkDependencies,
       getClerkInvitation: async (id) => {
@@ -654,14 +655,31 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       unavailableDependencies,
     );
     try {
+      const verifiedResponse = await fetch(`${degradedServer.baseUrl}/access/invitations`);
+      assert.equal(verifiedResponse.status, 200);
+      const verified = await verifiedResponse.json() as {
+        verification: { lastSuccessfulVerificationAt: string | null };
+      };
+      assert.ok(verified.verification.lastSuccessfulVerificationAt);
+      const lastSuccessfulVerificationAt = verified.verification.lastSuccessfulVerificationAt;
+
+      clerkUnavailable = true;
       const response = await fetch(`${degradedServer.baseUrl}/access/invitations`);
       assert.equal(response.status, 200);
       const listed = await response.json() as {
         invitations: Array<{ id: string; status: string }>;
-        verification: { status: string; message: string };
+        verification: {
+          status: string;
+          message: string;
+          lastSuccessfulVerificationAt: string | null;
+        };
       };
       assert.equal(listed.verification.status, "DEGRADED");
       assert.match(listed.verification.message, /disembunyikan sementara/);
+      assert.equal(
+        listed.verification.lastSuccessfulVerificationAt,
+        lastSuccessfulVerificationAt,
+      );
       assert.equal(listed.invitations.some(({ id }) => id === invitation.id), false);
 
       clerkUnavailable = false;

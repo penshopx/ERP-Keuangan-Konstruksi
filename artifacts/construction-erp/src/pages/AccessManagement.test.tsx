@@ -23,6 +23,7 @@ let invitationQuery: {
     verification: {
       status: "VERIFIED" | "DEGRADED";
       message: string;
+      lastSuccessfulVerificationAt: string | null;
     };
   };
   isError: boolean;
@@ -68,6 +69,7 @@ describe("status verifikasi daftar undangan", () => {
         verification: {
           status: "DEGRADED",
           message: "Clerk sedang tidak dapat dijangkau. Hanya undangan terverifikasi yang ditampilkan.",
+          lastSuccessfulVerificationAt: "2026-09-16T08:30:00.000Z",
         },
       },
       isError: false,
@@ -78,6 +80,7 @@ describe("status verifikasi daftar undangan", () => {
     const alert = screen.getByRole("alert");
     expect(within(alert).getByText("Status undangan belum dapat dipastikan")).toBeTruthy();
     expect(within(alert).getByText(/Hanya undangan terverifikasi yang ditampilkan/)).toBeTruthy();
+    expect(within(alert).getByText(/Terakhir berhasil diverifikasi melalui Clerk:/)).toBeTruthy();
     expect(screen.getByText("Staf Terverifikasi")).toBeTruthy();
     expect(screen.getByText(/staf@example\.com/)).toBeTruthy();
   });
