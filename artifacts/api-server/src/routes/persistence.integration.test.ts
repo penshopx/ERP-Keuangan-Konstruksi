@@ -1328,10 +1328,10 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     }
   });
 
-  await t.test("tax summary defaults to the current calendar month", async () => {
+  await t.test("tax summary defaults to the Asia/Jakarta month when UTC is still in the previous month", async () => {
     mock.timers.enable({
       apis: ["Date"],
-      now: new Date("2031-02-15T12:00:00.000Z"),
+      now: new Date("2031-01-31T18:00:00.000Z"),
     });
     const server = await startTestServer();
     try {

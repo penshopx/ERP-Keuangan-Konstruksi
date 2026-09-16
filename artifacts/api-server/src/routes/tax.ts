@@ -19,6 +19,12 @@ import { taxRuleLockKey } from "../domain/tax-rule-lock";
 import { requirePermission } from "../middlewares/access";
 
 const router: IRouter = Router();
+const TAX_OPERATIONAL_TIME_ZONE = "Asia/Jakarta";
+const taxPeriodFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: TAX_OPERATIONAL_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+});
 
 function isTaxRuleOverlapConstraint(error: unknown) {
   if (!error || typeof error !== "object") return false;
@@ -39,8 +45,11 @@ function previousCalendarDate(value: string) {
 }
 
 function currentCalendarPeriod() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const parts = taxPeriodFormatter.formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  if (!year || !month) throw new Error("Gagal menentukan periode pajak pada zona waktu operasional.");
+  return `${year}-${month}`;
 }
 
 router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
