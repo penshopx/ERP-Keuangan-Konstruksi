@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { hasPermission, useAccess } from "@/lib/access"
+import { getProjectStatusBadgeVariant } from "@/lib/project-status"
 
 export default function Projects() {
   const [search, setSearch] = useState("")
@@ -162,7 +163,7 @@ export default function Projects() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={project.status === "active" ? "default" : "secondary"}>
+                    <Badge variant={getProjectStatusBadgeVariant(project.status)}>
                       {project.status.toUpperCase()}
                     </Badge>
                   </TableCell>

@@ -8,6 +8,7 @@ import { formatRupiah, formatPercent, formatDate } from "@/lib/utils"
 import { Building2, Calendar, FileText, ArrowLeft, TrendingUp, AlertTriangle } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { getProjectStatusBadgeVariant, isProjectCompleted, PROJECT_STATUS } from "@/lib/project-status"
 
 export default function ProjectDetail() {
   const { id } = useParams()
@@ -26,7 +27,7 @@ export default function ProjectDetail() {
   const handleComplete = () => {
     updateProject.mutate({
       projectId: project.id,
-      data: { status: "completed", progress: 100 }
+      data: { status: PROJECT_STATUS.COMPLETED, progress: 100 }
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(project.id) })
@@ -43,7 +44,7 @@ export default function ProjectDetail() {
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
-            <Badge variant={project.status === "active" ? "default" : "secondary"}>
+            <Badge variant={getProjectStatusBadgeVariant(project.status)}>
               {project.status.toUpperCase()}
             </Badge>
           </div>
@@ -58,7 +59,7 @@ export default function ProjectDetail() {
               View RAB
             </Link>
           </Button>
-          {project.status !== "completed" && (
+          {!isProjectCompleted(project.status) && (
             <Button onClick={handleComplete} disabled={updateProject.isPending}>
               Mark Completed
             </Button>
