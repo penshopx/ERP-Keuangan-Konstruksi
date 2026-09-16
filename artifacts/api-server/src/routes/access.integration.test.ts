@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { after, test } from "node:test";
 import express, { type RequestHandler } from "express";
-import { eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -320,6 +320,58 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       .where(eq(staffInvitationsTable.email, email));
     assert.equal(invitation.status, "PENDING");
     assert.equal(invitation.acceptedUserId, null);
+  });
+
+  await t.test("a verified mixed-case Clerk email claims the normalized invitation exactly once", async () => {
+    const email = `${prefix}-mixed-case@example.test`;
+    const mixedCaseEmail = `${prefix}-MiXeD-CaSe@ExAmPlE.TeSt`;
+    const userId = `${prefix}-mixed-case-user`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email, [projectId]);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    const server = await startServer(clerkAccessMiddleware({
+      [userId]: {
+        email: mixedCaseEmail,
+        name: "Mixed Case User",
+        emailAddresses: [{ email: mixedCaseEmail, verified: true }],
+      },
+    }));
+    try {
+      const firstResponse = await getMe(server.baseUrl, userId);
+      assert.equal(firstResponse.status, 200);
+      const firstBody = await firstResponse.json() as {
+        role: string;
+        assignedProjectIds: string[];
+      };
+      assert.equal(firstBody.role, "TAX_STAFF");
+      assert.deepEqual(firstBody.assignedProjectIds, [projectId]);
+
+      const secondResponse = await getMe(server.baseUrl, userId);
+      assert.equal(secondResponse.status, 200);
+    } finally {
+      await server.close();
+    }
+
+    const roles = await db.select().from(userRolesTable)
+      .where(eq(userRolesTable.userId, userId));
+    assert.equal(roles.length, 1);
+    assert.equal(roles[0]?.role, "TAX_STAFF");
+
+    const assignments = await db.select().from(projectAssignmentsTable)
+      .where(eq(projectAssignmentsTable.userId, userId));
+    assert.equal(assignments.length, 1);
+    assert.equal(assignments[0]?.projectId, projectId);
+
+    const acceptedInvitations = await db.select().from(staffInvitationsTable)
+      .where(and(
+        eq(staffInvitationsTable.id, invitation.id),
+        eq(staffInvitationsTable.status, "ACCEPTED"),
+        eq(staffInvitationsTable.acceptedUserId, userId),
+      ));
+    assert.equal(acceptedInvitations.length, 1);
   });
 
   await t.test("an expired invitation cannot be claimed by a verified Clerk email", async () => {
