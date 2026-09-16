@@ -259,6 +259,12 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
             false, true, 2750, 1100, 250, 0
           ),
           (
+            'adjacent-override-2024', 'ADJACENT-OVERRIDE-2024',
+            '2024-04-01', '2024-06-30',
+            'Adjacent temporary exception', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
+            false, true, 2750, 1100, 300, 0
+          ),
+          (
             'temporary-override-2026', 'TEMPORARY-OVERRIDE-2026',
             '2026-01-01', '2026-12-31',
             'Second temporary exception', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
@@ -293,8 +299,14 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           pph_final_rate_basis_points: 250,
         },
         {
-          id: "legacy-open-continuation-2024-04-01",
+          id: "adjacent-override-2024",
           effective_from: "2024-04-01",
+          effective_to: "2024-06-30",
+          pph_final_rate_basis_points: 300,
+        },
+        {
+          id: "legacy-open-continuation-2024-07-01",
+          effective_from: "2024-07-01",
           effective_to: "2025-12-31",
           pph_final_rate_basis_points: 400,
         },
@@ -322,6 +334,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           VALUES
             (DATE '2023-12-31'),
             (DATE '2024-02-15'),
+            (DATE '2024-04-01'),
             (DATE '2025-06-30'),
             (DATE '2026-06-30'),
             (DATE '2027-01-01')
@@ -350,8 +363,13 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           pph_final_rate_basis_points: 250,
         },
         {
+          issued_at: "2024-04-01",
+          id: "adjacent-override-2024",
+          pph_final_rate_basis_points: 300,
+        },
+        {
           issued_at: "2025-06-30",
-          id: "legacy-open-continuation-2024-04-01",
+          id: "legacy-open-continuation-2024-07-01",
           pph_final_rate_basis_points: 400,
         },
         {
@@ -370,7 +388,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       const rerun = await client.query<{ count: number }>(
         "SELECT count(*)::int AS count FROM tax_rule_versions",
       );
-      assert.equal(rerun.rows[0]?.count, 5);
+      assert.equal(rerun.rows[0]?.count, 6);
       const appliedMigrations = await client.query<{ name: string }>(
         "SELECT name FROM app_migrations ORDER BY name",
       );
