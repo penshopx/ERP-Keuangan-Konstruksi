@@ -53,6 +53,7 @@ export async function getClerkInvitationState(
 
 export type AccessPersistenceHooks = {
   beforeInvitationInsert?: (clerkInvitationId: string) => Promise<void>;
+  beforeResendPersistence?: (clerkInvitationId: string) => Promise<void>;
   afterClerkInvitationRevoked?: (clerkInvitationId: string) => Promise<void>;
 };
 
@@ -365,6 +366,7 @@ router.post("/access/invitations/:invitationId/resend", async (req, res) => {
       publicMetadata: { source: "construction-erp" },
     });
     createdClerkInvitationId = clerkInvitation.id;
+    await hooks.beforeResendPersistence?.(clerkInvitation.id);
     const expiresAt = new Date(new Date(clerkInvitation.createdAt).getTime() + 30 * 86_400_000);
     const [updated] = await tx.update(staffInvitationsTable).set({
       clerkInvitationId: clerkInvitation.id,

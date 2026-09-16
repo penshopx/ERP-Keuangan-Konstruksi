@@ -428,6 +428,56 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     assert.equal(resendAuditsAfter.length, resendAuditsBefore.length);
   });
 
+  await t.test("resend persistence failure revokes the replacement Clerk invitation", async () => {
+    const email = `${prefix}-resend-persistence-failure@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    await db.update(staffInvitationsTable).set({
+      status: "EXPIRED",
+      expiresAt: new Date(Date.now() - 1_000),
+    }).where(eq(staffInvitationsTable.id, invitation.id));
+    const [storedBefore] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    clerkStatuses.set(storedBefore.clerkInvitationId, "expired");
+    const revokedCountBefore = revokedClerkIds.length;
+
+    const failing = await startServer(staticAccessMiddleware(), {
+      beforeResendPersistence: async () => {
+        throw new Error("Injected resend persistence failure");
+      },
+    });
+    try {
+      const response = await fetch(`${failing.baseUrl}/access/invitations/${invitation.id}/resend`, {
+        method: "POST",
+      });
+      assert.equal(response.status, 500);
+    } finally {
+      await failing.close();
+    }
+
+    const replacementClerkId = createdClerkIds.at(-1);
+    assert.ok(replacementClerkId);
+    assert.notEqual(replacementClerkId, storedBefore.clerkInvitationId);
+    assert.equal(revokedClerkIds.length, revokedCountBefore + 1);
+    assert.equal(revokedClerkIds.at(-1), replacementClerkId);
+    assert.equal(clerkStatuses.get(replacementClerkId), "revoked");
+
+    const [storedAfter] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(storedAfter.status, storedBefore.status);
+    assert.equal(storedAfter.clerkInvitationId, storedBefore.clerkInvitationId);
+    assert.equal(storedAfter.expiresAt.getTime(), storedBefore.expiresAt.getTime());
+
+    const resendAudits = (await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id)))
+      .filter(({ action }) => action === "UNDANGAN STAF DIKIRIM ULANG");
+    assert.equal(resendAudits.length, 0);
+  });
+
   await t.test("partial revoke failure is reconciled and audited", async () => {
     const email = `${prefix}-reconcile@example.test`;
     const creator = await startServer(staticAccessMiddleware());
