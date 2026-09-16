@@ -774,6 +774,191 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     }
   });
 
+  await t.test("concurrent RAB imports receive unique versions without mixing items or audits", async () => {
+    const concurrentProjectCode = `TST-${randomUUID().slice(0, 8)}`;
+    const templateFixtures = [
+      {
+        id: `test-rab-import-${randomUUID()}`,
+        name: "Template Concurrent RAB Alpha",
+        priceFactor: 1.25,
+        items: [
+          {
+            code: "TEST.CONCURRENT.A.1",
+            name: "Item Alpha Utama",
+            category: "ALPHA",
+            unit: "m2",
+            quantity: 2,
+            unitPrice: 400_000,
+            materialCost: 250_000,
+            laborCost: 100_000,
+            equipmentCost: 50_000,
+            parentCode: null,
+            level: 1,
+          },
+          {
+            code: "TEST.CONCURRENT.A.2",
+            name: "Item Alpha Tambahan",
+            category: "ALPHA",
+            unit: "ls",
+            quantity: 1,
+            unitPrice: 300_000,
+            materialCost: 200_000,
+            laborCost: 75_000,
+            equipmentCost: 25_000,
+            parentCode: null,
+            level: 1,
+          },
+        ],
+      },
+      {
+        id: `test-rab-import-${randomUUID()}`,
+        name: "Template Concurrent RAB Beta",
+        priceFactor: 1.1,
+        items: [
+          {
+            code: "TEST.CONCURRENT.B.1",
+            name: "Item Beta",
+            category: "BETA",
+            unit: "m3",
+            quantity: 3,
+            unitPrice: 250_000,
+            materialCost: 150_000,
+            laborCost: 75_000,
+            equipmentCost: 25_000,
+            parentCode: null,
+            level: 1,
+          },
+        ],
+      },
+    ];
+    let concurrentProjectId = "";
+    let waitingBeforeLock = 0;
+    let releaseVersionLocks!: () => void;
+    const bothTransactionsReady = new Promise<void>((resolve) => {
+      releaseVersionLocks = resolve;
+    });
+
+    await db.insert(rabTemplatesTable).values(templateFixtures.map((template) => ({
+      id: template.id,
+      name: template.name,
+      projectType: "TEST",
+      description: "Fixture unik untuk konkurensi impor RAB",
+      sourceNote: "Regression test",
+      items: template.items,
+    })));
+
+    const server = await startTestServer({}, access, {
+      beforeRabImportVersionLock: async (hookProjectId) => {
+        assert.equal(hookProjectId, concurrentProjectId);
+        waitingBeforeLock += 1;
+        if (waitingBeforeLock === templateFixtures.length) releaseVersionLocks();
+        await bothTransactionsReady;
+      },
+    });
+
+    try {
+      const created = await requestJson(server.baseUrl, "/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          code: concurrentProjectCode,
+          name: "Proyek Concurrent RAB",
+          owner: "Regression Test",
+          contractValue: 100_000_000,
+          endDate: "2027-12-31",
+        }),
+      });
+      concurrentProjectId = String(created.id);
+
+      const imports = await Promise.all(templateFixtures.map((template) =>
+        requestJson(server.baseUrl, `/projects/${concurrentProjectId}/rab/import`, {
+          method: "POST",
+          body: JSON.stringify({
+            templateId: template.id,
+            priceFactor: template.priceFactor,
+          }),
+        })
+      ));
+
+      assert.equal(waitingBeforeLock, templateFixtures.length);
+      const importsByTemplateId = new Map(templateFixtures.map((template, index) => [
+        template.id,
+        { response: imports[index], template },
+      ]));
+      const importedVersions = imports.map(({ version }) => Number(version)).sort((a, b) => a - b);
+      assert.equal(new Set(importedVersions).size, templateFixtures.length);
+      assert.equal(importedVersions[1], importedVersions[0] + 1);
+
+      const baselines = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.projectId, concurrentProjectId));
+      const importedBaselines = baselines.filter(({ version }) => importedVersions.includes(version));
+      assert.equal(importedBaselines.length, templateFixtures.length);
+
+      for (const baseline of importedBaselines) {
+        const [audit] = await db.select().from(auditLogsTable).where(and(
+          eq(auditLogsTable.entity, "RAB"),
+          eq(auditLogsTable.entityId, baseline.id),
+          eq(auditLogsTable.action, "DIIMPOR"),
+        ));
+        assert.ok(audit);
+        const templateId = String((audit.metadata as Record<string, unknown>).templateId);
+        const fixture = importsByTemplateId.get(templateId);
+        assert.ok(fixture);
+        assert.equal(Number(fixture.response.version), baseline.version);
+        assert.equal(audit.detail, `${fixture.template.name} menjadi RAB ${concurrentProjectCode} versi ${baseline.version}`);
+        assert.deepEqual(audit.metadata, {
+          templateId,
+          priceFactor: fixture.template.priceFactor,
+          itemCount: fixture.template.items.length,
+        });
+
+        const storedItems = await db.select().from(rabItemsTable)
+          .where(eq(rabItemsTable.baselineId, baseline.id))
+          .orderBy(rabItemsTable.code);
+        assert.deepEqual(
+          storedItems.map(({ code }) => code),
+          fixture.template.items.map(({ code }) => code),
+        );
+        assert.ok(storedItems.every(({ baselineId }) => baselineId === baseline.id));
+        assert.equal(
+          storedItems.reduce((sum, { budget }) => sum + budget, 0),
+          Number(fixture.response.totalBudget),
+        );
+      }
+
+      const latestBaseline = importedBaselines.find(({ version }) => version === importedVersions[1]);
+      assert.ok(latestBaseline);
+      const [latestAudit] = await db.select().from(auditLogsTable)
+        .where(eq(auditLogsTable.entityId, latestBaseline.id));
+      assert.ok(latestAudit);
+      const latestFixture = importsByTemplateId.get(
+        String((latestAudit.metadata as Record<string, unknown>).templateId),
+      );
+      assert.ok(latestFixture);
+      const [storedProject] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, concurrentProjectId));
+      assert.ok(storedProject);
+      assert.equal(storedProject.budget, Number(latestFixture.response.totalBudget));
+      assert.equal(storedProject.wbsCount, latestFixture.template.items.length);
+    } finally {
+      releaseVersionLocks();
+      await server.close();
+      await db.transaction(async (tx) => {
+        if (concurrentProjectId) {
+          const baselines = await tx.select({ id: rabBaselinesTable.id })
+            .from(rabBaselinesTable)
+            .where(eq(rabBaselinesTable.projectId, concurrentProjectId));
+          const entityIds = [concurrentProjectId, ...baselines.map(({ id }) => id)];
+          await tx.delete(auditLogsTable).where(inArray(auditLogsTable.entityId, entityIds));
+          await tx.delete(projectsTable).where(eq(projectsTable.id, concurrentProjectId));
+        }
+        await tx.delete(rabTemplatesTable).where(inArray(
+          rabTemplatesTable.id,
+          templateFixtures.map(({ id }) => id),
+        ));
+      });
+    }
+  });
+
   await t.test("invoice, tax snapshot, and audit are committed together", async () => {
     const server = await startTestServer();
     let invoiceId = "";

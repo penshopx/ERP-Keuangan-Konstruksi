@@ -31,6 +31,7 @@ export type ProjectPersistenceHooks = {
   beforeBaselineInsert?: (projectId: string) => Promise<void>;
   beforeAuditInsert?: (projectId: string) => Promise<void>;
   beforeUpdateAuditInsert?: (projectId: string) => Promise<void>;
+  beforeRabImportVersionLock?: (projectId: string, baselineId: string) => Promise<void>;
   beforeRabImportAuditInsert?: (projectId: string, baselineId: string) => Promise<void>;
 };
 
@@ -274,6 +275,7 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
   });
   const totalBudget = importedItems.reduce((sum, item) => sum + item.budget, 0);
   const version = await db.transaction(async (tx) => {
+    await hooks.beforeRabImportVersionLock?.(project.id, baselineId);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${project.id}))`);
     const [{ nextVersion }] = await tx.select({
       nextVersion: max(rabBaselinesTable.version),
