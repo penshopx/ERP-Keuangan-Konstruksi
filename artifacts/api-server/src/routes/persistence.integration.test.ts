@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { after, before, test } from "node:test";
+import { after, before, mock, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type Express } from "express";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -980,6 +980,21 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       }
     } finally {
       await server.close();
+    }
+  });
+
+  await t.test("tax summary defaults to the current calendar month", async () => {
+    mock.timers.enable({
+      apis: ["Date"],
+      now: new Date("2031-02-15T12:00:00.000Z"),
+    });
+    const server = await startTestServer();
+    try {
+      const summary = await requestJson(server.baseUrl, "/tax/summary");
+      assert.equal(summary.period, "2031-02");
+    } finally {
+      await server.close();
+      mock.timers.reset();
     }
   });
 

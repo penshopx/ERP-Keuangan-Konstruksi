@@ -38,13 +38,18 @@ function previousCalendarDate(value: string) {
   return date.toISOString().slice(0, 10);
 }
 
+function currentCalendarPeriod() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
   const parsed = GetTaxSummaryQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const period = parsed.data.period ?? "2026-09";
+  const period = parsed.data.period ?? currentCalendarPeriod();
   const match = /^(\d{4})-(\d{2})$/.exec(period);
   if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) {
     res.status(400).json({ error: "Periode harus menggunakan format YYYY-MM." });
