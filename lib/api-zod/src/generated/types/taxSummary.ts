@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { TaxReconciliationDetail } from './taxReconciliationDetail';
 
 export interface TaxSummary {
   period: string;
@@ -15,4 +16,5 @@ export interface TaxSummary {
   subLedgerTotal: number;
   documents: number;
   reconciliation: number;
+  reconciliationDetails: TaxReconciliationDetail[];
 }

@@ -192,6 +192,17 @@ export interface InvoiceInput {
   governmentCollector: boolean;
 }
 
+export interface TaxReconciliationDetail {
+  invoiceId: string;
+  invoiceNumber: string;
+  projectName: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  issuedAt: string;
+  ledgerTax: number;
+  snapshotTax: number;
+  variance: number;
+}
+
 export interface TaxSummary {
   period: string;
   pphFinal: number;
@@ -201,6 +212,7 @@ export interface TaxSummary {
   subLedgerTotal: number;
   documents: number;
   reconciliation: number;
+  reconciliationDetails: TaxReconciliationDetail[];
 }
 
 export type TaxRuleServiceType = typeof TaxRuleServiceType[keyof typeof TaxRuleServiceType];

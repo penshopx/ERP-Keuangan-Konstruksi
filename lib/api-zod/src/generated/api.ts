@@ -351,6 +351,9 @@ export const GetTaxSummaryQueryParams = zod.object({
   "period": zod.coerce.string().optional()
 })
 
+export const getTaxSummaryResponseReconciliationDetailsItemIssuedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
 export const GetTaxSummaryResponse = zod.object({
   "period": zod.string(),
   "pphFinal": zod.number(),
@@ -359,7 +362,16 @@ export const GetTaxSummaryResponse = zod.object({
   "total": zod.number(),
   "subLedgerTotal": zod.number(),
   "documents": zod.number().int(),
-  "reconciliation": zod.number()
+  "reconciliation": zod.number(),
+  "reconciliationDetails": zod.array(zod.object({
+  "invoiceId": zod.string(),
+  "invoiceNumber": zod.string(),
+  "projectName": zod.string(),
+  "issuedAt": zod.string().regex(getTaxSummaryResponseReconciliationDetailsItemIssuedAtRegExp),
+  "ledgerTax": zod.number(),
+  "snapshotTax": zod.number(),
+  "variance": zod.number()
+}))
 })
 
 

@@ -82,6 +82,42 @@ router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
   ));
   const { pphFinal, ppn, pph23, subLedgerTotal, documents } = summary;
   const total = pphFinal + ppn + pph23;
+  const reconciliationDetails = await db.select({
+    invoiceId: invoicesTable.id,
+    invoiceNumber: invoicesTable.number,
+    projectName: invoicesTable.projectName,
+    issuedAt: invoicesTable.issuedAt,
+    ledgerTax: sql<number>`(
+      ${invoicesTable.pphFinal} + ${invoicesTable.ppn} + ${invoicesTable.pph23}
+    )`.mapWith(Number),
+    snapshotTax: sql<number>`(
+      coalesce(${taxCalculationSnapshotsTable.pphFinal}, 0)
+      + coalesce(${taxCalculationSnapshotsTable.ppn}, 0)
+      + coalesce(${taxCalculationSnapshotsTable.pph23}, 0)
+    )`.mapWith(Number),
+    variance: sql<number>`(
+      ${invoicesTable.pphFinal} + ${invoicesTable.ppn} + ${invoicesTable.pph23}
+      - coalesce(${taxCalculationSnapshotsTable.pphFinal}, 0)
+      - coalesce(${taxCalculationSnapshotsTable.ppn}, 0)
+      - coalesce(${taxCalculationSnapshotsTable.pph23}, 0)
+    )`.mapWith(Number),
+  }).from(invoicesTable)
+    .leftJoin(
+      taxCalculationSnapshotsTable,
+      eq(taxCalculationSnapshotsTable.invoiceId, invoicesTable.id),
+    )
+    .where(and(
+      gte(invoicesTable.issuedAt, periodStart),
+      sql`${invoicesTable.issuedAt} < ${nextPeriodStart}`,
+      sql`(
+        ${invoicesTable.pphFinal} + ${invoicesTable.ppn} + ${invoicesTable.pph23}
+      ) <> (
+        coalesce(${taxCalculationSnapshotsTable.pphFinal}, 0)
+        + coalesce(${taxCalculationSnapshotsTable.ppn}, 0)
+        + coalesce(${taxCalculationSnapshotsTable.pph23}, 0)
+      )`,
+    ))
+    .orderBy(invoicesTable.issuedAt, invoicesTable.number);
   res.json(GetTaxSummaryResponse.parse({
     period,
     pphFinal,
@@ -93,6 +129,7 @@ router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
     reconciliation: total === 0
       ? (subLedgerTotal === 0 ? 1 : 0)
       : subLedgerTotal / total,
+    reconciliationDetails,
   }));
 });
 

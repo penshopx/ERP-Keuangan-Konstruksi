@@ -1059,6 +1059,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.equal(summary.subLedgerTotal, 8_250_200);
       assert.equal(summary.documents, 2);
       assert.equal(summary.reconciliation, 1);
+      assert.deepEqual(summary.reconciliationDetails, []);
 
       await db.update(taxCalculationSnapshotsTable)
         .set({ ppn: Number(otherService.ppn) - 100_000 })
@@ -1067,6 +1068,15 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       const summaryWithVariance = await requestJson(server.baseUrl, "/tax/summary?period=2098-05");
       assert.equal(summaryWithVariance.subLedgerTotal, 8_150_200);
       assert.equal(summaryWithVariance.reconciliation, 8_150_200 / 8_250_200);
+      assert.deepEqual(summaryWithVariance.reconciliationDetails, [{
+        invoiceId: otherService.id,
+        invoiceNumber: otherService.number,
+        projectName: otherService.projectName,
+        issuedAt: otherService.issuedAt,
+        ledgerTax: Number(otherService.ppn) + Number(otherService.pphFinal) + Number(otherService.pph23),
+        snapshotTax: Number(otherService.ppn) + Number(otherService.pphFinal) + Number(otherService.pph23) - 100_000,
+        variance: 100_000,
+      }]);
 
       await db.update(invoicesTable)
         .set({ ppn: 0, pphFinal: 0, pph23: 0 })
@@ -1079,6 +1089,13 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.equal(zeroLedgerWithVariance.total, 0);
       assert.equal(zeroLedgerWithVariance.subLedgerTotal, 100_000);
       assert.equal(zeroLedgerWithVariance.reconciliation, 0);
+      const zeroLedgerDetails = zeroLedgerWithVariance.reconciliationDetails;
+      assert.ok(Array.isArray(zeroLedgerDetails));
+      assert.equal(zeroLedgerDetails.length, 1);
+      assert.equal(zeroLedgerDetails[0].invoiceId, outsidePeriod.id);
+      assert.equal(zeroLedgerDetails[0].ledgerTax, 0);
+      assert.equal(zeroLedgerDetails[0].snapshotTax, 100_000);
+      assert.equal(zeroLedgerDetails[0].variance, -100_000);
 
       const emptyMonth = await requestJson(server.baseUrl, "/tax/summary?period=2098-07");
       assert.equal(emptyMonth.pphFinal, 0);
@@ -1088,6 +1105,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.equal(emptyMonth.subLedgerTotal, 0);
       assert.equal(emptyMonth.documents, 0);
       assert.equal(emptyMonth.reconciliation, 1);
+      assert.deepEqual(emptyMonth.reconciliationDetails, []);
     } finally {
       await server.close();
     }

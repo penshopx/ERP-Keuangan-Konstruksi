@@ -43,6 +43,7 @@ export * from './rabSummary';
 export * from './rabTemplate';
 export * from './rabTemplateImportInput';
 export * from './rabTemplateItem';
+export * from './taxReconciliationDetail';
 export * from './taxRule';
 export * from './taxRuleInput';
 export * from './taxRuleInputQualification';

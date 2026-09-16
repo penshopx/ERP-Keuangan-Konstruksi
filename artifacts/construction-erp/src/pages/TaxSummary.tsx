@@ -3,6 +3,8 @@ import { useGetTaxSummary } from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatRupiah } from "@/lib/utils"
 import { Download, FileCheck, CheckCircle2, AlertTriangle, FileText } from "lucide-react"
 
@@ -141,9 +143,49 @@ export default function TaxSummary() {
                 </div>
               </div>
               {!isReconciled && (
-                <Button className="w-full mt-2" variant="secondary">
-                  Run Automatic Reconciliation
-                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="w-full mt-2" variant="secondary">
+                      View {tax.reconciliationDetails.length} Mismatched Invoice{tax.reconciliationDetails.length === 1 ? "" : "s"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>Reconciliation Differences · {tax.period}</DialogTitle>
+                      <DialogDescription>
+                        Invoices whose tax value differs between the general ledger and tax snapshot.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Invoice</TableHead>
+                            <TableHead>Project</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="text-right">General Ledger</TableHead>
+                            <TableHead className="text-right">Tax Snapshot</TableHead>
+                            <TableHead className="text-right">Variance</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tax.reconciliationDetails.map(detail => (
+                            <TableRow key={detail.invoiceId}>
+                              <TableCell className="font-medium">{detail.invoiceNumber}</TableCell>
+                              <TableCell>{detail.projectName}</TableCell>
+                              <TableCell>{detail.issuedAt}</TableCell>
+                              <TableCell className="text-right">{formatRupiah(detail.ledgerTax)}</TableCell>
+                              <TableCell className="text-right">{formatRupiah(detail.snapshotTax)}</TableCell>
+                              <TableCell className="text-right font-semibold text-destructive">
+                                {formatRupiah(detail.variance)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               )}
             </div>
           </CardContent>
