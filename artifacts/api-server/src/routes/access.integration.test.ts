@@ -7,11 +7,14 @@ import { and, eq, inArray, like, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
+  invoicesTable,
   pool,
   projectAssignmentsTable,
   projectsTable,
+  rabBaselinesTable,
   staffInvitationProjectsTable,
   staffInvitationsTable,
+  taxCalculationSnapshotsTable,
   userRolesTable,
 } from "@workspace/db";
 import {
@@ -209,6 +212,106 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     } finally {
       await server.close();
     }
+  });
+
+  await t.test("an unassigned user cannot mutate projects, invoices, or administration data", async () => {
+    const blockedProjectCode = `${prefix}-blocked-project`;
+    const blockedInvitationEmail = `${prefix}-blocked-invitation@example.test`;
+    const before = {
+      projects: await db.select().from(projectsTable)
+        .where(eq(projectsTable.code, blockedProjectCode)),
+      invoices: await db.select().from(invoicesTable)
+        .where(eq(invoicesTable.projectId, projectId)),
+      invitations: await db.select().from(staffInvitationsTable)
+        .where(eq(staffInvitationsTable.email, blockedInvitationEmail)),
+      audits: await db.select().from(auditLogsTable)
+        .where(eq(auditLogsTable.actorUserId, unassignedId)),
+      createdClerkInvitationCount: createdClerkIds.length,
+    };
+    const server = await startServer(clerkAccessMiddleware({
+      [unassignedId]: {
+        email: `${unassignedId}@example.test`,
+        name: "Integration Unassigned",
+      },
+    }));
+
+    try {
+      const requests = [
+        fetch(`${server.baseUrl}/projects`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-test-user-id": unassignedId,
+          },
+          body: JSON.stringify({
+            code: blockedProjectCode,
+            name: "Blocked Project",
+            owner: "Blocked Owner",
+            contractValue: 10_000,
+            endDate: "2099-12-31",
+          }),
+        }),
+        fetch(`${server.baseUrl}/invoices`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-test-user-id": unassignedId,
+          },
+          body: JSON.stringify({
+            projectId,
+            period: "2099-01",
+            issuedAt: "2099-01-01",
+            dpp: 10_000,
+            retentionPercent: 0,
+            integrated: false,
+            serviceType: "JASA_LAIN",
+            qualification: "TIDAK_BERLAKU",
+            hasSbu: false,
+            supplierPkp: true,
+            governmentCollector: false,
+          }),
+        }),
+        fetch(`${server.baseUrl}/access/invitations`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-test-user-id": unassignedId,
+          },
+          body: inviteBody(blockedInvitationEmail, [projectId]),
+        }),
+      ];
+      const responses = await Promise.all(requests);
+
+      for (const response of responses) {
+        assert.equal(response.status, 403);
+      }
+    } finally {
+      await server.close();
+    }
+
+    const after = {
+      projects: await db.select().from(projectsTable)
+        .where(eq(projectsTable.code, blockedProjectCode)),
+      invoices: await db.select().from(invoicesTable)
+        .where(eq(invoicesTable.projectId, projectId)),
+      invitations: await db.select().from(staffInvitationsTable)
+        .where(eq(staffInvitationsTable.email, blockedInvitationEmail)),
+      audits: await db.select().from(auditLogsTable)
+        .where(eq(auditLogsTable.actorUserId, unassignedId)),
+      createdClerkInvitationCount: createdClerkIds.length,
+    };
+    assert.deepEqual(after, before);
+
+    const blockedProjects = await db.select({ id: projectsTable.id }).from(projectsTable)
+      .where(eq(projectsTable.code, blockedProjectCode));
+    assert.equal(blockedProjects.length, 0);
+    assert.equal((await db.select().from(rabBaselinesTable)
+      .where(inArray(rabBaselinesTable.projectId, blockedProjects.map(({ id }) => id)))).length, 0);
+
+    const blockedInvoices = await db.select({ id: invoicesTable.id }).from(invoicesTable)
+      .where(eq(invoicesTable.projectId, projectId));
+    assert.equal((await db.select().from(taxCalculationSnapshotsTable)
+      .where(inArray(taxCalculationSnapshotsTable.invoiceId, blockedInvoices.map(({ id }) => id)))).length, 0);
   });
 
   await t.test("concurrent first login creates exactly one bootstrap Director", async () => {
