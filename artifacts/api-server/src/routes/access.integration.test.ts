@@ -63,7 +63,12 @@ function staticAccessMiddleware(): RequestHandler {
 }
 
 function clerkAccessMiddleware(
-  users: Record<string, { email: string; name: string; verified?: boolean }>,
+  users: Record<string, {
+    email: string;
+    name: string;
+    verified?: boolean;
+    emailAddresses?: Array<{ email: string; verified: boolean }>;
+  }>,
   hooks: AccessProvisioningHooks = {},
 ) {
   return createRequireAccess({
@@ -79,10 +84,13 @@ function clerkAccessMiddleware(
         firstName: user.name,
         lastName: null,
         primaryEmailAddress: { emailAddress: user.email },
-        emailAddresses: [{
-          emailAddress: user.email,
-          verification: { status: user.verified === false ? "unverified" : "verified" },
-        }],
+        emailAddresses: (user.emailAddresses ?? [{
+          email: user.email,
+          verified: user.verified !== false,
+        }]).map((email) => ({
+          emailAddress: email.email,
+          verification: { status: email.verified ? "verified" : "unverified" },
+        })),
       };
     }) as never,
   }, hooks);
@@ -241,16 +249,24 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     }
   });
 
-  await t.test("an unverified Clerk email cannot claim an active invitation", async () => {
+  await t.test("a matching unverified Clerk email cannot claim an invitation when another email is verified", async () => {
     const email = `${prefix}-unverified@example.test`;
     const userId = `${prefix}-unverified-user`;
+    const verifiedEmail = `${prefix}-verified-other@example.test`;
     const creator = await startServer(staticAccessMiddleware());
     const created = await postInvite(creator.baseUrl, email, [projectId]);
     assert.equal(created.status, 201);
     await creator.close();
 
     const server = await startServer(clerkAccessMiddleware({
-      [userId]: { email, name: "Unverified User", verified: false },
+      [userId]: {
+        email,
+        name: "Unverified User",
+        emailAddresses: [
+          { email: verifiedEmail, verified: true },
+          { email, verified: false },
+        ],
+      },
     }));
     try {
       const response = await getMe(server.baseUrl, userId);
