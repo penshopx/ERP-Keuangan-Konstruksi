@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { seedDemoData } from "./lib/demo-data";
 import { seedRabTemplates } from "./lib/rab-template-data";
 import { schedulePendingInvitationReconciliation } from "./lib/invitation-reconciliation";
+import { shouldSeedDemoData } from "./lib/demo-seeding";
 import { getClerkInvitationState } from "./routes/access";
 
 const rawPort = process.env["PORT"];
@@ -22,7 +23,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 await assertRequiredDatabaseMigrations();
 await seedRabTemplates();
-if (process.env.NODE_ENV === "development") {
+if (shouldSeedDemoData(process.env)) {
   await seedDemoData();
 }
 

@@ -150,6 +150,7 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
     ...process.env,
     DATABASE_URL: freshDatabaseUrl,
     NODE_ENV: "production",
+    SEED_DEMO_DATA: "true",
   };
   await runCommand(
     "pnpm",
@@ -194,6 +195,14 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
     .trim()
     .split("\n");
   assert.deepEqual(tables, expectedTables);
+
+  const demoProjectCount = (
+    await runPsql(
+      "SELECT count(*) FROM projects WHERE id IN ('prj-001', 'prj-002', 'prj-003', 'prj-004')",
+      databaseName,
+    )
+  ).trim();
+  assert.equal(demoProjectCount, "0");
 
   const history = (
     await runPsql(
