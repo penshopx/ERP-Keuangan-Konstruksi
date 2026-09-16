@@ -141,6 +141,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RabSummary"
+  /projects/{projectId}/rab/versions:
+    get:
+      operationId: listProjectRabVersions
+      tags: [projects, rab]
+      summary: List project RAB baseline versions
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: RAB baseline versions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RabVersion"
+  /projects/{projectId}/rab/versions/{version}:
+    get:
+      operationId: getProjectRabVersion
+      tags: [projects, rab]
+      summary: Get a specific project RAB baseline version
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Requested RAB baseline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RabSummary"
   /projects/{projectId}/rab/import:
     post:
       operationId: importProjectRabTemplate
@@ -548,6 +584,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RabItem"
+    RabVersion:
+      type: object
+      required: [version, status, createdAt, updatedAt]
+      properties:
+        version: { type: integer }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     RabItem:
       type: object
       required: [id, code, name, category, level, unit, quantity, unitPrice, materialCost, laborCost, equipmentCost, budget, committed, actual, variance, utilization]

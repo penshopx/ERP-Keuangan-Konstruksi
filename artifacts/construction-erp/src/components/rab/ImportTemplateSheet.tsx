@@ -8,7 +8,8 @@ import {
   getListRabTemplatesQueryKey,
   useImportProjectRabTemplate,
   getGetProjectRabQueryKey,
-  getGetProjectQueryKey
+  getGetProjectQueryKey,
+  getListProjectRabVersionsQueryKey,
 } from "@workspace/api-client-react"
 import {
   Sheet,
@@ -89,6 +90,7 @@ export function ImportTemplateSheet({ projectId, currentTotal }: { projectId: st
           description: "RAB draft baru telah dibuat berdasarkan template.",
         })
         queryClient.invalidateQueries({ queryKey: getGetProjectRabQueryKey(projectId) })
+        queryClient.invalidateQueries({ queryKey: getListProjectRabVersionsQueryKey(projectId) })
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
         setOpen(false)
         form.reset()

@@ -16,9 +16,13 @@ import {
   GetProjectParams,
   GetProjectRabParams,
   GetProjectRabResponse,
+  GetProjectRabVersionParams,
+  GetProjectRabVersionResponse,
   GetProjectResponse,
   ImportProjectRabTemplateBody,
   ImportProjectRabTemplateResponse,
+  ListProjectRabVersionsParams,
+  ListProjectRabVersionsResponse,
   ListProjectsQueryParams,
   ListProjectsResponse,
   UpdateProjectBody,
@@ -41,6 +45,31 @@ const router: IRouter = Router();
 function projectResponse(project: typeof projectsTable.$inferSelect) {
   const { wbsCount: _wbsCount, spiBasisPoints: _spi, cpiBasisPoints: _cpi, createdAt: _created, updatedAt: _updated, ...response } = project;
   return response;
+}
+
+async function rabSummary(projectId: string, baseline: typeof rabBaselinesTable.$inferSelect) {
+  const storedItems = await db.select().from(rabItemsTable)
+    .where(eq(rabItemsTable.baselineId, baseline.id))
+    .orderBy(rabItemsTable.code);
+  const items = storedItems.map((item) => ({
+    ...item,
+    quantity: item.quantityBasisPoints / 100,
+    variance: item.budget - item.actual,
+    utilization: item.budget === 0 ? 0 : Number(((item.actual / item.budget) * 100).toFixed(1)),
+  }));
+  const totalBudget = items.reduce((sum, item) => sum + item.budget, 0);
+  const committed = items.reduce((sum, item) => sum + item.committed, 0);
+  const actual = items.reduce((sum, item) => sum + item.actual, 0);
+  return {
+    projectId,
+    version: baseline.version,
+    status: baseline.status,
+    totalBudget,
+    committed,
+    actual,
+    remaining: totalBudget - actual,
+    items,
+  };
 }
 
 router.get("/projects", requirePermission("projects:view"), async (req, res) => {
@@ -205,28 +234,61 @@ router.get("/projects/:projectId/rab", requirePermission("projects:view"), async
     res.status(404).json({ error: "Baseline RAB tidak ditemukan" });
     return;
   }
-  const storedItems = await db.select().from(rabItemsTable)
-    .where(eq(rabItemsTable.baselineId, baseline.id))
-    .orderBy(rabItemsTable.code);
-  const items = storedItems.map((item) => ({
-    ...item,
-    quantity: item.quantityBasisPoints / 100,
-    variance: item.budget - item.actual,
-    utilization: item.budget === 0 ? 0 : Number(((item.actual / item.budget) * 100).toFixed(1)),
-  }));
-  const totalBudget = items.reduce((sum, item) => sum + item.budget, 0);
-  const committed = items.reduce((sum, item) => sum + item.committed, 0);
-  const actual = items.reduce((sum, item) => sum + item.actual, 0);
-  res.json(GetProjectRabResponse.parse({
-    projectId: project.id,
-    version: baseline.version,
-    status: baseline.status,
-    totalBudget,
-    committed,
-    actual,
-    remaining: totalBudget - actual,
-    items,
-  }));
+  res.json(GetProjectRabResponse.parse(await rabSummary(project.id, baseline)));
+});
+
+router.get("/projects/:projectId/rab/versions", requirePermission("projects:view"), async (req, res) => {
+  const parsed = ListProjectRabVersionsParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parsed.data.projectId)).limit(1);
+  if (!project) {
+    res.status(404).json({ error: "Proyek tidak ditemukan" });
+    return;
+  }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
+    return;
+  }
+  const baselines = await db.select({
+    version: rabBaselinesTable.version,
+    status: rabBaselinesTable.status,
+    createdAt: rabBaselinesTable.createdAt,
+    updatedAt: rabBaselinesTable.updatedAt,
+  }).from(rabBaselinesTable)
+    .where(eq(rabBaselinesTable.projectId, project.id))
+    .orderBy(desc(rabBaselinesTable.version));
+  res.json(ListProjectRabVersionsResponse.parse(baselines));
+});
+
+router.get("/projects/:projectId/rab/versions/:version", requirePermission("projects:view"), async (req, res) => {
+  const parsed = GetProjectRabVersionParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parsed.data.projectId)).limit(1);
+  if (!project) {
+    res.status(404).json({ error: "Proyek tidak ditemukan" });
+    return;
+  }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
+    return;
+  }
+  const [baseline] = await db.select().from(rabBaselinesTable)
+    .where(and(
+      eq(rabBaselinesTable.projectId, project.id),
+      eq(rabBaselinesTable.version, parsed.data.version),
+    ))
+    .limit(1);
+  if (!baseline) {
+    res.status(404).json({ error: "Versi RAB tidak ditemukan" });
+    return;
+  }
+  res.json(GetProjectRabVersionResponse.parse(await rabSummary(project.id, baseline)));
 });
 
 router.post("/projects/:projectId/rab/import", requirePermission("projects:write"), async (req, res) => {

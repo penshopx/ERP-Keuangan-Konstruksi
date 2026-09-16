@@ -1,18 +1,45 @@
-import { useGetProjectRab } from "@workspace/api-client-react"
+import { useState } from "react"
+import {
+  getGetProjectRabVersionQueryKey,
+  getListProjectRabVersionsQueryKey,
+  useGetProjectRab,
+  useGetProjectRabVersion,
+  useListProjectRabVersions,
+} from "@workspace/api-client-react"
 import { useParams, Link } from "wouter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, AlertTriangle } from "lucide-react"
+import { ArrowLeft, AlertTriangle, History } from "lucide-react"
 import { formatRupiah, formatPercent } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import { ImportTemplateSheet } from "@/components/rab/ImportTemplateSheet"
 
 export default function ProjectRab() {
   const { id } = useParams()
-  const { data: rab, isLoading, isError } = useGetProjectRab(id || "")
+  const projectId = id || ""
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
+  const latestQuery = useGetProjectRab(projectId)
+  const versionsQuery = useListProjectRabVersions(projectId, {
+    query: {
+      enabled: Boolean(projectId),
+      queryKey: getListProjectRabVersionsQueryKey(projectId),
+    },
+  })
+  const historicalQuery = useGetProjectRabVersion(projectId, selectedVersion ?? 1, {
+    query: {
+      enabled: Boolean(projectId) && selectedVersion !== null,
+      queryKey: getGetProjectRabVersionQueryKey(projectId, selectedVersion ?? 1),
+    },
+  })
+  const isHistorical = selectedVersion !== null
+  const rab = isHistorical ? historicalQuery.data : latestQuery.data
+  const isLoading = isHistorical ? historicalQuery.isLoading : latestQuery.isLoading
+  const isError = isHistorical ? historicalQuery.isError : latestQuery.isError
 
   if (isLoading) {
     return (
@@ -41,16 +68,60 @@ export default function ProjectRab() {
           </div>
           <p className="text-muted-foreground text-sm">Baseline pengendalian biaya dan struktur WBS proyek.</p>
         </div>
-        <div className="ml-auto">
-          <ImportTemplateSheet projectId={id || ""} currentTotal={rab.totalBudget} />
+        <div className="ml-auto flex items-center gap-3">
+          <Select
+            value={selectedVersion === null ? "latest" : String(selectedVersion)}
+            onValueChange={(value) => setSelectedVersion(value === "latest" ? null : Number(value))}
+          >
+            <SelectTrigger className="w-[220px]" data-testid="select-rab-version">
+              <History className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Pilih versi RAB" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="latest" data-testid="option-rab-version-latest">
+                Versi terbaru{latestQuery.data ? ` · v${latestQuery.data.version}.0` : ""}
+              </SelectItem>
+              {versionsQuery.data
+                ?.filter((version) => version.version !== latestQuery.data?.version)
+                .map((version) => (
+                  <SelectItem
+                    key={version.version}
+                    value={String(version.version)}
+                    data-testid={`option-rab-version-${version.version}`}
+                  >
+                    v{version.version}.0 · {version.status}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          {!isHistorical && <ImportTemplateSheet projectId={projectId} currentTotal={rab.totalBudget} />}
         </div>
       </div>
+
+      {isHistorical && (
+        <Alert className="border-amber-500/40 bg-amber-500/5" data-testid="alert-rab-historical">
+          <History className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle>Versi historis hanya-baca</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>Anda sedang melihat RAB v{rab.version}.0. Versi aktif proyek tidak berubah.</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedVersion(null)}
+              data-testid="button-rab-return-latest"
+            >
+              Kembali ke versi terbaru
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-muted/30">
           <CardContent className="p-6">
             <div className="text-sm font-medium text-muted-foreground mb-2">Total Budget</div>
-            <div className="text-2xl font-bold">{formatRupiah(rab.totalBudget)}</div>
+            <div className="text-2xl font-bold" data-testid="text-rab-total-budget">{formatRupiah(rab.totalBudget)}</div>
           </CardContent>
         </Card>
         <Card className="bg-muted/30">

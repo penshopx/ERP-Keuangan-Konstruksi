@@ -157,6 +157,13 @@ export interface RabSummary {
   items: RabItem[];
 }
 
+export interface RabVersion {
+  version: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RabTemplateItem {
   code: string;
   /** @nullable */

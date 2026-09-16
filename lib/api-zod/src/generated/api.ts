@@ -212,6 +212,63 @@ export const GetProjectRabResponse = zod.object({
 
 
 /**
+ * @summary List project RAB baseline versions
+ */
+export const ListProjectRabVersionsParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const ListProjectRabVersionsResponseItem = zod.object({
+  "version": zod.number().int(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListProjectRabVersionsResponse = zod.array(ListProjectRabVersionsResponseItem)
+
+
+/**
+ * @summary Get a specific project RAB baseline version
+ */
+
+
+
+export const GetProjectRabVersionParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "version": zod.coerce.number().int().min(1)
+})
+
+export const GetProjectRabVersionResponse = zod.object({
+  "projectId": zod.string(),
+  "version": zod.number().int(),
+  "status": zod.string(),
+  "totalBudget": zod.number(),
+  "committed": zod.number(),
+  "actual": zod.number(),
+  "remaining": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "parentCode": zod.string().nullish(),
+  "level": zod.number().int(),
+  "unit": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "materialCost": zod.number(),
+  "laborCost": zod.number(),
+  "equipmentCost": zod.number(),
+  "budget": zod.number(),
+  "committed": zod.number(),
+  "actual": zod.number(),
+  "variance": zod.number(),
+  "utilization": zod.number()
+}))
+})
+
+
+/**
  * @summary Import a reusable RAB template as a new draft baseline
  */
 export const ImportProjectRabTemplateParams = zod.object({

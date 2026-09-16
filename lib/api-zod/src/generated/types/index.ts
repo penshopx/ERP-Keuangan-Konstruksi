@@ -47,6 +47,7 @@ export * from './rabSummary';
 export * from './rabTemplate';
 export * from './rabTemplateImportInput';
 export * from './rabTemplateItem';
+export * from './rabVersion';
 export * from './taxReconciliationDetail';
 export * from './taxRule';
 export * from './taxRuleInput';

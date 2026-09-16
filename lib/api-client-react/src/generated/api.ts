@@ -42,6 +42,7 @@ import type {
   RabSummary,
   RabTemplate,
   RabTemplateImportInput,
+  RabVersion,
   TaxRule,
   TaxRuleInput,
   TaxSummary
@@ -632,6 +633,165 @@ export function useGetProjectRab<TData = Awaited<ReturnType<typeof getProjectRab
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetProjectRabQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListProjectRabVersionsUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/rab/versions`
+}
+
+/**
+ * @summary List project RAB baseline versions
+ */
+export const listProjectRabVersions = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<RabVersion[]> => {
+
+  return customFetch<RabVersion[]>(getListProjectRabVersionsUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProjectRabVersionsQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/rab/versions`
+    ] as const;
+    }
+
+
+export const getListProjectRabVersionsQueryOptions = <TData = Awaited<ReturnType<typeof listProjectRabVersions>>, TError = ErrorType<unknown>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjectRabVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProjectRabVersionsQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjectRabVersions>>> = ({ signal }) => listProjectRabVersions(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjectRabVersions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProjectRabVersionsQueryResult = NonNullable<Awaited<ReturnType<typeof listProjectRabVersions>>>
+export type ListProjectRabVersionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List project RAB baseline versions
+ */
+
+export function useListProjectRabVersions<TData = Awaited<ReturnType<typeof listProjectRabVersions>>, TError = ErrorType<unknown>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjectRabVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProjectRabVersionsQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetProjectRabVersionUrl = (projectId: string,
+    version: number,) => {
+
+
+
+
+  return `/api/projects/${projectId}/rab/versions/${version}`
+}
+
+/**
+ * @summary Get a specific project RAB baseline version
+ */
+export const getProjectRabVersion = async (projectId: string,
+    version: number, options?: Parameters<typeof customFetch>[1]): Promise<RabSummary> => {
+
+  return customFetch<RabSummary>(getGetProjectRabVersionUrl(projectId,version),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectRabVersionQueryKey = (projectId: string,
+    version: number,) => {
+    return [
+    `/api/projects/${projectId}/rab/versions/${version}`
+    ] as const;
+    }
+
+
+export const getGetProjectRabVersionQueryOptions = <TData = Awaited<ReturnType<typeof getProjectRabVersion>>, TError = ErrorType<unknown>>(projectId: string,
+    version: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectRabVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectRabVersionQueryKey(projectId,version);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectRabVersion>>> = ({ signal }) => getProjectRabVersion(projectId,version, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && version !== null && version !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectRabVersion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectRabVersionQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectRabVersion>>>
+export type GetProjectRabVersionQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a specific project RAB baseline version
+ */
+
+export function useGetProjectRabVersion<TData = Awaited<ReturnType<typeof getProjectRabVersion>>, TError = ErrorType<unknown>>(
+ projectId: string,
+    version: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectRabVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectRabVersionQueryOptions(projectId,version,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -726,9 +726,13 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
 
     try {
       let importedVersion = 0;
+      let newerVersion = 0;
       let importedBaselineId = "";
       const expectedBudgets = [1_000_000, 875_000];
       const expectedTotalBudget = expectedBudgets.reduce((sum, value) => sum + value, 0);
+      const newerPriceFactor = 2;
+      const newerExpectedBudgets = [1_600_000, 1_400_000];
+      const newerExpectedTotalBudget = newerExpectedBudgets.reduce((sum, value) => sum + value, 0);
       const firstServer = await startTestServer();
       try {
         const imported = await requestJson(firstServer.baseUrl, `/projects/${projectId}/rab/import`, {
@@ -777,6 +781,14 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           priceFactor,
           itemCount: templateItems.length,
         });
+
+        const newerImport = await requestJson(firstServer.baseUrl, `/projects/${projectId}/rab/import`, {
+          method: "POST",
+          body: JSON.stringify({ templateId, priceFactor: newerPriceFactor }),
+        });
+        newerVersion = Number(newerImport.version);
+        assert.equal(newerVersion, importedVersion + 1);
+        assert.equal(newerImport.totalBudget, newerExpectedTotalBudget);
       } finally {
         await firstServer.close();
       }
@@ -785,10 +797,10 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       try {
         const persisted = await requestJson(restartedServer.baseUrl, `/projects/${projectId}/rab`);
         assert.equal(persisted.projectId, projectId);
-        assert.equal(persisted.version, importedVersion);
+        assert.equal(persisted.version, newerVersion);
         assert.equal(persisted.status, "DRAF");
-        assert.equal(persisted.totalBudget, expectedTotalBudget);
-        assert.equal(persisted.remaining, expectedTotalBudget);
+        assert.equal(persisted.totalBudget, newerExpectedTotalBudget);
+        assert.equal(persisted.remaining, newerExpectedTotalBudget);
         assert.deepEqual(
           (persisted.items as Array<Record<string, unknown>>).map(({ code, quantity, unitPrice, budget }) => ({
             code,
@@ -797,12 +809,62 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
             budget,
           })),
           [
-            { code: "TEST.PERSIST.1", quantity: 2, unitPrice: 500_000, budget: expectedBudgets[0] },
-            { code: "TEST.PERSIST.1.1", quantity: 3.5, unitPrice: 250_000, budget: expectedBudgets[1] },
+            { code: "TEST.PERSIST.1", quantity: 2, unitPrice: 800_000, budget: newerExpectedBudgets[0] },
+            { code: "TEST.PERSIST.1.1", quantity: 3.5, unitPrice: 400_000, budget: newerExpectedBudgets[1] },
           ],
         );
+
+        const versions = await requestJson(restartedServer.baseUrl, `/projects/${projectId}/rab/versions`);
+        const listedVersions = versions as unknown as Array<Record<string, unknown>>;
+        assert.deepEqual(
+          listedVersions.slice(0, 2).map(({ version }) => version),
+          [newerVersion, importedVersion],
+        );
+        assert.ok(listedVersions.every(({ createdAt, updatedAt }) => (
+          typeof createdAt === "string" && typeof updatedAt === "string"
+        )));
+
+        const olderBaseline = await requestJson(
+          restartedServer.baseUrl,
+          `/projects/${projectId}/rab/versions/${importedVersion}`,
+        );
+        const newerBaseline = await requestJson(
+          restartedServer.baseUrl,
+          `/projects/${projectId}/rab/versions/${newerVersion}`,
+        );
+        assert.equal(olderBaseline.version, importedVersion);
+        assert.equal(olderBaseline.totalBudget, expectedTotalBudget);
+        assert.deepEqual(
+          (olderBaseline.items as Array<Record<string, unknown>>).map(({ budget }) => budget),
+          expectedBudgets,
+        );
+        assert.equal(newerBaseline.version, newerVersion);
+        assert.equal(newerBaseline.totalBudget, newerExpectedTotalBudget);
+        assert.deepEqual(
+          (newerBaseline.items as Array<Record<string, unknown>>).map(({ budget }) => budget),
+          newerExpectedBudgets,
+        );
+
+        const latestAfterHistoricalReads = await requestJson(restartedServer.baseUrl, `/projects/${projectId}/rab`);
+        assert.equal(latestAfterHistoricalReads.version, newerVersion);
+        assert.equal(latestAfterHistoricalReads.totalBudget, newerExpectedTotalBudget);
       } finally {
         await restartedServer.close();
+      }
+
+      const restrictedServer = await startTestServer({}, {
+        ...access,
+        role: "PROJECT_MANAGER",
+        assignedProjectIds: ["project-outside-rab-history-test"],
+      });
+      try {
+        const responses = await Promise.all([
+          fetch(`${restrictedServer.baseUrl}/projects/${projectId}/rab/versions`),
+          fetch(`${restrictedServer.baseUrl}/projects/${projectId}/rab/versions/${importedVersion}`),
+        ]);
+        assert.deepEqual(responses.map(({ status }) => status), [403, 403]);
+      } finally {
+        await restrictedServer.close();
       }
     } finally {
       await db.delete(rabTemplatesTable).where(eq(rabTemplatesTable.id, templateId));
