@@ -38,7 +38,7 @@ import {
   taxCalculationSnapshotsTable,
   taxRuleVersionsTable,
 } from "@workspace/db";
-import { isNull } from "drizzle-orm";
+import { and, inArray, isNull } from "drizzle-orm";
 
 const booleanVariants = [false, true] as const;
 const constructionQualifications = [
@@ -229,6 +229,9 @@ export const demoActivity = [
   { id: "act-05", action: "DIREKONSILIASI", entity: "Pajak", detail: "PPN masa Agustus cocok 99,8% dengan buku", user: "Siska Amelia", timestamp: "2026-09-11T10:50:00+07:00", tone: "success" },
 ];
 
+const demoInvoiceIds = demoInvoices.map(({ id }) => id);
+const demoTaxSnapshotIds = demoInvoices.map(({ id }) => `tax-${id}`);
+
 export async function seedDemoData() {
   await db.transaction(async (tx) => {
     await tx.insert(taxRuleVersionsTable).values(demoTaxRules).onConflictDoNothing();
@@ -284,7 +287,10 @@ export async function seedDemoData() {
     }))).onConflictDoNothing();
     await tx.update(invoicesTable)
       .set({ taxRuleVersionId: "tax-legacy-demo-2026" })
-      .where(isNull(invoicesTable.taxRuleVersionId));
+      .where(and(
+        inArray(invoicesTable.id, demoInvoiceIds),
+        isNull(invoicesTable.taxRuleVersionId),
+      ));
     await tx.update(taxCalculationSnapshotsTable)
       .set({
         taxRuleVersionId: "tax-legacy-demo-2026",
@@ -292,7 +298,10 @@ export async function seedDemoData() {
         regulatorySource: "Migrasi formula demo historis; sumber regulasi tidak tercatat pada transaksi asal",
         ruleSnapshot: demoTaxRules[0],
       })
-      .where(isNull(taxCalculationSnapshotsTable.taxRuleVersionId));
+      .where(and(
+        inArray(taxCalculationSnapshotsTable.id, demoTaxSnapshotIds),
+        isNull(taxCalculationSnapshotsTable.taxRuleVersionId),
+      ));
     await tx.insert(auditLogsTable).values(demoActivity.map((item) => ({
       ...item,
       timestamp: new Date(item.timestamp),
