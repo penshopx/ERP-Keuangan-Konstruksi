@@ -27,6 +27,7 @@ const runId = randomUUID();
 const prefix = `access-test-${runId}`;
 const directorId = `${prefix}-director`;
 const projectId = `${prefix}-project`;
+const unassignedId = `${prefix}-unassigned`;
 const createdClerkIds: string[] = [];
 const revokedClerkIds: string[] = [];
 const clerkStatuses = new Map<string, string>();
@@ -173,6 +174,37 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     owner: "Integration Test",
     contractValue: 1,
     endDate: "2099-12-31",
+  });
+
+  await db.insert(userRolesTable).values({
+    userId: unassignedId,
+    role: "UNASSIGNED",
+    displayName: "Integration Unassigned",
+  });
+
+  await t.test("an unassigned user cannot read protected data endpoints", async () => {
+    const server = await startServer(clerkAccessMiddleware({
+      [unassignedId]: {
+        email: `${unassignedId}@example.test`,
+        name: "Integration Unassigned",
+      },
+    }));
+    try {
+      const endpoints = ["/projects", "/invoices", "/access/users"];
+      const responses = await Promise.all(endpoints.map((endpoint) =>
+        fetch(`${server.baseUrl}${endpoint}`, {
+          headers: { "x-test-user-id": unassignedId },
+        })));
+
+      for (const response of responses) {
+        assert.equal(response.status, 403);
+        assert.deepEqual(await response.json(), {
+          error: "Akun menunggu Director menetapkan jabatan dan proyek",
+        });
+      }
+    } finally {
+      await server.close();
+    }
   });
 
   await t.test("concurrent first login creates exactly one bootstrap Director", async () => {
