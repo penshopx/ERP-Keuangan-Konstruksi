@@ -4,6 +4,7 @@ import {
   auditLogsTable,
   db,
   staffInvitationsTable,
+  tryWithDatabaseAdvisoryLock,
 } from "@workspace/db";
 
 export type ClerkInvitationState = {
@@ -78,6 +79,7 @@ const scheduledActor: ReconciliationActor = {
 };
 
 const inactiveClerkStatuses = new Set(["revoked", "expired"]);
+const scheduledReconciliationLockName = "api-server:scheduled-invitation-reconciliation";
 
 export async function reconcileInvitationFromClerk(
   invitation: typeof staffInvitationsTable.$inferSelect,
@@ -164,6 +166,17 @@ export async function reconcilePendingInvitations(
   return { checked, updated, failed };
 }
 
+export async function runScheduledInvitationReconciliation(
+  dependencies: ScheduledInvitationReconciliationDependencies,
+) {
+  const result = await tryWithDatabaseAdvisoryLock(
+    scheduledReconciliationLockName,
+    () => reconcilePendingInvitations(dependencies),
+  );
+  if (!result.acquired) return { skipped: true as const };
+  return { skipped: false as const, ...result.value };
+}
+
 export function schedulePendingInvitationReconciliation(
   dependencies: ScheduledInvitationReconciliationDependencies,
   options: InvitationReconciliationScheduleOptions = {},
@@ -175,7 +188,7 @@ export function schedulePendingInvitationReconciliation(
     if (running) return;
     running = true;
     try {
-      await reconcilePendingInvitations(dependencies);
+      await runScheduledInvitationReconciliation(dependencies);
     } catch (error) {
       recordReconciliationFailure();
       dependencies.onRunError?.(error);

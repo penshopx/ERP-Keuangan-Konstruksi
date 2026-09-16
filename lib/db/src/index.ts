@@ -13,6 +13,38 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
+export type TryWithDatabaseAdvisoryLockResult<T> =
+  | { acquired: true; value: T }
+  | { acquired: false };
+
+export async function tryWithDatabaseAdvisoryLock<T>(
+  lockName: string,
+  operation: () => Promise<T>,
+): Promise<TryWithDatabaseAdvisoryLockResult<T>> {
+  const client = await pool.connect();
+  let acquired = false;
+  try {
+    const result = await client.query<{ acquired: boolean }>(
+      "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
+      [lockName],
+    );
+    acquired = result.rows[0]?.acquired === true;
+    if (!acquired) return { acquired: false };
+    return { acquired: true, value: await operation() };
+  } finally {
+    try {
+      if (acquired) {
+        await client.query(
+          "SELECT pg_advisory_unlock(hashtextextended($1, 0))",
+          [lockName],
+        );
+      }
+    } finally {
+      client.release();
+    }
+  }
+}
+
 const REQUIRED_MIGRATION = "0001_prevent_overlapping_tax_rule_periods.sql";
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {

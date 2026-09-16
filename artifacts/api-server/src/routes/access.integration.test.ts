@@ -24,6 +24,7 @@ import type { AccessPersistenceHooks, AccessRouterDependencies } from "./access"
 import {
   getInvitationReconciliationHealth,
   reconcilePendingInvitations,
+  runScheduledInvitationReconciliation,
 } from "../lib/invitation-reconciliation";
 
 const runId = randomUUID();
@@ -775,6 +776,45 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     assert.equal(finalAudits.filter(({ action }) =>
       action === "STATUS UNDANGAN DIREKONSILIASI").length, 1);
     clerkStatuses.set(storedBefore.clerkInvitationId, "expired");
+  });
+
+  await t.test("scheduled reconciliation allows only one active pass across instances", async () => {
+    let releaseFirstLookup!: () => void;
+    const firstLookupStarted = new Promise<void>((resolve) => {
+      releaseFirstLookup = resolve;
+    });
+    let notifyLookupStarted!: () => void;
+    const lookupStarted = new Promise<void>((resolve) => {
+      notifyLookupStarted = resolve;
+    });
+    let firstLookup = true;
+    const firstRun = runScheduledInvitationReconciliation({
+      getClerkInvitation: async () => {
+        if (firstLookup) {
+          firstLookup = false;
+          notifyLookupStarted();
+          await firstLookupStarted;
+        }
+        return { status: "pending" };
+      },
+    });
+
+    await lookupStarted;
+    const competingRun = await runScheduledInvitationReconciliation({
+      getClerkInvitation: async () => {
+        throw new Error("Competing reconciliation must not call Clerk");
+      },
+    });
+    assert.deepEqual(competingRun, { skipped: true });
+
+    releaseFirstLookup();
+    const completedFirstRun = await firstRun;
+    assert.equal(completedFirstRun.skipped, false);
+
+    const nextRun = await runScheduledInvitationReconciliation({
+      getClerkInvitation: async () => ({ status: "pending" }),
+    });
+    assert.equal(nextRun.skipped, false);
   });
 
   await t.test("invited role and projects are applied atomically on first login", async () => {
