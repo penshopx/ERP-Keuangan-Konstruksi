@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { pool } from "@workspace/db";
+import {
+  acquireDatabaseSuiteLock,
+  defaultPersistenceDatabaseSuiteLockTimeoutMs,
+  persistenceDatabaseSuiteLockName,
+  releaseDatabaseSuiteLock,
+} from "../testing/database-suite-lock";
 
 type ExplainPlanNode = {
   "Node Type": string;
@@ -10,7 +16,13 @@ type ExplainPlanNode = {
   Plans?: ExplainPlanNode[];
 };
 
-const databaseSuiteLockName = "api-server:persistence-integration-shared-fixtures";
+const databaseSuiteLockTimeoutMs = Number(
+  process.env.ACTIVITY_QUERY_PLAN_TEST_LOCK_TIMEOUT_MS ?? defaultPersistenceDatabaseSuiteLockTimeoutMs,
+);
+const databaseSuiteLockOptions = {
+  lockName: persistenceDatabaseSuiteLockName,
+  suiteName: "activity query-plan validation",
+};
 const regressionUserIdPattern = "^test-user-[0-9a-f-]{36}$";
 const runId = randomUUID();
 const actorUserId = `test-user-${runId}`;
@@ -24,11 +36,18 @@ after(async () => {
 });
 
 test("activity timeline uses its timestamp index at representative volume", async () => {
-  const client = await pool.connect();
-  let lockHeld = false;
+  if (!Number.isFinite(databaseSuiteLockTimeoutMs) || databaseSuiteLockTimeoutMs <= 0) {
+    throw new Error(
+      `ACTIVITY_QUERY_PLAN_TEST_LOCK_TIMEOUT_MS must be a positive number; received ${
+        process.env.ACTIVITY_QUERY_PLAN_TEST_LOCK_TIMEOUT_MS
+      }`,
+    );
+  }
+  const client = await acquireDatabaseSuiteLock({
+    ...databaseSuiteLockOptions,
+    timeoutMs: databaseSuiteLockTimeoutMs,
+  });
   try {
-    await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [databaseSuiteLockName]);
-    lockHeld = true;
     await client.query("DELETE FROM audit_logs WHERE actor_user_id ~ $1", [regressionUserIdPattern]);
     await client.query(
       `INSERT INTO audit_logs (
@@ -78,10 +97,7 @@ test("activity timeline uses its timestamp index at representative volume", asyn
       await client.query("DELETE FROM audit_logs WHERE actor_user_id = $1", [actorUserId]);
       await client.query("ANALYZE audit_logs");
     } finally {
-      if (lockHeld) {
-        await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [databaseSuiteLockName]);
-      }
-      client.release();
+      await releaseDatabaseSuiteLock(client, databaseSuiteLockOptions);
     }
   }
 });
