@@ -1,4 +1,5 @@
 - [Versioned tax rules](versioned-tax-rules.md) — Construction tax rates and formulas must be effective-dated configuration, never permanent constants.
+- [Versioned domain configuration](versioned-domain-configuration.md) — Regulatory and client-specific construction values must be dated configuration, not code constants.
 - [RAB reference templates](rab-reference-templates.md) — Uploaded learning materials define structure and terminology, not authoritative current market prices.
 - [Persistence regression tests](persistence-regression-tests.md) — prove database writes directly and inject failures inside the API transaction boundary.
 - [Shared database test isolation](shared-database-test-isolation.md) — serialize suites that mutate shared fixtures with a database-scoped lock held through cleanup.
