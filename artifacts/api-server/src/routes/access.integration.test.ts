@@ -477,7 +477,6 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       .filter(({ action }) => action === "UNDANGAN STAF DIKIRIM ULANG");
     assert.equal(resendAudits.length, 0);
   });
-
   await t.test("partial revoke failure is reconciled and audited", async () => {
     const email = `${prefix}-reconcile@example.test`;
     const creator = await startServer(staticAccessMiddleware());
