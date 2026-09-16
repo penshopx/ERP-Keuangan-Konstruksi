@@ -649,6 +649,131 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     }
   });
 
+  await t.test("successful RAB import remains stored and readable after server restart", async () => {
+    const templateId = `test-rab-import-${randomUUID()}`;
+    const priceFactor = 1.25;
+    const templateItems = [
+      {
+        code: "TEST.PERSIST.1",
+        name: "Pekerjaan persiapan persistensi",
+        category: "PERSIAPAN",
+        unit: "ls",
+        quantity: 2,
+        unitPrice: 400_000,
+        materialCost: 250_000,
+        laborCost: 100_000,
+        equipmentCost: 50_000,
+        parentCode: null,
+        level: 1,
+      },
+      {
+        code: "TEST.PERSIST.1.1",
+        name: "Pekerjaan turunan persistensi",
+        category: "PERSIAPAN",
+        unit: "m2",
+        quantity: 3.5,
+        unitPrice: 200_000,
+        materialCost: 125_000,
+        laborCost: 50_000,
+        equipmentCost: 25_000,
+        parentCode: "TEST.PERSIST.1",
+        level: 2,
+      },
+    ];
+    await db.insert(rabTemplatesTable).values({
+      id: templateId,
+      name: "Template Persistensi Impor RAB",
+      projectType: "TEST",
+      description: "Fixture unik untuk membuktikan hasil impor tersimpan",
+      sourceNote: "Regression test",
+      items: templateItems,
+    });
+
+    try {
+      let importedVersion = 0;
+      let importedBaselineId = "";
+      const expectedBudgets = [1_000_000, 875_000];
+      const expectedTotalBudget = expectedBudgets.reduce((sum, value) => sum + value, 0);
+      const firstServer = await startTestServer();
+      try {
+        const imported = await requestJson(firstServer.baseUrl, `/projects/${projectId}/rab/import`, {
+          method: "POST",
+          body: JSON.stringify({ templateId, priceFactor }),
+        });
+        importedVersion = Number(imported.version);
+        assert.equal(imported.status, "DRAF");
+        assert.equal(imported.totalBudget, expectedTotalBudget);
+        assert.equal((imported.items as unknown[]).length, templateItems.length);
+
+        const [baseline] = await db.select().from(rabBaselinesTable)
+          .where(and(
+            eq(rabBaselinesTable.projectId, projectId),
+            eq(rabBaselinesTable.version, importedVersion),
+          ));
+        assert.ok(baseline);
+        importedBaselineId = baseline.id;
+        assert.equal(baseline.status, "DRAF");
+
+        const storedItems = await db.select().from(rabItemsTable)
+          .where(eq(rabItemsTable.baselineId, importedBaselineId))
+          .orderBy(rabItemsTable.code);
+        assert.equal(storedItems.length, templateItems.length);
+        assert.deepEqual(storedItems.map(({ code }) => code), templateItems.map(({ code }) => code));
+        assert.deepEqual(storedItems.map(({ quantityBasisPoints }) => quantityBasisPoints), [200, 350]);
+        assert.deepEqual(storedItems.map(({ unitPrice }) => unitPrice), [500_000, 250_000]);
+        assert.deepEqual(storedItems.map(({ budget }) => budget), expectedBudgets);
+
+        const [storedProject] = await db.select().from(projectsTable)
+          .where(eq(projectsTable.id, projectId));
+        assert.ok(storedProject);
+        assert.equal(storedProject.budget, expectedTotalBudget);
+        assert.equal(storedProject.wbsCount, templateItems.length);
+
+        const [storedAudit] = await db.select().from(auditLogsTable)
+          .where(and(
+            eq(auditLogsTable.entity, "RAB"),
+            eq(auditLogsTable.entityId, importedBaselineId),
+            eq(auditLogsTable.action, "DIIMPOR"),
+          ));
+        assert.ok(storedAudit);
+        assert.equal(storedAudit.actorUserId, access.userId);
+        assert.deepEqual(storedAudit.metadata, {
+          templateId,
+          priceFactor,
+          itemCount: templateItems.length,
+        });
+      } finally {
+        await firstServer.close();
+      }
+
+      const restartedServer = await startTestServer();
+      try {
+        const persisted = await requestJson(restartedServer.baseUrl, `/projects/${projectId}/rab`);
+        assert.equal(persisted.projectId, projectId);
+        assert.equal(persisted.version, importedVersion);
+        assert.equal(persisted.status, "DRAF");
+        assert.equal(persisted.totalBudget, expectedTotalBudget);
+        assert.equal(persisted.remaining, expectedTotalBudget);
+        assert.deepEqual(
+          (persisted.items as Array<Record<string, unknown>>).map(({ code, quantity, unitPrice, budget }) => ({
+            code,
+            quantity,
+            unitPrice,
+            budget,
+          })),
+          [
+            { code: "TEST.PERSIST.1", quantity: 2, unitPrice: 500_000, budget: expectedBudgets[0] },
+            { code: "TEST.PERSIST.1.1", quantity: 3.5, unitPrice: 250_000, budget: expectedBudgets[1] },
+          ],
+        );
+      } finally {
+        await restartedServer.close();
+      }
+    } finally {
+      await db.delete(rabTemplatesTable).where(eq(rabTemplatesTable.id, templateId));
+    }
+  });
+
   await t.test("invoice, tax snapshot, and audit are committed together", async () => {
     const server = await startTestServer();
     let invoiceId = "";
