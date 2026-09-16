@@ -5,8 +5,35 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type HealthStatusStatus = typeof HealthStatusStatus[keyof typeof HealthStatusStatus];
+
+
+export const HealthStatusStatus = {
+  ok: 'ok',
+  degraded: 'degraded',
+} as const;
+
+export type HealthStatusInvitationReconciliationStatus = typeof HealthStatusInvitationReconciliationStatus[keyof typeof HealthStatusInvitationReconciliationStatus];
+
+
+export const HealthStatusInvitationReconciliationStatus = {
+  HEALTHY: 'HEALTHY',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export type HealthStatusInvitationReconciliation = {
+  status: HealthStatusInvitationReconciliationStatus;
+  /** @minimum 0 */
+  consecutiveFailures: number;
+  /** @nullable */
+  lastFailureAt: string | null;
+  /** @nullable */
+  lastSuccessAt: string | null;
+};
+
 export interface HealthStatus {
-  status: string;
+  status: HealthStatusStatus;
+  invitationReconciliation: HealthStatusInvitationReconciliation;
 }
 
 export interface Alert {

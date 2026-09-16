@@ -21,7 +21,10 @@ import {
 } from "../middlewares/access";
 import { createApiRouter } from "./index";
 import type { AccessPersistenceHooks, AccessRouterDependencies } from "./access";
-import { reconcilePendingInvitations } from "../lib/invitation-reconciliation";
+import {
+  getInvitationReconciliationHealth,
+  reconcilePendingInvitations,
+} from "../lib/invitation-reconciliation";
 
 const runId = randomUUID();
 const prefix = `access-test-${runId}`;
@@ -695,13 +698,54 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
           return { status: clerkStatuses.get(clerkInvitationId) ?? "pending" };
         }
         attempts += 1;
-        if (attempts === 1) throw new Error("Injected transient Clerk failure");
+        if (attempts <= 2) throw new Error("Injected transient Clerk failure");
         return { status: "expired" };
       },
     };
 
     const failedPass = await reconcilePendingInvitations(dependencies);
     assert.equal(failedPass.failed, 1);
+    const healthAfterFailure = getInvitationReconciliationHealth();
+    assert.equal(healthAfterFailure.status, "DEGRADED");
+    assert.ok(healthAfterFailure.consecutiveFailures >= 1);
+    assert.ok(healthAfterFailure.lastFailureAt);
+
+    const repeatedFailurePass = await reconcilePendingInvitations(dependencies);
+    assert.equal(repeatedFailurePass.failed, 1);
+    const healthAfterRepeatedFailure = getInvitationReconciliationHealth();
+    assert.equal(healthAfterRepeatedFailure.status, "DEGRADED");
+    assert.equal(
+      healthAfterRepeatedFailure.consecutiveFailures,
+      healthAfterFailure.consecutiveFailures + 1,
+    );
+    assert.ok(healthAfterRepeatedFailure.lastFailureAt);
+
+    const healthServer = await startServer(staticAccessMiddleware());
+    try {
+      const healthResponse = await fetch(`${healthServer.baseUrl}/healthz`);
+      assert.equal(healthResponse.status, 200);
+      const health = await healthResponse.json() as {
+        status: string;
+        invitationReconciliation: {
+          status: string;
+          consecutiveFailures: number;
+          lastFailureAt: string | null;
+        };
+      };
+      assert.equal(health.status, "degraded");
+      assert.equal(health.invitationReconciliation.status, "DEGRADED");
+      assert.equal(
+        health.invitationReconciliation.consecutiveFailures,
+        healthAfterRepeatedFailure.consecutiveFailures,
+      );
+      assert.equal(
+        health.invitationReconciliation.lastFailureAt,
+        healthAfterRepeatedFailure.lastFailureAt,
+      );
+    } finally {
+      await healthServer.close();
+    }
+
     const auditsAfterFailure = await db.select().from(auditLogsTable)
       .where(eq(auditLogsTable.entityId, invitation.id));
     assert.equal(auditsAfterFailure.filter(({ action }) =>
@@ -709,6 +753,10 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
 
     const retryPass = await reconcilePendingInvitations(dependencies);
     assert.equal(retryPass.updated, 1);
+    const healthAfterRecovery = getInvitationReconciliationHealth();
+    assert.equal(healthAfterRecovery.status, "HEALTHY");
+    assert.equal(healthAfterRecovery.consecutiveFailures, 0);
+    assert.ok(healthAfterRecovery.lastSuccessAt);
     const [storedAfter] = await db.select().from(staffInvitationsTable)
       .where(eq(staffInvitationsTable.id, invitation.id));
     assert.equal(storedAfter.status, "EXPIRED");

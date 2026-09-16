@@ -426,8 +426,30 @@ components:
       properties:
         status:
           type: string
+          enum: [ok, degraded]
+        invitationReconciliation:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [HEALTHY, DEGRADED]
+            consecutiveFailures:
+              type: integer
+              minimum: 0
+            lastFailureAt:
+              type: [string, "null"]
+              format: date-time
+            lastSuccessAt:
+              type: [string, "null"]
+              format: date-time
+          required:
+            - status
+            - consecutiveFailures
+            - lastFailureAt
+            - lastSuccessAt
       required:
         - status
+        - invitationReconciliation
     DashboardSummary:
       type: object
       required: [activeProjects, portfolioValue, committedCost, cashPosition, budgetUtilization, alerts, cashflow]

@@ -104,14 +104,26 @@ async function waitForHealth(
     if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error(`API exited before becoming healthy\n${readOutput()}`);
     }
+    let response: Response;
     try {
-      const response = await fetch(url);
-      if (response.ok) {
-        assert.deepEqual(await response.json(), { status: "ok" });
-        return;
-      }
+      response = await fetch(url);
     } catch {
       // Startup has not opened the port yet.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      continue;
+    }
+    if (response.ok) {
+      const health = await response.json() as {
+        status: string;
+        invitationReconciliation: {
+          status: string;
+          consecutiveFailures: number;
+        };
+      };
+      assert.equal(health.status, "ok");
+      assert.equal(health.invitationReconciliation.status, "HEALTHY");
+      assert.equal(health.invitationReconciliation.consecutiveFailures, 0);
+      return;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }

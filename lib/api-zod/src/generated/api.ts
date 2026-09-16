@@ -12,8 +12,18 @@ import * as zod from 'zod';
  * Returns server health status
  * @summary Health check
  */
+export const healthCheckResponseInvitationReconciliationConsecutiveFailuresMin = 0;
+
+
+
 export const HealthCheckResponse = zod.object({
-  "status": zod.string()
+  "status": zod.enum(['ok', 'degraded']),
+  "invitationReconciliation": zod.object({
+  "status": zod.enum(['HEALTHY', 'DEGRADED']),
+  "consecutiveFailures": zod.number().int().min(healthCheckResponseInvitationReconciliationConsecutiveFailuresMin),
+  "lastFailureAt": zod.coerce.date().nullable(),
+  "lastSuccessAt": zod.coerce.date().nullable()
+})
 })
 
 

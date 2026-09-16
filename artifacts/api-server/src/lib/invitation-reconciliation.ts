@@ -35,6 +35,42 @@ export type InvitationReconciliationScheduleOptions = {
   runImmediately?: boolean;
 };
 
+export type InvitationReconciliationHealth = {
+  status: "HEALTHY" | "DEGRADED";
+  consecutiveFailures: number;
+  lastFailureAt: string | null;
+  lastSuccessAt: string | null;
+};
+
+let reconciliationHealth: InvitationReconciliationHealth = {
+  status: "HEALTHY",
+  consecutiveFailures: 0,
+  lastFailureAt: null,
+  lastSuccessAt: null,
+};
+
+function recordReconciliationFailure() {
+  reconciliationHealth = {
+    ...reconciliationHealth,
+    status: "DEGRADED",
+    consecutiveFailures: reconciliationHealth.consecutiveFailures + 1,
+    lastFailureAt: new Date().toISOString(),
+  };
+}
+
+function recordReconciliationSuccess() {
+  reconciliationHealth = {
+    ...reconciliationHealth,
+    status: "HEALTHY",
+    consecutiveFailures: 0,
+    lastSuccessAt: new Date().toISOString(),
+  };
+}
+
+export function getInvitationReconciliationHealth(): InvitationReconciliationHealth {
+  return { ...reconciliationHealth };
+}
+
 const scheduledActor: ReconciliationActor = {
   userId: "system:invitation-reconciliation",
   displayName: "Sistem Rekonsiliasi Undangan",
@@ -119,6 +155,12 @@ export async function reconcilePendingInvitations(
     }
   }
 
+  if (failed > 0) {
+    recordReconciliationFailure();
+  } else {
+    recordReconciliationSuccess();
+  }
+
   return { checked, updated, failed };
 }
 
@@ -135,6 +177,7 @@ export function schedulePendingInvitationReconciliation(
     try {
       await reconcilePendingInvitations(dependencies);
     } catch (error) {
+      recordReconciliationFailure();
       dependencies.onRunError?.(error);
     } finally {
       running = false;
