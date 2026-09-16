@@ -144,6 +144,41 @@ async function stopProcess(child: ChildProcess): Promise<void> {
   ]);
 }
 
+async function waitForFailedStartup(
+  child: ChildProcess,
+  healthUrl: string,
+  readOutput: () => string,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  const deadline = Date.now() + 30_000;
+  let healthWasReachable = false;
+
+  while (
+    child.exitCode === null &&
+    child.signalCode === null &&
+    Date.now() < deadline
+  ) {
+    try {
+      const response = await fetch(healthUrl);
+      healthWasReachable = healthWasReachable || response.ok;
+    } catch {
+      // Expected: migration validation must fail before the port opens.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  if (child.exitCode === null && child.signalCode === null) {
+    throw new Error(`API did not exit after migration failure\n${readOutput()}`);
+  }
+
+  assert.equal(
+    healthWasReachable,
+    false,
+    `API health check became reachable before startup failed\n${readOutput()}`,
+  );
+
+  return { code: child.exitCode, signal: child.signalCode };
+}
+
 test("setup prepares an empty PostgreSQL database before API startup", async (t) => {
   assert.ok(process.env.DATABASE_URL, "DATABASE_URL is required");
 
@@ -247,4 +282,66 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
     "tax_rule_versions_no_overlapping_periods",
     "tax_rule_versions_valid_period",
   ]);
+});
+
+test("API exits before opening its port when mandatory migrations are missing", async (t) => {
+  assert.ok(process.env.DATABASE_URL, "DATABASE_URL is required");
+
+  const databaseName = `failed_startup_${randomUUID().replaceAll("-", "")}`;
+  const emptyDatabaseUrl = databaseUrlFor(databaseName);
+  let api: ChildProcess | undefined;
+
+  await runPsql(`CREATE DATABASE "${databaseName}"`);
+
+  t.after(async () => {
+    if (api) await stopProcess(api);
+    await runPsql(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
+  });
+
+  const startupEnv = {
+    ...process.env,
+    DATABASE_URL: emptyDatabaseUrl,
+    NODE_ENV: "production",
+    SEED_DEMO_DATA: "false",
+  };
+  await runCommand(
+    "pnpm",
+    ["--filter", "@workspace/api-server", "run", "build"],
+    startupEnv,
+  );
+
+  const port = await reservePort();
+  let apiOutput = "";
+  api = spawn(
+    "pnpm",
+    ["--filter", "@workspace/api-server", "run", "start"],
+    {
+      cwd: workspaceRoot,
+      env: { ...startupEnv, PORT: String(port) },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  api.stdout?.on("data", (chunk) => {
+    apiOutput += chunk;
+  });
+  api.stderr?.on("data", (chunk) => {
+    apiOutput += chunk;
+  });
+
+  const exit = await waitForFailedStartup(
+    api,
+    `http://127.0.0.1:${port}/api/healthz`,
+    () => apiOutput,
+  );
+
+  assert.notEqual(exit.code, 0, `API unexpectedly exited successfully\n${apiOutput}`);
+  assert.equal(exit.signal, null);
+  assert.match(
+    apiOutput,
+    /Mandatory database migration .* is not fully applied/,
+  );
+  await assert.rejects(
+    fetch(`http://127.0.0.1:${port}/api/healthz`),
+    /fetch failed/,
+  );
 });
