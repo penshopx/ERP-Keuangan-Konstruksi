@@ -326,6 +326,56 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     }
   });
 
+  await t.test("Clerk create failure leaves an expired resend unchanged", async () => {
+    const email = `${prefix}-resend-clerk-failure@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    assert.equal(created.status, 201);
+    const invitation = await created.json() as { id: string };
+    await creator.close();
+
+    const expiredAt = new Date(Date.now() - 1_000);
+    await db.update(staffInvitationsTable).set({
+      status: "EXPIRED",
+      expiresAt: expiredAt,
+    }).where(eq(staffInvitationsTable.id, invitation.id));
+    const [storedBefore] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    clerkStatuses.set(storedBefore.clerkInvitationId, "expired");
+    const createdClerkIdsBefore = [...createdClerkIds];
+    const resendAuditsBefore = (await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id)))
+      .filter(({ action }) => action === "UNDANGAN STAF DIKIRIM ULANG");
+
+    const failingDependencies: AccessRouterDependencies = {
+      ...clerkDependencies,
+      createClerkInvitation: async () => {
+        throw new Error("Injected Clerk invitation creation failure");
+      },
+    };
+    const server = await startServer(staticAccessMiddleware(), {}, failingDependencies);
+    try {
+      const response = await fetch(`${server.baseUrl}/access/invitations/${invitation.id}/resend`, {
+        method: "POST",
+      });
+      assert.equal(response.status, 500);
+    } finally {
+      await server.close();
+    }
+
+    const [storedAfter] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitation.id));
+    assert.equal(storedAfter.status, storedBefore.status);
+    assert.equal(storedAfter.clerkInvitationId, storedBefore.clerkInvitationId);
+    assert.equal(storedAfter.expiresAt.getTime(), storedBefore.expiresAt.getTime());
+    assert.deepEqual(createdClerkIds, createdClerkIdsBefore);
+
+    const resendAuditsAfter = (await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.entityId, invitation.id)))
+      .filter(({ action }) => action === "UNDANGAN STAF DIKIRIM ULANG");
+    assert.equal(resendAuditsAfter.length, resendAuditsBefore.length);
+  });
+
   await t.test("partial revoke failure is reconciled and audited", async () => {
     const email = `${prefix}-reconcile@example.test`;
     const creator = await startServer(staticAccessMiddleware());
