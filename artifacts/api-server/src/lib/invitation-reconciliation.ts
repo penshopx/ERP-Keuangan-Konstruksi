@@ -29,6 +29,7 @@ export type ScheduledInvitationReconciliationDependencies = {
     invitation: typeof staffInvitationsTable.$inferSelect,
   ) => void;
   onRunError?: (error: unknown) => void;
+  alerting?: InvitationReconciliationAlerting;
 };
 
 export type InvitationReconciliationScheduleOptions = {
@@ -41,6 +42,23 @@ export type InvitationReconciliationHealth = {
   consecutiveFailures: number;
   lastFailureAt: string | null;
   lastSuccessAt: string | null;
+};
+
+export type InvitationReconciliationAlert = {
+  type: "DEGRADED" | "RECOVERED";
+  occurredAt: string;
+  consecutiveFailures: number;
+  lastFailureAt: string | null;
+  lastSuccessAt: string | null;
+};
+
+export type InvitationReconciliationAlerting = {
+  failureThreshold: number;
+  notify: (alert: InvitationReconciliationAlert) => Promise<void>;
+  onNotificationError?: (
+    error: unknown,
+    alert: InvitationReconciliationAlert,
+  ) => void;
 };
 
 let reconciliationHealth: InvitationReconciliationHealth = {
@@ -68,6 +86,69 @@ function recordReconciliationSuccess() {
     consecutiveFailures: 0,
     lastSuccessAt: new Date().toISOString(),
   };
+}
+
+type AlertIncidentState = {
+  active: boolean;
+  pendingDegraded: InvitationReconciliationAlert | null;
+};
+
+const alertIncidentStates =
+  new WeakMap<InvitationReconciliationAlerting, AlertIncidentState>();
+
+export async function updateInvitationReconciliationAlert(
+  alerting: InvitationReconciliationAlerting | undefined,
+  health: InvitationReconciliationHealth,
+) {
+  if (!alerting) return;
+
+  const state = alertIncidentStates.get(alerting) ?? {
+    active: false,
+    pendingDegraded: null,
+  };
+  alertIncidentStates.set(alerting, state);
+
+  if (
+    !state.active
+    && !state.pendingDegraded
+    && health.consecutiveFailures >= alerting.failureThreshold
+  ) {
+    state.pendingDegraded = {
+      type: "DEGRADED",
+      occurredAt: new Date().toISOString(),
+      consecutiveFailures: health.consecutiveFailures,
+      lastFailureAt: health.lastFailureAt,
+      lastSuccessAt: health.lastSuccessAt,
+    };
+  }
+
+  if (state.pendingDegraded) {
+    const pending = state.pendingDegraded;
+    try {
+      await alerting.notify(pending);
+      state.pendingDegraded = null;
+      state.active = true;
+    } catch (error) {
+      alerting.onNotificationError?.(error, pending);
+      return;
+    }
+  }
+
+  if (!state.active || health.status !== "HEALTHY") return;
+
+  const recovered: InvitationReconciliationAlert = {
+    type: "RECOVERED",
+    occurredAt: new Date().toISOString(),
+    consecutiveFailures: health.consecutiveFailures,
+    lastFailureAt: health.lastFailureAt,
+    lastSuccessAt: health.lastSuccessAt,
+  };
+  try {
+    await alerting.notify(recovered);
+    state.active = false;
+  } catch (error) {
+    alerting.onNotificationError?.(error, recovered);
+  }
 }
 
 export function getInvitationReconciliationHealth(): InvitationReconciliationHealth {
@@ -173,7 +254,6 @@ export async function reconcilePendingInvitations(
   } else {
     recordReconciliationSuccess();
   }
-
   return { checked, updated, failed };
 }
 
@@ -185,6 +265,10 @@ export async function runScheduledInvitationReconciliation(
     () => reconcilePendingInvitations(dependencies),
   );
   if (!result.acquired) return { skipped: true as const };
+  await updateInvitationReconciliationAlert(
+    dependencies.alerting,
+    reconciliationHealth,
+  );
   return { skipped: false as const, ...result.value };
 }
 
@@ -203,6 +287,10 @@ export function schedulePendingInvitationReconciliation(
     } catch (error) {
       recordReconciliationFailure();
       dependencies.onRunError?.(error);
+      await updateInvitationReconciliationAlert(
+        dependencies.alerting,
+        reconciliationHealth,
+      );
     } finally {
       running = false;
     }

@@ -3,7 +3,10 @@ import { assertRequiredDatabaseMigrations } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { seedDemoData } from "./lib/demo-data";
 import { seedRabTemplates } from "./lib/rab-template-data";
-import { schedulePendingInvitationReconciliation } from "./lib/invitation-reconciliation";
+import {
+  type InvitationReconciliationAlert,
+  schedulePendingInvitationReconciliation,
+} from "./lib/invitation-reconciliation";
 import { shouldSeedDemoData } from "./lib/demo-seeding";
 import { getClerkInvitationState } from "./routes/access";
 
@@ -19,6 +22,46 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+const alertWebhookUrl = process.env["INVITATION_RECONCILIATION_ALERT_WEBHOOK_URL"];
+const rawFailureThreshold =
+  process.env["INVITATION_RECONCILIATION_ALERT_FAILURE_THRESHOLD"] ?? "3";
+const alertFailureThreshold = Number(rawFailureThreshold);
+if (!Number.isInteger(alertFailureThreshold) || alertFailureThreshold <= 0) {
+  throw new Error(
+    "INVITATION_RECONCILIATION_ALERT_FAILURE_THRESHOLD must be a positive integer",
+  );
+}
+const rawAlertTimeoutMs =
+  process.env["INVITATION_RECONCILIATION_ALERT_TIMEOUT_MS"] ?? "5000";
+const alertTimeoutMs = Number(rawAlertTimeoutMs);
+if (!Number.isInteger(alertTimeoutMs) || alertTimeoutMs <= 0) {
+  throw new Error(
+    "INVITATION_RECONCILIATION_ALERT_TIMEOUT_MS must be a positive integer",
+  );
+}
+
+async function sendInvitationReconciliationAlert(
+  alert: InvitationReconciliationAlert,
+) {
+  if (!alertWebhookUrl) return;
+  const response = await fetch(alertWebhookUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    signal: AbortSignal.timeout(alertTimeoutMs),
+    body: JSON.stringify({
+      source: "invitation-reconciliation",
+      severity: alert.type === "DEGRADED" ? "error" : "info",
+      message: alert.type === "DEGRADED"
+        ? `Rekonsiliasi undangan gagal ${alert.consecutiveFailures} kali berturut-turut`
+        : "Rekonsiliasi undangan telah pulih",
+      ...alert,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Alert webhook returned HTTP ${response.status}`);
+  }
 }
 
 await assertRequiredDatabaseMigrations();
@@ -38,6 +81,16 @@ const server = app.listen(port, (err) => {
 
 const invitationReconciliation = schedulePendingInvitationReconciliation({
   getClerkInvitation: getClerkInvitationState,
+  alerting: alertWebhookUrl
+    ? {
+        failureThreshold: alertFailureThreshold,
+        notify: sendInvitationReconciliationAlert,
+        onNotificationError: (err, alert) => {
+          logger.error({ err, alertType: alert.type },
+            "Invitation reconciliation alert delivery failed; it will be retried");
+        },
+      }
+    : undefined,
   onError: (err, invitation) => {
     logger.warn({
       err,
