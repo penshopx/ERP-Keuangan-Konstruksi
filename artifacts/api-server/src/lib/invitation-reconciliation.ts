@@ -171,7 +171,8 @@ const scheduledActor: ReconciliationActor = {
 };
 
 const inactiveClerkStatuses = new Set(["revoked", "expired"]);
-const scheduledReconciliationLockName = "api-server:scheduled-invitation-reconciliation";
+export const scheduledReconciliationLockName =
+  "api-server:scheduled-invitation-reconciliation";
 
 export async function reconcileInvitationFromClerk(
   invitation: typeof staffInvitationsTable.$inferSelect,

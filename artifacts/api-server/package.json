@@ -14,6 +14,7 @@
     "test:access": "tsx --test src/middlewares/access-policy.test.ts",
     "test:persistence": "tsx --test src/routes/persistence.integration.test.ts",
     "test:persistence-lock": "tsx --test src/testing/database-suite-lock.integration.test.ts",
+    "test:reconciliation-crash": "tsx --test src/testing/invitation-reconciliation-crash.integration.test.ts",
     "test:fresh-database": "tsx --test src/fresh-database-startup.integration.test.ts"
   },
   "dependencies": {
