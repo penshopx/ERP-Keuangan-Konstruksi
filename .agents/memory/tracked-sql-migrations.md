@@ -7,4 +7,4 @@ Custom SQL migrations use a database history table, checksums, and a database ad
 
 **Why:** Drizzle schema push treats undeclared tables and check constraints as drift and may remove them. A recorded migration then remains marked as applied even though part of its protection is gone.
 
-**How to apply:** Use schema push only for initial schema setup, run tracked SQL migrations before every API startup, and verify mandatory migration history plus required database objects before opening the server port.
+**How to apply:** Use schema push only for initial schema setup, run tracked SQL migrations before every API startup, and verify mandatory migration history plus required database objects before opening the server port. Constraint migrations must tolerate the constraint already existing because schema push can create declared constraints before the tracked migration runs.

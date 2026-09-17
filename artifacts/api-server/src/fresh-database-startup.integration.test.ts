@@ -14,6 +14,7 @@ const requiredMigrations = [
   "0001_prevent_overlapping_tax_rule_periods.sql",
   "0002_preserve_multiple_bounded_tax_overrides.sql",
   "0003_add_operational_state.sql",
+  "0004_restrict_project_status.sql",
 ];
 const expectedTables = [
   "app_migrations",
@@ -268,8 +269,9 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
       `
       SELECT conname
       FROM pg_constraint
-      WHERE conrelid = 'tax_rule_versions'::regclass
+      WHERE conrelid IN ('projects'::regclass, 'tax_rule_versions'::regclass)
         AND conname IN (
+          'projects_status_supported',
           'tax_rule_versions_valid_period',
           'tax_rule_versions_no_overlapping_periods'
         )
@@ -281,6 +283,7 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
     .trim()
     .split("\n");
   assert.deepEqual(constraints, [
+    "projects_status_supported",
     "tax_rule_versions_no_overlapping_periods",
     "tax_rule_versions_valid_period",
   ]);
@@ -318,9 +321,9 @@ test("API exits before opening its port when mandatory migrations are missing", 
   );
   await runPsql(
     `
-    DROP TABLE operational_state;
+    ALTER TABLE projects DROP CONSTRAINT projects_status_supported;
     DELETE FROM app_migrations
-    WHERE name = '0003_add_operational_state.sql';
+    WHERE name = '0004_restrict_project_status.sql';
     `,
     databaseName,
   );

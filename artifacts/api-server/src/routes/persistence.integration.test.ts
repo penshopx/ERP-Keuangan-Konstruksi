@@ -45,6 +45,10 @@ const preserveMultipleBoundedTaxOverridesMigrationUrl = new URL(
   "../../../../lib/db/migrations/0002_preserve_multiple_bounded_tax_overrides.sql",
   import.meta.url,
 );
+const restrictProjectStatusMigrationUrl = new URL(
+  "../../../../lib/db/migrations/0004_restrict_project_status.sql",
+  import.meta.url,
+);
 let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
 const constructionQualifications = [
   { qualification: "KECIL", hasSbu: true, pphFinal: 2_100_000 },
@@ -195,6 +199,52 @@ after(async () => {
 
 test("API persistence and invoice atomicity survive regressions", async (t) => {
   let projectId = "";
+
+  await t.test("project status migration rejects unknown legacy values without rewriting them", async () => {
+    const client = await pool.connect();
+    const schemaName = `test_project_status_migration_${runId.replaceAll("-", "")}`;
+    const migrationSql = await readFile(restrictProjectStatusMigrationUrl, "utf8");
+    // @ts-expect-error The migration runner is intentionally plain JavaScript.
+    const { runMigrations } = await import("../../../../lib/db/scripts/migrate.mjs");
+    const migration = {
+      name: "0004_restrict_project_status.sql",
+      sql: migrationSql,
+      checksum: createHash("sha256").update(migrationSql).digest("hex"),
+    };
+    try {
+      await client.query(`CREATE SCHEMA ${schemaName}`);
+      await client.query(`SET search_path TO ${schemaName}, public`);
+      await client.query("CREATE TABLE projects (id text PRIMARY KEY, status text NOT NULL)");
+      await client.query(
+        "INSERT INTO projects (id, status) VALUES ('legacy-project', 'ACTIVE')",
+      );
+
+      await assert.rejects(
+        runMigrations(client, [migration]),
+        /unsupported existing values: 'ACTIVE'/,
+      );
+
+      const legacyProject = await client.query<{ status: string }>(
+        "SELECT status FROM projects WHERE id = 'legacy-project'",
+      );
+      assert.equal(legacyProject.rows[0]?.status, "ACTIVE");
+
+      await client.query(
+        "UPDATE projects SET status = 'PERSIAPAN' WHERE id = 'legacy-project'",
+      );
+      await runMigrations(client, [migration]);
+      await assert.rejects(
+        client.query(
+          "UPDATE projects SET status = 'ACTIVE' WHERE id = 'legacy-project'",
+        ),
+        /projects_status_supported/,
+      );
+    } finally {
+      await client.query("RESET search_path");
+      await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
+      client.release();
+    }
+  });
 
   await t.test("legacy bounded override migration preserves rates and is idempotent", async () => {
     const client = await pool.connect();
@@ -473,6 +523,22 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       const [unchangedProject] = await db.select().from(projectsTable)
         .where(eq(projectsTable.id, projectId));
       assert.equal(unchangedProject?.status, "BERJALAN");
+
+      await assert.rejects(
+        pool.query(
+          "UPDATE projects SET status = $1 WHERE id = $2",
+          ["STATUS_TIDAK_DIDUKUNG", projectId],
+        ),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /projects_status_supported/);
+          return true;
+        },
+      );
+
+      const [projectAfterRejectedDirectWrite] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, projectId));
+      assert.equal(projectAfterRejectedDirectWrite?.status, "BERJALAN");
     } finally {
       await firstServer.close();
     }

@@ -48,6 +48,7 @@ export async function tryWithDatabaseAdvisoryLock<T>(
 const REQUIRED_MIGRATIONS = [
   "0001_prevent_overlapping_tax_rule_periods.sql",
   "0003_add_operational_state.sql",
+  "0004_restrict_project_status.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -66,6 +67,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
   const result = await pool.query<{
     valid_period_constraint: boolean;
     overlap_constraint: boolean;
+    project_status_constraint: boolean;
     operational_state_shape: boolean;
   }>(`
     SELECT
@@ -79,6 +81,11 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
         WHERE conname = 'tax_rule_versions_no_overlapping_periods'
           AND conrelid = to_regclass('tax_rule_versions')
       ) AS overlap_constraint,
+      EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'projects_status_supported'
+          AND conrelid = to_regclass('projects')
+      ) AS project_status_constraint,
       (
         SELECT count(*) = 3
         FROM information_schema.columns
@@ -101,6 +108,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     !status ||
     !status.valid_period_constraint ||
     !status.overlap_constraint ||
+    !status.project_status_constraint ||
     !status.operational_state_shape
   ) {
     throw new Error(
