@@ -15,7 +15,10 @@ const latestRab = {
   committed: 0,
   actual: 0,
   remaining: 2_000_000,
-  items: [],
+  items: [
+    { id: "new-1", code: "A.1", name: "Pekerjaan lama", category: "Struktur", parentCode: null, level: 0, unit: "m2", quantity: 12, unitPrice: 125_000, materialCost: 0, laborCost: 0, equipmentCost: 0, budget: 1_500_000, committed: 0, actual: 0, variance: 1_500_000, utilization: 0 },
+    { id: "new-2", code: "C.1", name: "Item baru", category: "Arsitektur", parentCode: null, level: 0, unit: "ls", quantity: 1, unitPrice: 500_000, materialCost: 0, laborCost: 0, equipmentCost: 0, budget: 500_000, committed: 0, actual: 0, variance: 500_000, utilization: 0 },
+  ],
 }
 
 const historicalRab = {
@@ -23,6 +26,10 @@ const historicalRab = {
   version: 1,
   totalBudget: 1_000_000,
   remaining: 1_000_000,
+  items: [
+    { id: "old-1", code: "A.1", name: "Pekerjaan lama", category: "Struktur", parentCode: null, level: 0, unit: "m2", quantity: 10, unitPrice: 100_000, materialCost: 0, laborCost: 0, equipmentCost: 0, budget: 1_000_000, committed: 0, actual: 0, variance: 1_000_000, utilization: 0 },
+    { id: "old-2", code: "B.1", name: "Item dihapus", category: "Struktur", parentCode: null, level: 0, unit: "ls", quantity: 1, unitPrice: 100_000, materialCost: 0, laborCost: 0, equipmentCost: 0, budget: 100_000, committed: 0, actual: 0, variance: 100_000, utilization: 0 },
+  ],
 }
 
 vi.mock("wouter", () => ({
@@ -69,9 +76,10 @@ vi.mock("@workspace/api-client-react", async (importOriginal) => {
       isLoading: false,
       isError: false,
     }),
-    useGetProjectRabVersion: () => ({ data: historicalRab, isLoading: false, isError: false }),
+    useGetProjectRabVersion: (_projectId: string, version: number) => ({ data: version === 1 ? historicalRab : latestRab, isLoading: false, isError: false }),
   }
 })
+
 
 beforeAll(() => {
   HTMLElement.prototype.hasPointerCapture = () => false
@@ -104,5 +112,20 @@ describe("riwayat versi RAB", () => {
     expect(screen.queryByTestId("alert-rab-historical")).toBeNull()
     expect(screen.getByTestId("text-rab-total-budget").textContent).toContain("2.000.000")
     expect(screen.getByTestId("button-import-rab")).toBeTruthy()
+  })
+
+  test("membandingkan item berubah, baru, dihapus, dan total dua versi", async () => {
+    const user = userEvent.setup()
+    render(createElement(ProjectRab))
+
+    await user.click(screen.getByTestId("button-compare-rab-versions"))
+
+    expect(screen.getByText("Perbandingan Versi RAB")).toBeTruthy()
+    expect(screen.getByTestId("text-rab-comparison-total-delta").textContent).toContain("+Rp")
+    expect(screen.getByTestId("row-rab-comparison-A.1").textContent).toContain("BERUBAH")
+    expect(screen.getByTestId("row-rab-comparison-A.1").textContent).toContain("10")
+    expect(screen.getByTestId("row-rab-comparison-A.1").textContent).toContain("12")
+    expect(screen.getByTestId("row-rab-comparison-B.1").textContent).toContain("DIHAPUS")
+    expect(screen.getByTestId("row-rab-comparison-C.1").textContent).toContain("BARU")
   })
 })

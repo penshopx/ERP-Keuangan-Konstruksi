@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, AlertTriangle, History } from "lucide-react"
+import { ArrowLeft, AlertTriangle, GitCompareArrows, History } from "lucide-react"
 import { formatRupiah, formatPercent } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -23,6 +23,7 @@ export default function ProjectRab() {
   const { id } = useParams()
   const projectId = id || ""
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
+  const [comparisonVersions, setComparisonVersions] = useState<{ from: number; to: number } | null>(null)
   const latestQuery = useGetProjectRab(projectId)
   const versionsQuery = useListProjectRabVersions(projectId, {
     query: {
@@ -34,6 +35,18 @@ export default function ProjectRab() {
     query: {
       enabled: Boolean(projectId) && selectedVersion !== null,
       queryKey: getGetProjectRabVersionQueryKey(projectId, selectedVersion ?? 1),
+    },
+  })
+  const comparisonFromQuery = useGetProjectRabVersion(projectId, comparisonVersions?.from ?? 1, {
+    query: {
+      enabled: Boolean(projectId) && comparisonVersions !== null,
+      queryKey: getGetProjectRabVersionQueryKey(projectId, comparisonVersions?.from ?? 1),
+    },
+  })
+  const comparisonToQuery = useGetProjectRabVersion(projectId, comparisonVersions?.to ?? 1, {
+    query: {
+      enabled: Boolean(projectId) && comparisonVersions !== null,
+      queryKey: getGetProjectRabVersionQueryKey(projectId, comparisonVersions?.to ?? 1),
     },
   })
   const isHistorical = selectedVersion !== null
@@ -50,6 +63,112 @@ export default function ProjectRab() {
   }
   if (isError || !rab) {
     return <div className="flex h-[50vh] items-center justify-center text-destructive">RAB proyek tidak dapat dimuat.</div>
+  }
+
+  const versions = versionsQuery.data ?? []
+  const canCompare = versions.length >= 2
+  const comparisonFrom = comparisonFromQuery.data
+  const comparisonTo = comparisonToQuery.data
+  const comparisonItems = comparisonFrom && comparisonTo
+    ? (() => {
+        const fromByCode = new Map(comparisonFrom.items.map((item) => [item.code, item]))
+        const toByCode = new Map(comparisonTo.items.map((item) => [item.code, item]))
+        return Array.from(new Set([...fromByCode.keys(), ...toByCode.keys()])).sort().map((code) => {
+        const from = fromByCode.get(code)
+        const to = toByCode.get(code)
+        const status = !from ? "ADDED" : !to ? "REMOVED" : (
+          from.quantity !== to.quantity ||
+          from.unitPrice !== to.unitPrice ||
+          from.budget !== to.budget ||
+          from.name !== to.name
+        ) ? "CHANGED" : "UNCHANGED"
+        return { code, from, to, status }
+      }).filter((item) => item.status !== "UNCHANGED")
+      })()
+    : []
+
+  if (comparisonVersions) {
+    const comparisonLoading = comparisonFromQuery.isLoading || comparisonToQuery.isLoading
+    const comparisonError = comparisonFromQuery.isError || comparisonToQuery.isError
+    return (
+      <div className="flex flex-col gap-6 animate-in fade-in duration-500">
+        <div className="flex flex-wrap items-center gap-4">
+          <Button type="button" variant="outline" size="icon" onClick={() => setComparisonVersions(null)} data-testid="button-close-rab-comparison">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">Perbandingan Versi RAB</h1>
+              <Badge variant="outline">v{comparisonVersions.from}.0 → v{comparisonVersions.to}.0</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">Perubahan biaya dan item antar-baseline proyek.</p>
+          </div>
+          <div className="ml-auto flex flex-wrap items-end gap-3">
+            <VersionSelect
+              label="Versi awal"
+              value={comparisonVersions.from}
+              versions={versions}
+              testId="select-rab-comparison-from"
+              onChange={(from) => setComparisonVersions((current) => current ? { ...current, from } : null)}
+            />
+            <VersionSelect
+              label="Versi pembanding"
+              value={comparisonVersions.to}
+              versions={versions}
+              testId="select-rab-comparison-to"
+              onChange={(to) => setComparisonVersions((current) => current ? { ...current, to } : null)}
+            />
+          </div>
+        </div>
+
+        {comparisonVersions.from === comparisonVersions.to && (
+          <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Pilih dua versi berbeda</AlertTitle></Alert>
+        )}
+        {comparisonLoading && <div className="py-16 text-center text-muted-foreground">Memuat perbandingan RAB…</div>}
+        {comparisonError && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Perbandingan RAB tidak dapat dimuat</AlertTitle></Alert>}
+        {!comparisonLoading && !comparisonError && comparisonFrom && comparisonTo && (
+          <>
+            <div className="grid gap-4 md:grid-cols-3">
+              <ComparisonTotal label={`Total v${comparisonFrom.version}.0`} value={comparisonFrom.totalBudget} />
+              <ComparisonTotal label={`Total v${comparisonTo.version}.0`} value={comparisonTo.totalBudget} />
+              <ComparisonTotal label="Perubahan total" value={comparisonTo.totalBudget - comparisonFrom.totalBudget} signed />
+            </div>
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Item RAB</TableHead>
+                    <TableHead className="text-right">Kuantitas</TableHead>
+                    <TableHead className="text-right">Harga satuan</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {comparisonItems.map(({ code, from, to, status }) => (
+                    <TableRow key={code} data-testid={`row-rab-comparison-${code}`}>
+                      <TableCell><Badge variant={status === "ADDED" ? "success" : status === "REMOVED" ? "destructive" : "secondary"}>
+                        {status === "ADDED" ? "BARU" : status === "REMOVED" ? "DIHAPUS" : "BERUBAH"}
+                      </Badge></TableCell>
+                      <TableCell>
+                        <div className="font-mono text-xs text-muted-foreground">{code}</div>
+                        <div className="font-medium">{to?.name ?? from?.name}</div>
+                      </TableCell>
+                      <ComparisonValue from={from?.quantity} to={to?.quantity} suffix={` ${to?.unit ?? from?.unit ?? ""}`} />
+                      <ComparisonValue from={from?.unitPrice} to={to?.unitPrice} currency />
+                      <ComparisonValue from={from?.budget} to={to?.budget} currency />
+                    </TableRow>
+                  ))}
+                  {comparisonItems.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">Tidak ada perubahan item pada dua versi ini.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -69,6 +188,16 @@ export default function ProjectRab() {
           <p className="text-muted-foreground text-sm">Baseline pengendalian biaya dan struktur WBS proyek.</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!canCompare}
+            onClick={() => setComparisonVersions({ from: versions[1].version, to: versions[0].version })}
+            data-testid="button-compare-rab-versions"
+          >
+            <GitCompareArrows className="mr-2 h-4 w-4" />
+            Bandingkan versi
+          </Button>
           <Select
             value={selectedVersion === null ? "latest" : String(selectedVersion)}
             onValueChange={(value) => setSelectedVersion(value === "latest" ? null : Number(value))}
@@ -209,5 +338,55 @@ export default function ProjectRab() {
         </Table>
       </Card>
     </div>
+  )
+}
+
+function VersionSelect({ label, value, versions, testId, onChange }: {
+  label: string
+  value: number
+  versions: Array<{ version: number; status: string }>
+  testId: string
+  onChange: (version: number) => void
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
+        <SelectTrigger className="w-[180px]" data-testid={testId}><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {versions.map((version) => <SelectItem key={version.version} value={String(version.version)}>v{version.version}.0 · {version.status}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+function ComparisonTotal({ label, value, signed = false }: { label: string; value: number; signed?: boolean }) {
+  const tone = signed ? value > 0 ? "text-amber-600 dark:text-amber-400" : value < 0 ? "text-emerald-600 dark:text-emerald-400" : "" : ""
+  return (
+    <Card className="bg-muted/30"><CardContent className="p-6">
+      <div className="mb-2 text-sm font-medium text-muted-foreground">{label}</div>
+      <div className={`text-2xl font-bold ${tone}`} data-testid={signed ? "text-rab-comparison-total-delta" : undefined}>
+        {signed && value > 0 ? "+" : ""}{formatRupiah(value)}
+      </div>
+    </CardContent></Card>
+  )
+}
+
+function ComparisonValue({ from, to, currency = false, suffix = "" }: {
+  from?: number
+  to?: number
+  currency?: boolean
+  suffix?: string
+}) {
+  const format = (value: number) => currency ? formatRupiah(value) : `${value.toLocaleString("id-ID")}${suffix}`
+  const delta = (to ?? 0) - (from ?? 0)
+  return (
+    <TableCell className="text-right">
+      <div>{from === undefined ? "—" : format(from)} → {to === undefined ? "—" : format(to)}</div>
+      <div className={`text-xs font-medium ${delta > 0 ? "text-amber-600 dark:text-amber-400" : delta < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+        {delta > 0 ? "+" : ""}{format(delta)}
+      </div>
+    </TableCell>
   )
 }
