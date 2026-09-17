@@ -29,6 +29,7 @@ export * from './dashboardSummary';
 export * from './getTaxSummaryParams';
 export * from './healthStatus';
 export * from './healthStatusInvitationReconciliation';
+export * from './healthStatusInvitationReconciliationLastRun';
 export * from './healthStatusInvitationReconciliationStatus';
 export * from './healthStatusStatus';
 export * from './invoice';

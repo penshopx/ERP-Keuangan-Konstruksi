@@ -6,6 +6,14 @@ import {
   updateInvitationReconciliationAlert,
 } from "./invitation-reconciliation";
 
+const completedRun: InvitationReconciliationHealth["lastRun"] = {
+  outcome: "COMPLETED",
+  occurredAt: new Date().toISOString(),
+  checked: 0,
+  updated: 0,
+  failed: 0,
+};
+
 test("alerts once after the failure threshold and once after recovery", async () => {
   const alerts: InvitationReconciliationAlert[] = [];
   const alerting = {
@@ -22,6 +30,7 @@ test("alerts once after the failure threshold and once after recovery", async ()
     consecutiveFailures,
     lastFailureAt: status === "DEGRADED" ? new Date().toISOString() : null,
     lastSuccessAt: status === "HEALTHY" ? new Date().toISOString() : null,
+    lastRun: completedRun,
   });
 
   await updateInvitationReconciliationAlert(alerting, health("DEGRADED", 1));
@@ -54,6 +63,7 @@ test("retries a failed alert delivery instead of silently suppressing it", async
     consecutiveFailures: 1,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
+    lastRun: completedRun,
   };
 
   await updateInvitationReconciliationAlert(alerting, degraded);
@@ -80,12 +90,14 @@ test("delivers a pending degradation before recovery when service recovers", asy
     consecutiveFailures: 1,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
+    lastRun: completedRun,
   });
   await updateInvitationReconciliationAlert(alerting, {
     status: "HEALTHY",
     consecutiveFailures: 0,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: new Date().toISOString(),
+    lastRun: completedRun,
   });
 
   assert.deepEqual(delivered, ["DEGRADED", "RECOVERED"]);

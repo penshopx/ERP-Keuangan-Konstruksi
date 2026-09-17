@@ -1022,12 +1022,23 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     });
 
     await lookupStarted;
+    const healthBeforeSkip = getInvitationReconciliationHealth();
+    const competingEvents: string[] = [];
     const competingRun = await runScheduledInvitationReconciliation({
       getClerkInvitation: async () => {
         throw new Error("Competing reconciliation must not call Clerk");
       },
+      onRunEvent: ({ outcome }) => competingEvents.push(outcome),
     });
     assert.deepEqual(competingRun, { skipped: true });
+    assert.deepEqual(competingEvents, ["RUNNING", "SKIPPED"]);
+    const healthAfterSkip = getInvitationReconciliationHealth();
+    assert.equal(healthAfterSkip.lastRun.outcome, "SKIPPED");
+    assert.equal(healthAfterSkip.status, healthBeforeSkip.status);
+    assert.equal(
+      healthAfterSkip.consecutiveFailures,
+      healthBeforeSkip.consecutiveFailures,
+    );
 
     releaseFirstLookup();
     const completedFirstRun = await firstRun;

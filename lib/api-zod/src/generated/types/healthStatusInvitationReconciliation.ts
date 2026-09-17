@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { HealthStatusInvitationReconciliationLastRun } from './healthStatusInvitationReconciliationLastRun';
 import type { HealthStatusInvitationReconciliationStatus } from './healthStatusInvitationReconciliationStatus';
 
 export type HealthStatusInvitationReconciliation = {
@@ -15,4 +16,5 @@ export type HealthStatusInvitationReconciliation = {
   lastFailureAt: Date | null;
   /** @nullable */
   lastSuccessAt: Date | null;
+  lastRun: HealthStatusInvitationReconciliationLastRun;
 };

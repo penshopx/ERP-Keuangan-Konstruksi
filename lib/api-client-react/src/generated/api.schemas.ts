@@ -21,6 +21,28 @@ export const HealthStatusInvitationReconciliationStatus = {
   DEGRADED: 'DEGRADED',
 } as const;
 
+export type HealthStatusInvitationReconciliationLastRun = {
+  outcome: 'NEVER_RUN';
+  /** @nullable */
+  occurredAt: null;
+} | {
+  outcome: 'RUNNING' | 'FAILED';
+  occurredAt: string;
+} | {
+  outcome: 'SKIPPED';
+  occurredAt: string;
+  reason: 'COORDINATION_LOCK_UNAVAILABLE';
+} | {
+  outcome: 'COMPLETED';
+  occurredAt: string;
+  /** @minimum 0 */
+  checked: number;
+  /** @minimum 0 */
+  updated: number;
+  /** @minimum 0 */
+  failed: number;
+};
+
 export type HealthStatusInvitationReconciliation = {
   status: HealthStatusInvitationReconciliationStatus;
   /** @minimum 0 */
@@ -29,6 +51,7 @@ export type HealthStatusInvitationReconciliation = {
   lastFailureAt: string | null;
   /** @nullable */
   lastSuccessAt: string | null;
+  lastRun: HealthStatusInvitationReconciliationLastRun;
 };
 
 export interface HealthStatus {

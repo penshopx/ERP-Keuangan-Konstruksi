@@ -29,6 +29,7 @@ export type ScheduledInvitationReconciliationDependencies = {
     invitation: typeof staffInvitationsTable.$inferSelect,
   ) => void;
   onRunError?: (error: unknown) => void;
+  onRunEvent?: (event: InvitationReconciliationRunEvent) => void;
   alerting?: InvitationReconciliationAlerting;
 };
 
@@ -42,7 +43,34 @@ export type InvitationReconciliationHealth = {
   consecutiveFailures: number;
   lastFailureAt: string | null;
   lastSuccessAt: string | null;
+  lastRun: InvitationReconciliationRunEvent;
 };
+
+export type InvitationReconciliationRunEvent =
+  | {
+      outcome: "NEVER_RUN";
+      occurredAt: null;
+    }
+  | {
+      outcome: "RUNNING";
+      occurredAt: string;
+    }
+  | {
+      outcome: "SKIPPED";
+      occurredAt: string;
+      reason: "COORDINATION_LOCK_UNAVAILABLE";
+    }
+  | {
+      outcome: "COMPLETED";
+      occurredAt: string;
+      checked: number;
+      updated: number;
+      failed: number;
+    }
+  | {
+      outcome: "FAILED";
+      occurredAt: string;
+    };
 
 export type InvitationReconciliationAlert = {
   type: "DEGRADED" | "RECOVERED";
@@ -66,6 +94,10 @@ let reconciliationHealth: InvitationReconciliationHealth = {
   consecutiveFailures: 0,
   lastFailureAt: null,
   lastSuccessAt: null,
+  lastRun: {
+    outcome: "NEVER_RUN",
+    occurredAt: null,
+  },
 };
 
 let lastSuccessfulClerkVerificationAt: string | null = null;
@@ -261,11 +293,34 @@ export async function reconcilePendingInvitations(
 export async function runScheduledInvitationReconciliation(
   dependencies: ScheduledInvitationReconciliationDependencies,
 ) {
+  const runningEvent: InvitationReconciliationRunEvent = {
+    outcome: "RUNNING",
+    occurredAt: new Date().toISOString(),
+  };
+  reconciliationHealth = { ...reconciliationHealth, lastRun: runningEvent };
+  dependencies.onRunEvent?.(runningEvent);
+
   const result = await tryWithDatabaseAdvisoryLock(
     scheduledReconciliationLockName,
     () => reconcilePendingInvitations(dependencies),
   );
-  if (!result.acquired) return { skipped: true as const };
+  if (!result.acquired) {
+    const skippedEvent: InvitationReconciliationRunEvent = {
+      outcome: "SKIPPED",
+      occurredAt: new Date().toISOString(),
+      reason: "COORDINATION_LOCK_UNAVAILABLE",
+    };
+    reconciliationHealth = { ...reconciliationHealth, lastRun: skippedEvent };
+    dependencies.onRunEvent?.(skippedEvent);
+    return { skipped: true as const };
+  }
+  const completedEvent: InvitationReconciliationRunEvent = {
+    outcome: "COMPLETED",
+    occurredAt: new Date().toISOString(),
+    ...result.value,
+  };
+  reconciliationHealth = { ...reconciliationHealth, lastRun: completedEvent };
+  dependencies.onRunEvent?.(completedEvent);
   await updateInvitationReconciliationAlert(
     dependencies.alerting,
     reconciliationHealth,
@@ -287,6 +342,12 @@ export function schedulePendingInvitationReconciliation(
       await runScheduledInvitationReconciliation(dependencies);
     } catch (error) {
       recordReconciliationFailure();
+      const failedEvent: InvitationReconciliationRunEvent = {
+        outcome: "FAILED",
+        occurredAt: new Date().toISOString(),
+      };
+      reconciliationHealth = { ...reconciliationHealth, lastRun: failedEvent };
+      dependencies.onRunEvent?.(failedEvent);
       dependencies.onRunError?.(error);
       await updateInvitationReconciliationAlert(
         dependencies.alerting,

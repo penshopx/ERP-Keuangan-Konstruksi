@@ -101,6 +101,12 @@ const invitationReconciliation = schedulePendingInvitationReconciliation({
   onRunError: (err) => {
     logger.warn({ err }, "Scheduled invitation reconciliation pass failed; it will be retried");
   },
+  onRunEvent: (event) => {
+    logger.info({
+      event: "invitation_reconciliation_run",
+      ...event,
+    }, `Scheduled invitation reconciliation ${event.outcome.toLowerCase()}`);
+  },
 });
 
 server.on("close", () => invitationReconciliation.stop());

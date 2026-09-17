@@ -480,11 +480,61 @@ components:
             lastSuccessAt:
               type: [string, "null"]
               format: date-time
+            lastRun:
+              oneOf:
+                - type: object
+                  properties:
+                    outcome:
+                      type: string
+                      enum: [NEVER_RUN]
+                    occurredAt:
+                      type: "null"
+                  required: [outcome, occurredAt]
+                - type: object
+                  properties:
+                    outcome:
+                      type: string
+                      enum: [RUNNING, FAILED]
+                    occurredAt:
+                      type: string
+                      format: date-time
+                  required: [outcome, occurredAt]
+                - type: object
+                  properties:
+                    outcome:
+                      type: string
+                      enum: [SKIPPED]
+                    occurredAt:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      enum: [COORDINATION_LOCK_UNAVAILABLE]
+                  required: [outcome, occurredAt, reason]
+                - type: object
+                  properties:
+                    outcome:
+                      type: string
+                      enum: [COMPLETED]
+                    occurredAt:
+                      type: string
+                      format: date-time
+                    checked:
+                      type: integer
+                      minimum: 0
+                    updated:
+                      type: integer
+                      minimum: 0
+                    failed:
+                      type: integer
+                      minimum: 0
+                  required: [outcome, occurredAt, checked, updated, failed]
           required:
             - status
             - consecutiveFailures
             - lastFailureAt
             - lastSuccessAt
+            - lastRun
       required:
         - status
         - invitationReconciliation

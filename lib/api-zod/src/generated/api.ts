@@ -14,6 +14,12 @@ import * as zod from 'zod';
  */
 export const healthCheckResponseInvitationReconciliationConsecutiveFailuresMin = 0;
 
+export const healthCheckResponseInvitationReconciliationLastRunFourCheckedMin = 0;
+
+export const healthCheckResponseInvitationReconciliationLastRunFourUpdatedMin = 0;
+
+export const healthCheckResponseInvitationReconciliationLastRunFourFailedMin = 0;
+
 
 
 export const HealthCheckResponse = zod.object({
@@ -22,7 +28,24 @@ export const HealthCheckResponse = zod.object({
   "status": zod.enum(['HEALTHY', 'DEGRADED']),
   "consecutiveFailures": zod.number().int().min(healthCheckResponseInvitationReconciliationConsecutiveFailuresMin),
   "lastFailureAt": zod.coerce.date().nullable(),
-  "lastSuccessAt": zod.coerce.date().nullable()
+  "lastSuccessAt": zod.coerce.date().nullable(),
+  "lastRun": zod.union([zod.object({
+  "outcome": zod.enum(['NEVER_RUN']),
+  "occurredAt": zod.null()
+}),zod.object({
+  "outcome": zod.enum(['RUNNING', 'FAILED']),
+  "occurredAt": zod.coerce.date()
+}),zod.object({
+  "outcome": zod.enum(['SKIPPED']),
+  "occurredAt": zod.coerce.date(),
+  "reason": zod.enum(['COORDINATION_LOCK_UNAVAILABLE'])
+}),zod.object({
+  "outcome": zod.enum(['COMPLETED']),
+  "occurredAt": zod.coerce.date(),
+  "checked": zod.number().int().min(healthCheckResponseInvitationReconciliationLastRunFourCheckedMin),
+  "updated": zod.number().int().min(healthCheckResponseInvitationReconciliationLastRunFourUpdatedMin),
+  "failed": zod.number().int().min(healthCheckResponseInvitationReconciliationLastRunFourFailedMin)
+})])
 })
 })
 
