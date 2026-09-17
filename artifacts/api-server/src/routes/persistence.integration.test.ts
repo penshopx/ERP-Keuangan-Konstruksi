@@ -246,7 +246,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     }
   });
 
-  await t.test("legacy bounded override migration preserves rates and is idempotent", async () => {
+  await t.test("legacy migration preserves rates across a longer mixed sequence of bounded overrides", async () => {
     const client = await pool.connect();
     const schemaName = `test_tax_migration_${runId.replaceAll("-", "")}`;
     const migrationSql = await readFile(preventOverlappingTaxRulesMigrationUrl, "utf8");
@@ -315,9 +315,15 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
             false, true, 2750, 1100, 300, 0
           ),
           (
+            'temporary-override-2025', 'TEMPORARY-OVERRIDE-2025',
+            '2025-01-01', '2025-06-30',
+            'Third temporary exception, separated by a real gap', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
+            false, true, 2750, 1100, 350, 0
+          ),
+          (
             'temporary-override-2026', 'TEMPORARY-OVERRIDE-2026',
             '2026-01-01', '2026-12-31',
-            'Second temporary exception', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
+            'Fourth temporary exception, separated by another real gap', 'KONSTRUKSI', 'TANPA_KUALIFIKASI', false, true,
             false, true, 2750, 1100, 250, 0
           )
       `);
@@ -357,6 +363,18 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         {
           id: "legacy-open-continuation-2024-07-01",
           effective_from: "2024-07-01",
+          effective_to: "2024-12-31",
+          pph_final_rate_basis_points: 400,
+        },
+        {
+          id: "temporary-override-2025",
+          effective_from: "2025-01-01",
+          effective_to: "2025-06-30",
+          pph_final_rate_basis_points: 350,
+        },
+        {
+          id: "legacy-open-continuation-2025-07-01",
+          effective_from: "2025-07-01",
           effective_to: "2025-12-31",
           pph_final_rate_basis_points: 400,
         },
@@ -383,10 +401,20 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
         FROM (
           VALUES
             (DATE '2023-12-31'),
+            (DATE '2024-01-01'),
             (DATE '2024-02-15'),
+            (DATE '2024-03-31'),
             (DATE '2024-04-01'),
+            (DATE '2024-06-30'),
+            (DATE '2024-07-01'),
+            (DATE '2024-12-31'),
+            (DATE '2025-01-01'),
             (DATE '2025-06-30'),
+            (DATE '2025-07-01'),
+            (DATE '2025-12-31'),
+            (DATE '2026-01-01'),
             (DATE '2026-06-30'),
+            (DATE '2026-12-31'),
             (DATE '2027-01-01')
         ) AS dates(issued_at)
         CROSS JOIN LATERAL (
@@ -408,7 +436,17 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       assert.deepEqual(selectedRates.rows, [
         { issued_at: "2023-12-31", id: "legacy-open", pph_final_rate_basis_points: 400 },
         {
+          issued_at: "2024-01-01",
+          id: "temporary-override-2024",
+          pph_final_rate_basis_points: 250,
+        },
+        {
           issued_at: "2024-02-15",
+          id: "temporary-override-2024",
+          pph_final_rate_basis_points: 250,
+        },
+        {
+          issued_at: "2024-03-31",
           id: "temporary-override-2024",
           pph_final_rate_basis_points: 250,
         },
@@ -418,12 +456,52 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           pph_final_rate_basis_points: 300,
         },
         {
-          issued_at: "2025-06-30",
+          issued_at: "2024-06-30",
+          id: "adjacent-override-2024",
+          pph_final_rate_basis_points: 300,
+        },
+        {
+          issued_at: "2024-07-01",
           id: "legacy-open-continuation-2024-07-01",
           pph_final_rate_basis_points: 400,
         },
         {
+          issued_at: "2024-12-31",
+          id: "legacy-open-continuation-2024-07-01",
+          pph_final_rate_basis_points: 400,
+        },
+        {
+          issued_at: "2025-01-01",
+          id: "temporary-override-2025",
+          pph_final_rate_basis_points: 350,
+        },
+        {
+          issued_at: "2025-06-30",
+          id: "temporary-override-2025",
+          pph_final_rate_basis_points: 350,
+        },
+        {
+          issued_at: "2025-07-01",
+          id: "legacy-open-continuation-2025-07-01",
+          pph_final_rate_basis_points: 400,
+        },
+        {
+          issued_at: "2025-12-31",
+          id: "legacy-open-continuation-2025-07-01",
+          pph_final_rate_basis_points: 400,
+        },
+        {
+          issued_at: "2026-01-01",
+          id: "temporary-override-2026",
+          pph_final_rate_basis_points: 250,
+        },
+        {
           issued_at: "2026-06-30",
+          id: "temporary-override-2026",
+          pph_final_rate_basis_points: 250,
+        },
+        {
+          issued_at: "2026-12-31",
           id: "temporary-override-2026",
           pph_final_rate_basis_points: 250,
         },
@@ -438,7 +516,7 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
       const rerun = await client.query<{ count: number }>(
         "SELECT count(*)::int AS count FROM tax_rule_versions",
       );
-      assert.equal(rerun.rows[0]?.count, 6);
+      assert.equal(rerun.rows[0]?.count, 8);
       const appliedMigrations = await client.query<{ name: string }>(
         "SELECT name FROM app_migrations ORDER BY name",
       );
