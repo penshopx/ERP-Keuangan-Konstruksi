@@ -36,7 +36,7 @@ export type ProjectPersistenceHooks = {
   beforeAuditInsert?: (projectId: string) => Promise<void>;
   beforeUpdateAuditInsert?: (projectId: string) => Promise<void>;
   beforeRabImportVersionLock?: (projectId: string, baselineId: string) => Promise<void>;
-  beforeRabImportAuditInsert?: (projectId: string, baselineId: string) => Promise<void>;
+  beforeRabImportAuditInsert?: (projectId: string, baselineId: string, version: number) => Promise<void>;
 };
 
 export function createProjectsRouter(hooks: ProjectPersistenceHooks = {}): IRouter {
@@ -346,7 +346,7 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
     await tx.insert(rabBaselinesTable).values({ id: baselineId, projectId: project.id, version: lockedVersion, status: "DRAF" });
     await tx.insert(rabItemsTable).values(importedItems);
     await tx.update(projectsTable).set({ budget: totalBudget, wbsCount: importedItems.length }).where(eq(projectsTable.id, project.id));
-    await hooks.beforeRabImportAuditInsert?.(project.id, baselineId);
+    await hooks.beforeRabImportAuditInsert?.(project.id, baselineId, lockedVersion);
     await tx.insert(auditLogsTable).values({
       id: randomUUID(),
       action: "DIIMPOR",
