@@ -1,13 +1,9 @@
-export const PROJECT_STATUS = {
-  PREPARATION: "PERSIAPAN",
-  ACTIVE: "BERJALAN",
-  COMPLETED: "SELESAI",
-} as const;
+import { ProjectStatus } from "@workspace/api-client-react";
 
-export function getProjectStatusBadgeVariant(status: string): "default" | "secondary" {
-  return status === PROJECT_STATUS.ACTIVE ? "default" : "secondary";
+export function getProjectStatusBadgeVariant(status: ProjectStatus): "default" | "secondary" {
+  return status === ProjectStatus.BERJALAN ? "default" : "secondary";
 }
 
-export function isProjectCompleted(status: string): boolean {
-  return status === PROJECT_STATUS.COMPLETED;
+export function isProjectCompleted(status: ProjectStatus): boolean {
+  return status === ProjectStatus.SELESAI;
 }

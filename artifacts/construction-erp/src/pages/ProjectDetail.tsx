@@ -1,4 +1,4 @@
-import { useGetProject, useUpdateProject, getGetProjectQueryKey } from "@workspace/api-client-react"
+import { useGetProject, useUpdateProject, getGetProjectQueryKey, ProjectStatus } from "@workspace/api-client-react"
 import { useParams, Link } from "wouter"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +8,7 @@ import { formatRupiah, formatPercent, formatDate } from "@/lib/utils"
 import { Building2, Calendar, FileText, ArrowLeft, TrendingUp, AlertTriangle } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { getProjectStatusBadgeVariant, isProjectCompleted, PROJECT_STATUS } from "@/lib/project-status"
+import { getProjectStatusBadgeVariant, isProjectCompleted } from "@/lib/project-status"
 
 export default function ProjectDetail() {
   const { id } = useParams()
@@ -27,7 +27,7 @@ export default function ProjectDetail() {
   const handleComplete = () => {
     updateProject.mutate({
       projectId: project.id,
-      data: { status: PROJECT_STATUS.COMPLETED, progress: 100 }
+      data: { status: ProjectStatus.SELESAI, progress: 100 }
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(project.id) })
