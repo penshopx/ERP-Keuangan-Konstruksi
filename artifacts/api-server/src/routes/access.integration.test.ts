@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
-import { after, test } from "node:test";
+import { after, before, test } from "node:test";
 import express, { type RequestHandler } from "express";
-import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -16,6 +16,7 @@ import {
   staffInvitationProjectsTable,
   staffInvitationsTable,
   taxCalculationSnapshotsTable,
+  taxRuleVersionsTable,
   userRolesTable,
 } from "@workspace/db";
 import {
@@ -31,16 +32,25 @@ import {
   reconcilePendingInvitations,
   runScheduledInvitationReconciliation,
 } from "../lib/invitation-reconciliation";
+import {
+  acquirePersistenceDatabaseSuiteLock,
+  releasePersistenceDatabaseSuiteLock,
+  type DatabaseSuiteLockClient,
+} from "../testing/database-suite-lock";
 
 const runId = randomUUID();
 const prefix = `access-test-${runId}`;
 const directorId = `${prefix}-director`;
 const projectId = `${prefix}-project`;
 const unassignedId = `${prefix}-unassigned`;
+const projectManagerId = `${prefix}-project-manager`;
+const taxStaffId = `${prefix}-tax-staff`;
+const financeId = `${prefix}-finance`;
 const createdClerkIds: string[] = [];
 const revokedClerkIds: string[] = [];
 const clerkStatuses = new Map<string, string>();
 let clerkSequence = 0;
+let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
 
 const directorAccess: AccessContext = {
   userId: directorId,
@@ -154,6 +164,7 @@ async function deleteTestAccessRows() {
     .from(staffInvitationsTable).where(like(staffInvitationsTable.email, `${prefix}%`));
   const invitationIds = invitations.map(({ id }) => id);
   await db.delete(auditLogsTable).where(like(auditLogsTable.entityId, `${prefix}%`));
+  await db.delete(auditLogsTable).where(like(auditLogsTable.actorUserId, "access-test-%"));
   if (invitationIds.length) {
     await db.delete(auditLogsTable).where(inArray(auditLogsTable.entityId, invitationIds));
     await db.delete(staffInvitationProjectsTable)
@@ -162,12 +173,31 @@ async function deleteTestAccessRows() {
   }
   await db.delete(projectAssignmentsTable).where(like(projectAssignmentsTable.userId, `${prefix}%`));
   await db.delete(userRolesTable).where(like(userRolesTable.userId, `${prefix}%`));
+  const invoices = await db.select({ id: invoicesTable.id }).from(invoicesTable)
+    .where(like(invoicesTable.period, `${prefix}%`));
+  if (invoices.length) {
+    await db.delete(taxCalculationSnapshotsTable)
+      .where(inArray(taxCalculationSnapshotsTable.invoiceId, invoices.map(({ id }) => id)));
+    await db.delete(invoicesTable).where(inArray(invoicesTable.id, invoices.map(({ id }) => id)));
+  }
+  await db.delete(taxRuleVersionsTable).where(like(taxRuleVersionsTable.version, `${prefix}%`));
 }
 
+before(async () => {
+  databaseSuiteLockClient = await acquirePersistenceDatabaseSuiteLock();
+});
+
 after(async () => {
-  await deleteTestAccessRows();
-  await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
-  await pool.end();
+  try {
+    await deleteTestAccessRows();
+    await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+  } finally {
+    if (databaseSuiteLockClient) {
+      await releasePersistenceDatabaseSuiteLock(databaseSuiteLockClient);
+      databaseSuiteLockClient = undefined;
+    }
+    await pool.end();
+  }
 });
 
 test("staff invitation concurrency and atomic provisioning", async (t) => {
@@ -189,6 +219,208 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     userId: unassignedId,
     role: "UNASSIGNED",
     displayName: "Integration Unassigned",
+  });
+
+  await db.insert(userRolesTable).values([
+    {
+      userId: projectManagerId,
+      role: "PROJECT_MANAGER",
+      displayName: "Integration Project Manager",
+    },
+    {
+      userId: taxStaffId,
+      role: "TAX_STAFF",
+      displayName: "Integration Tax Staff",
+    },
+    {
+      userId: financeId,
+      role: "FINANCE",
+      displayName: "Integration Finance",
+    },
+  ]);
+  await db.insert(projectAssignmentsTable).values({
+    userId: projectManagerId,
+    projectId,
+  });
+
+  await t.test("assigned staff mutations follow the production permission matrix", async () => {
+    const users = {
+      [projectManagerId]: {
+        email: `${projectManagerId}@example.test`,
+        name: "Integration Project Manager",
+      },
+      [taxStaffId]: {
+        email: `${taxStaffId}@example.test`,
+        name: "Integration Tax Staff",
+      },
+      [financeId]: {
+        email: `${financeId}@example.test`,
+        name: "Integration Finance",
+      },
+    };
+    const server = await startServer(clerkAccessMiddleware(users));
+    const [supersededFinanceRule] = await db.select().from(taxRuleVersionsTable).where(and(
+      eq(taxRuleVersionsTable.serviceType, "JASA_LAIN"),
+      isNull(taxRuleVersionsTable.qualification),
+      eq(taxRuleVersionsTable.requiresSbu, false),
+      eq(taxRuleVersionsTable.supplierPkp, false),
+      eq(taxRuleVersionsTable.governmentCollector, false),
+      eq(taxRuleVersionsTable.integrated, false),
+      isNull(taxRuleVersionsTable.effectiveTo),
+    )).limit(1);
+    const financeRuleVersion = `${prefix}-finance-rule`;
+    const financeInvoicePeriod = `${prefix}-finance-invoice`;
+    const headers = (userId: string) => ({
+      "content-type": "application/json",
+      "x-test-user-id": userId,
+    });
+    const projectMutation = (userId: string, name: string, status?: "BERJALAN") => fetch(
+      `${server.baseUrl}/projects/${projectId}`,
+      {
+        method: "PATCH",
+        headers: headers(userId),
+        body: JSON.stringify({ name, status }),
+      },
+    );
+    const invoiceMutation = (userId: string, period: string) => fetch(
+      `${server.baseUrl}/invoices`,
+      {
+        method: "POST",
+        headers: headers(userId),
+        body: JSON.stringify({
+          projectId,
+          period,
+          issuedAt: "2099-01-15",
+          dpp: 10_000,
+          retentionPercent: 0,
+          integrated: false,
+          serviceType: "JASA_LAIN",
+          qualification: "TIDAK_BERLAKU",
+          hasSbu: false,
+          supplierPkp: false,
+          governmentCollector: false,
+        }),
+      },
+    );
+    const taxRuleMutation = (userId: string, version: string) => fetch(
+      `${server.baseUrl}/tax/rules`,
+      {
+        method: "POST",
+        headers: headers(userId),
+        body: JSON.stringify({
+          version,
+          effectiveFrom: "2099-01-01",
+          regulatorySource: "Integration access matrix",
+          serviceType: "JASA_LAIN",
+          qualification: null,
+          requiresSbu: false,
+          supplierPkp: false,
+          governmentCollector: false,
+          integrated: false,
+          dppRateBasisPoints: 10_000,
+          ppnRateBasisPoints: 0,
+          pphFinalRateBasisPoints: 0,
+          pph23RateBasisPoints: 200,
+        }),
+      },
+    );
+    const assertForbiddenWithoutDatabaseChanges = async (
+      userId: string,
+      request: () => Promise<Response>,
+      readState: () => Promise<unknown>,
+    ) => {
+      const beforeState = await readState();
+      const beforeAudits = await db.select().from(auditLogsTable)
+        .where(eq(auditLogsTable.actorUserId, userId));
+      const response = await request();
+      assert.equal(response.status, 403);
+      assert.deepEqual(await readState(), beforeState);
+      assert.deepEqual(
+        await db.select().from(auditLogsTable).where(eq(auditLogsTable.actorUserId, userId)),
+        beforeAudits,
+      );
+    };
+
+    try {
+      const projectManagerName = `${prefix}-pm-project`;
+      assert.equal(
+        (await projectMutation(projectManagerId, projectManagerName, "BERJALAN")).status,
+        200,
+      );
+      assert.equal(
+        (await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)))[0]?.name,
+        projectManagerName,
+      );
+
+      const pmInvoicePeriod = `${prefix}-pm-invoice`;
+      await assertForbiddenWithoutDatabaseChanges(
+        projectManagerId,
+        () => invoiceMutation(projectManagerId, pmInvoicePeriod),
+        () => db.select().from(invoicesTable).where(eq(invoicesTable.period, pmInvoicePeriod)),
+      );
+      const pmTaxVersion = `${prefix}-pm-tax`;
+      await assertForbiddenWithoutDatabaseChanges(
+        projectManagerId,
+        () => taxRuleMutation(projectManagerId, pmTaxVersion),
+        () => db.select().from(taxRuleVersionsTable).where(eq(taxRuleVersionsTable.version, pmTaxVersion)),
+      );
+
+      const taxStaffProjectName = `${prefix}-tax-project`;
+      await assertForbiddenWithoutDatabaseChanges(
+        taxStaffId,
+        () => projectMutation(taxStaffId, taxStaffProjectName),
+        () => db.select().from(projectsTable).where(eq(projectsTable.id, projectId)),
+      );
+      const taxStaffInvoicePeriod = `${prefix}-tax-invoice`;
+      await assertForbiddenWithoutDatabaseChanges(
+        taxStaffId,
+        () => invoiceMutation(taxStaffId, taxStaffInvoicePeriod),
+        () => db.select().from(invoicesTable).where(eq(invoicesTable.period, taxStaffInvoicePeriod)),
+      );
+      const taxStaffRuleVersion = `${prefix}-tax-staff-rule`;
+      await assertForbiddenWithoutDatabaseChanges(
+        taxStaffId,
+        () => taxRuleMutation(taxStaffId, taxStaffRuleVersion),
+        () => db.select().from(taxRuleVersionsTable)
+          .where(eq(taxRuleVersionsTable.version, taxStaffRuleVersion)),
+      );
+
+      const financeProjectName = `${prefix}-finance-project`;
+      await assertForbiddenWithoutDatabaseChanges(
+        financeId,
+        () => projectMutation(financeId, financeProjectName),
+        () => db.select().from(projectsTable).where(eq(projectsTable.id, projectId)),
+      );
+
+      assert.equal((await taxRuleMutation(financeId, financeRuleVersion)).status, 201);
+      assert.equal(
+        (await db.select().from(taxRuleVersionsTable)
+          .where(eq(taxRuleVersionsTable.version, financeRuleVersion))).length,
+        1,
+      );
+
+      assert.equal((await invoiceMutation(financeId, financeInvoicePeriod)).status, 201);
+      const financeInvoices = await db.select().from(invoicesTable)
+        .where(eq(invoicesTable.period, financeInvoicePeriod));
+      assert.equal(financeInvoices.length, 1);
+    } finally {
+      const financeInvoices = await db.select({ id: invoicesTable.id }).from(invoicesTable)
+        .where(eq(invoicesTable.period, financeInvoicePeriod));
+      if (financeInvoices.length) {
+        await db.delete(taxCalculationSnapshotsTable)
+          .where(inArray(taxCalculationSnapshotsTable.invoiceId, financeInvoices.map(({ id }) => id)));
+        await db.delete(invoicesTable)
+          .where(inArray(invoicesTable.id, financeInvoices.map(({ id }) => id)));
+      }
+      await db.delete(taxRuleVersionsTable)
+        .where(eq(taxRuleVersionsTable.version, financeRuleVersion));
+      if (supersededFinanceRule) {
+        await db.update(taxRuleVersionsTable)
+          .set({ effectiveTo: supersededFinanceRule.effectiveTo })
+          .where(eq(taxRuleVersionsTable.id, supersededFinanceRule.id));
+      }
+      await server.close();
+    }
   });
 
   await t.test("an unassigned user cannot read protected data endpoints", async () => {
