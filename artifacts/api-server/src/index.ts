@@ -9,6 +9,7 @@ import {
 } from "./lib/invitation-reconciliation";
 import { shouldSeedDemoData } from "./lib/demo-seeding";
 import { getClerkInvitationState } from "./routes/access";
+import { clerkClient } from "@clerk/express";
 
 const rawPort = process.env["PORT"];
 
@@ -81,6 +82,9 @@ const server = app.listen(port, (err) => {
 
 const invitationReconciliation = schedulePendingInvitationReconciliation({
   getClerkInvitation: getClerkInvitationState,
+  revokeClerkInvitation: clerkClient.invitations.revokeInvitation.bind(
+    clerkClient.invitations,
+  ),
   alerting: alertWebhookUrl
     ? {
         failureThreshold: alertFailureThreshold,

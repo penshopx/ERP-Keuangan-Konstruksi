@@ -25,6 +25,7 @@ export type InvitationReconciliationReason =
 
 export type ScheduledInvitationReconciliationDependencies = {
   getClerkInvitation: (invitationId: string) => Promise<ClerkInvitationState>;
+  revokeClerkInvitation?: (invitationId: string) => Promise<unknown>;
   onError?: (
     error: unknown,
     invitation: typeof staffInvitationsTable.$inferSelect,
@@ -227,6 +228,8 @@ const scheduledActor: ReconciliationActor = {
 };
 
 const inactiveClerkStatuses = new Set(["revoked", "expired"]);
+const replacementRevokeFailureAction =
+  "KEGAGALAN PARSIAL KOMPENSASI KIRIM ULANG UNDANGAN";
 export const scheduledReconciliationLockName =
   "api-server:scheduled-invitation-reconciliation";
 
@@ -303,6 +306,54 @@ export async function reconcilePendingInvitations(
     } catch (error) {
       failed += 1;
       dependencies.onError?.(error, invitation);
+    }
+  }
+
+  if (dependencies.revokeClerkInvitation) {
+    const partialFailures = await db.select().from(auditLogsTable)
+      .where(eq(auditLogsTable.action, replacementRevokeFailureAction));
+    for (const partialFailure of partialFailures) {
+      const metadata = partialFailure.metadata;
+      if (
+        metadata?.reconciliationRequired !== true
+        || typeof metadata.replacementClerkInvitationId !== "string"
+      ) {
+        continue;
+      }
+      try {
+        const clerkState = await dependencies.getClerkInvitation(
+          metadata.replacementClerkInvitationId,
+        );
+        const clerkStatus = clerkState.status.toLowerCase();
+        if (!inactiveClerkStatuses.has(clerkStatus)) {
+          await dependencies.revokeClerkInvitation(
+            metadata.replacementClerkInvitationId,
+          );
+        }
+        await db.update(auditLogsTable).set({
+          metadata: {
+            ...metadata,
+            reconciliationRequired: false,
+            reconciliationOutcome: inactiveClerkStatuses.has(clerkStatus)
+              ? "ALREADY_INACTIVE"
+              : "REVOKED",
+            clerkStatusBeforeReconciliation: clerkStatus,
+            reconciledAt: new Date().toISOString(),
+          },
+        }).where(and(
+          eq(auditLogsTable.id, partialFailure.id),
+          sql`${auditLogsTable.metadata}->>'reconciliationRequired' = 'true'`,
+        ));
+        checked += 1;
+        updated += 1;
+      } catch (error) {
+        failed += 1;
+        const [invitation] = partialFailure.entityId
+          ? await db.select().from(staffInvitationsTable)
+            .where(eq(staffInvitationsTable.id, partialFailure.entityId)).limit(1)
+          : [];
+        if (invitation) dependencies.onError?.(error, invitation);
+      }
     }
   }
 
@@ -418,4 +469,36 @@ export async function recordInvitationPartialFailure(
     },
   };
   await db.insert(auditLogsTable).values(audit);
+}
+
+export async function recordReplacementRevokePartialFailure(
+  invitation: typeof staffInvitationsTable.$inferSelect,
+  replacementClerkInvitationId: string,
+  actor: ReconciliationActor,
+  persistenceError: unknown,
+  revokeError: unknown,
+) {
+  const errorMessage = (error: unknown) =>
+    error instanceof Error ? error.message : String(error);
+  await db.insert(auditLogsTable).values({
+    id: randomUUID(),
+    action: replacementRevokeFailureAction,
+    entity: "Undangan",
+    entityId: invitation.id,
+    detail: `${invitation.displayName} · penyimpanan resend dan pembatalan undangan pengganti gagal`,
+    user: actor.displayName,
+    actorUserId: actor.userId,
+    actorRole: actor.role,
+    tone: "warning",
+    metadata: {
+      operation: "RESEND_INVITATION_COMPENSATION",
+      previousClerkInvitationId: invitation.clerkInvitationId,
+      replacementClerkInvitationId,
+      erpOutcome: "FAILED",
+      clerkCompensationOutcome: "FAILED",
+      persistenceError: errorMessage(persistenceError),
+      revokeError: errorMessage(revokeError),
+      reconciliationRequired: true,
+    },
+  });
 }

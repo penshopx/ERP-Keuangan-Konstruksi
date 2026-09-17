@@ -25,6 +25,7 @@ import {
   getLastSuccessfulClerkVerificationAt,
   reconcileInvitationFromClerk,
   recordInvitationPartialFailure,
+  recordReplacementRevokePartialFailure,
   recordSuccessfulClerkVerification,
   type ClerkInvitationState,
 } from "../lib/invitation-reconciliation";
@@ -400,7 +401,28 @@ router.post("/access/invitations/:invitationId/resend", async (req, res) => {
     return { outcome: "resent", invitation: updated, projectIds: projects.map(({ projectId }) => projectId) } as const;
   }).catch(async (error) => {
     if (createdClerkInvitationId) {
-      await dependencies.revokeClerkInvitation(createdClerkInvitationId).catch(() => undefined);
+      try {
+        await dependencies.revokeClerkInvitation(createdClerkInvitationId);
+      } catch (revokeError) {
+        const actor = {
+          userId: req.access!.userId,
+          displayName: req.access!.displayName,
+          role: req.access!.role,
+        };
+        await recordReplacementRevokePartialFailure(
+          requestedInvitation,
+          createdClerkInvitationId,
+          actor,
+          error,
+          revokeError,
+        );
+        (req.log ?? logger).error({
+          err: revokeError,
+          invitationId: requestedInvitation.id,
+          replacementClerkInvitationId: createdClerkInvitationId,
+          event: "invitation_resend_compensation_failed",
+        }, "Replacement Clerk invitation could not be revoked; reconciliation required");
+      }
     }
     throw error;
   });
