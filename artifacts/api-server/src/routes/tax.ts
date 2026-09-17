@@ -16,15 +16,10 @@ import {
   taxRuleVersionsTable,
 } from "@workspace/db";
 import { taxRuleLockKey } from "../domain/tax-rule-lock";
+import { currentOperationalMonth } from "../domain/operational-calendar";
 import { requirePermission } from "../middlewares/access";
 
 const router: IRouter = Router();
-const TAX_OPERATIONAL_TIME_ZONE = "Asia/Jakarta";
-const taxPeriodFormatter = new Intl.DateTimeFormat("en-US", {
-  timeZone: TAX_OPERATIONAL_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-});
 
 function isTaxRuleOverlapConstraint(error: unknown) {
   if (!error || typeof error !== "object") return false;
@@ -44,21 +39,13 @@ function previousCalendarDate(value: string) {
   return date.toISOString().slice(0, 10);
 }
 
-function currentCalendarPeriod() {
-  const parts = taxPeriodFormatter.formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  if (!year || !month) throw new Error("Gagal menentukan periode pajak pada zona waktu operasional.");
-  return `${year}-${month}`;
-}
-
 router.get("/tax/summary", requirePermission("tax:view"), async (req, res) => {
   const parsed = GetTaxSummaryQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const period = parsed.data.period ?? currentCalendarPeriod();
+  const period = parsed.data.period ?? currentOperationalMonth();
   const match = /^(\d{4})-(\d{2})$/.exec(period);
   if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) {
     res.status(400).json({ error: "Periode harus menggunakan format YYYY-MM." });
