@@ -7,3 +7,4 @@
 - [Invitation mutation concurrency](invitation-mutation-concurrency.md) — advisory locks serialize invitation actions, but stale requests also need snapshot identity checks to prevent a second transition.
 - [Tracked SQL migrations](tracked-sql-migrations.md) — declare migration-history objects in Drizzle and keep SQL-only constraints protected from schema push.
 - [Composite package declarations](composite-package-declarations.md) — rebuild emitted declarations after merges before consumers run TypeScript validation.
+- [Database timeout errors](database-timeout-errors.md) — transaction-local PostgreSQL timeouts may surface through wrapped causes; preserve rollback and inspect the error chain.

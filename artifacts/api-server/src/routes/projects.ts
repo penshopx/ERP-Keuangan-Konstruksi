@@ -37,7 +37,19 @@ export type ProjectPersistenceHooks = {
   beforeUpdateAuditInsert?: (projectId: string) => Promise<void>;
   beforeRabImportVersionLock?: (projectId: string, baselineId: string) => Promise<void>;
   beforeRabImportAuditInsert?: (projectId: string, baselineId: string, version: number) => Promise<void>;
+  rabImportLockTimeoutMs?: number;
 };
+
+const defaultRabImportLockTimeoutMs = 5_000;
+
+function isLockTimeout(error: unknown): boolean {
+  let current = error;
+  while (typeof current === "object" && current !== null) {
+    if ("code" in current && current.code === "55P03") return true;
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return false;
+}
 
 export function createProjectsRouter(hooks: ProjectPersistenceHooks = {}): IRouter {
 const router: IRouter = Router();
@@ -336,31 +348,45 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
     };
   });
   const totalBudget = importedItems.reduce((sum, item) => sum + item.budget, 0);
-  const version = await db.transaction(async (tx) => {
-    await hooks.beforeRabImportVersionLock?.(project.id, baselineId);
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${project.id}))`);
-    const [{ nextVersion }] = await tx.select({
-      nextVersion: max(rabBaselinesTable.version),
-    }).from(rabBaselinesTable).where(eq(rabBaselinesTable.projectId, project.id));
-    const lockedVersion = (nextVersion ?? 0) + 1;
-    await tx.insert(rabBaselinesTable).values({ id: baselineId, projectId: project.id, version: lockedVersion, status: "DRAF" });
-    await tx.insert(rabItemsTable).values(importedItems);
-    await tx.update(projectsTable).set({ budget: totalBudget, wbsCount: importedItems.length }).where(eq(projectsTable.id, project.id));
-    await hooks.beforeRabImportAuditInsert?.(project.id, baselineId, lockedVersion);
-    await tx.insert(auditLogsTable).values({
-      id: randomUUID(),
-      action: "DIIMPOR",
-      entity: "RAB",
-      entityId: baselineId,
-      detail: `${template.name} menjadi RAB ${project.code} versi ${lockedVersion}`,
-      user: req.access!.displayName,
-      actorUserId: req.access!.userId,
-      actorRole: req.access!.role,
-      tone: "info",
-      metadata: { templateId: template.id, priceFactor: factor, itemCount: importedItems.length },
+  let version: number;
+  try {
+    version = await db.transaction(async (tx) => {
+      const lockTimeoutMs = hooks.rabImportLockTimeoutMs ?? defaultRabImportLockTimeoutMs;
+      await tx.execute(sql`select set_config('lock_timeout', ${`${lockTimeoutMs}ms`}, true)`);
+      await hooks.beforeRabImportVersionLock?.(project.id, baselineId);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${project.id}))`);
+      const [{ nextVersion }] = await tx.select({
+        nextVersion: max(rabBaselinesTable.version),
+      }).from(rabBaselinesTable).where(eq(rabBaselinesTable.projectId, project.id));
+      const lockedVersion = (nextVersion ?? 0) + 1;
+      await tx.insert(rabBaselinesTable).values({ id: baselineId, projectId: project.id, version: lockedVersion, status: "DRAF" });
+      await tx.insert(rabItemsTable).values(importedItems);
+      await tx.update(projectsTable).set({ budget: totalBudget, wbsCount: importedItems.length }).where(eq(projectsTable.id, project.id));
+      await hooks.beforeRabImportAuditInsert?.(project.id, baselineId, lockedVersion);
+      await tx.insert(auditLogsTable).values({
+        id: randomUUID(),
+        action: "DIIMPOR",
+        entity: "RAB",
+        entityId: baselineId,
+        detail: `${template.name} menjadi RAB ${project.code} versi ${lockedVersion}`,
+        user: req.access!.displayName,
+        actorUserId: req.access!.userId,
+        actorRole: req.access!.role,
+        tone: "info",
+        metadata: { templateId: template.id, priceFactor: factor, itemCount: importedItems.length },
+      });
+      return lockedVersion;
     });
-    return lockedVersion;
-  });
+  } catch (error) {
+    if (isLockTimeout(error)) {
+      res.status(503).json({
+        error: "Impor RAB sedang diproses oleh transaksi lain. Coba lagi beberapa saat.",
+        retryable: true,
+      });
+      return;
+    }
+    throw error;
+  }
   const responseItems = importedItems.map((item) => ({
     ...item,
     quantity: item.quantityBasisPoints / 100,

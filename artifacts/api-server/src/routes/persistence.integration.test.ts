@@ -1272,6 +1272,111 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     }
   });
 
+  await t.test("a RAB import lock timeout returns a retryable response without partial writes", async () => {
+    const lockedProjectCode = `TST-${randomUUID().slice(0, 8)}`;
+    const template = {
+      id: `test-rab-import-${randomUUID()}`,
+      name: "Template RAB Lock Timeout",
+      items: [{
+        code: "TEST.LOCK.TIMEOUT.1",
+        name: "Item yang tidak boleh tersimpan",
+        category: "TEST",
+        unit: "ls",
+        quantity: 2,
+        unitPrice: 500_000,
+        materialCost: 300_000,
+        laborCost: 150_000,
+        equipmentCost: 50_000,
+        parentCode: null,
+        level: 1,
+      }],
+    };
+    let lockedProjectId = "";
+    let attemptedBaselineId = "";
+    const lockClient = await pool.connect();
+    const server = await startTestServer({}, access, {
+      rabImportLockTimeoutMs: 100,
+      beforeRabImportVersionLock: async (_projectId, baselineId) => {
+        attemptedBaselineId = baselineId;
+      },
+    });
+
+    try {
+      await db.insert(rabTemplatesTable).values({
+        id: template.id,
+        name: template.name,
+        projectType: "TEST",
+        description: "Fixture timeout advisory lock impor RAB",
+        sourceNote: "Regression test",
+        items: template.items,
+      });
+      const created = await requestJson(server.baseUrl, "/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          code: lockedProjectCode,
+          name: "Proyek RAB Lock Timeout",
+          owner: "Regression Test",
+          contractValue: 100_000_000,
+          endDate: "2027-12-31",
+        }),
+      });
+      lockedProjectId = String(created.id);
+      const [beforeProject] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, lockedProjectId));
+      const beforeBaselines = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.projectId, lockedProjectId));
+
+      await lockClient.query("begin");
+      await lockClient.query("select pg_advisory_xact_lock(hashtext($1))", [lockedProjectId]);
+      const startedAt = Date.now();
+      const response = await fetch(`${server.baseUrl}/projects/${lockedProjectId}/rab/import`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ templateId: template.id, priceFactor: 1 }),
+      });
+      const elapsedMs = Date.now() - startedAt;
+      const responseBody = await response.json() as Record<string, unknown>;
+
+      assert.equal(response.status, 503);
+      assert.equal(responseBody.retryable, true);
+      assert.match(String(responseBody.error), /Coba lagi/);
+      assert.ok(elapsedMs >= 75, `lock timeout returned too early after ${elapsedMs}ms`);
+      assert.ok(elapsedMs < 2_000, `lock timeout took too long: ${elapsedMs}ms`);
+      assert.notEqual(attemptedBaselineId, "");
+
+      const [afterProject] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, lockedProjectId));
+      const afterBaselines = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.projectId, lockedProjectId));
+      const attemptedItems = await db.select().from(rabItemsTable)
+        .where(eq(rabItemsTable.baselineId, attemptedBaselineId));
+      const attemptedAudits = await db.select().from(auditLogsTable)
+        .where(eq(auditLogsTable.entityId, attemptedBaselineId));
+
+      assert.deepEqual(afterProject, beforeProject);
+      assert.deepEqual(afterBaselines, beforeBaselines);
+      assert.deepEqual(attemptedItems, []);
+      assert.deepEqual(attemptedAudits, []);
+    } finally {
+      await lockClient.query("rollback").catch(() => undefined);
+      lockClient.release();
+      await server.close();
+      await db.transaction(async (tx) => {
+        if (lockedProjectId) {
+          const baselines = await tx.select({ id: rabBaselinesTable.id })
+            .from(rabBaselinesTable)
+            .where(eq(rabBaselinesTable.projectId, lockedProjectId));
+          await tx.delete(auditLogsTable).where(inArray(
+            auditLogsTable.entityId,
+            [lockedProjectId, attemptedBaselineId, ...baselines.map(({ id }) => id)].filter(Boolean),
+          ));
+          await tx.delete(projectsTable).where(eq(projectsTable.id, lockedProjectId));
+        }
+        await tx.delete(rabTemplatesTable).where(eq(rabTemplatesTable.id, template.id));
+      });
+    }
+  });
+
   await t.test("invoice, tax snapshot, and audit are committed together", async () => {
     const server = await startTestServer();
     let invoiceId = "";
