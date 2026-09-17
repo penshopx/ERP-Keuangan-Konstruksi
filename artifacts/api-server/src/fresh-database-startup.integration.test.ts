@@ -15,6 +15,7 @@ const requiredMigrations = [
   "0002_preserve_multiple_bounded_tax_overrides.sql",
   "0003_add_operational_state.sql",
   "0004_restrict_project_status.sql",
+  "0005_add_fixture_ownership.sql",
 ];
 const expectedTables = [
   "app_migrations",

@@ -38,7 +38,7 @@ import {
   taxCalculationSnapshotsTable,
   taxRuleVersionsTable,
 } from "@workspace/db";
-import { and, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 const booleanVariants = [false, true] as const;
 const constructionQualifications = [
@@ -231,6 +231,7 @@ export const demoActivity = [
 
 const demoInvoiceIds = demoInvoices.map(({ id }) => id);
 const demoTaxSnapshotIds = demoInvoices.map(({ id }) => `tax-${id}`);
+const demoFixtureOwner = "construction-erp-demo-v1";
 
 export async function seedDemoData() {
   await db.transaction(async (tx) => {
@@ -261,34 +262,51 @@ export async function seedDemoData() {
       ...invoice,
       pph23: 0,
       taxRuleVersionId: "tax-legacy-demo-2026",
+      fixtureOwner: demoFixtureOwner,
     }))).onConflictDoNothing();
-    await tx.insert(taxCalculationSnapshotsTable).values(demoInvoices.map((invoice) => ({
-      id: `tax-${invoice.id}`,
-      invoiceId: invoice.id,
-      taxRuleVersionId: "tax-legacy-demo-2026",
-      ruleVersion: "LEGACY-DEMO-2026",
-      regulatorySource: "Migrasi formula demo historis; sumber regulasi tidak tercatat pada transaksi asal",
-      ruleSnapshot: demoTaxRules[0],
-      dpp: invoice.dpp,
-      serviceType: "KONSTRUKSI",
-      qualification: "TANPA_KUALIFIKASI",
-      hasSbu: false,
-      supplierPkp: true,
-      governmentCollector: false,
-      integrated: true,
-      dppLainRateBasisPoints: 2750,
-      ppnRateBasisPoints: 1100,
-      pphRateBasisPoints: 250,
-      retentionPercentBasisPoints: 500,
-      ppn: invoice.ppn,
-      pphFinal: invoice.pphFinal,
-      pph23: 0,
-      retention: invoice.retention,
-    }))).onConflictDoNothing();
+    const ownedDemoInvoices = await tx.select({ id: invoicesTable.id })
+      .from(invoicesTable)
+      .where(and(
+        inArray(invoicesTable.id, demoInvoiceIds),
+        eq(invoicesTable.fixtureOwner, demoFixtureOwner),
+      ));
+    const ownedDemoInvoiceIds = new Set(ownedDemoInvoices.map(({ id }) => id));
+    const ownedDemoSnapshots = demoInvoices
+      .filter(({ id }) => ownedDemoInvoiceIds.has(id))
+      .map((invoice) => ({
+        id: `tax-${invoice.id}`,
+        invoiceId: invoice.id,
+        taxRuleVersionId: "tax-legacy-demo-2026",
+        fixtureOwner: demoFixtureOwner,
+        ruleVersion: "LEGACY-DEMO-2026",
+        regulatorySource: "Migrasi formula demo historis; sumber regulasi tidak tercatat pada transaksi asal",
+        ruleSnapshot: demoTaxRules[0],
+        dpp: invoice.dpp,
+        serviceType: "KONSTRUKSI",
+        qualification: "TANPA_KUALIFIKASI",
+        hasSbu: false,
+        supplierPkp: true,
+        governmentCollector: false,
+        integrated: true,
+        dppLainRateBasisPoints: 2750,
+        ppnRateBasisPoints: 1100,
+        pphRateBasisPoints: 250,
+        retentionPercentBasisPoints: 500,
+        ppn: invoice.ppn,
+        pphFinal: invoice.pphFinal,
+        pph23: 0,
+        retention: invoice.retention,
+      }));
+    if (ownedDemoSnapshots.length > 0) {
+      await tx.insert(taxCalculationSnapshotsTable)
+        .values(ownedDemoSnapshots)
+        .onConflictDoNothing();
+    }
     await tx.update(invoicesTable)
       .set({ taxRuleVersionId: "tax-legacy-demo-2026" })
       .where(and(
         inArray(invoicesTable.id, demoInvoiceIds),
+        eq(invoicesTable.fixtureOwner, demoFixtureOwner),
         isNull(invoicesTable.taxRuleVersionId),
       ));
     await tx.update(taxCalculationSnapshotsTable)
@@ -300,6 +318,7 @@ export async function seedDemoData() {
       })
       .where(and(
         inArray(taxCalculationSnapshotsTable.id, demoTaxSnapshotIds),
+        eq(taxCalculationSnapshotsTable.fixtureOwner, demoFixtureOwner),
         isNull(taxCalculationSnapshotsTable.taxRuleVersionId),
       ));
     await tx.insert(auditLogsTable).values(demoActivity.map((item) => ({

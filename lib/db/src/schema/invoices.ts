@@ -51,6 +51,7 @@ export const invoicesTable = pgTable("invoices", {
   status: text("status").notNull(),
   issuedAt: date("issued_at", { mode: "string" }).notNull(),
   taxRuleVersionId: text("tax_rule_version_id").references(() => taxRuleVersionsTable.id, { onDelete: "restrict" }),
+  fixtureOwner: text("fixture_owner"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -59,6 +60,7 @@ export const taxCalculationSnapshotsTable = pgTable("tax_calculation_snapshots",
   id: text("id").primaryKey(),
   invoiceId: text("invoice_id").notNull().unique().references(() => invoicesTable.id, { onDelete: "cascade" }),
   taxRuleVersionId: text("tax_rule_version_id").references(() => taxRuleVersionsTable.id, { onDelete: "restrict" }),
+  fixtureOwner: text("fixture_owner"),
   ruleVersion: text("rule_version").notNull().default("LEGACY"),
   regulatorySource: text("regulatory_source").notNull().default("Snapshot transaksi sebelum aturan berversi"),
   ruleSnapshot: jsonb("rule_snapshot").notNull().default({}),
@@ -80,9 +82,16 @@ export const taxCalculationSnapshotsTable = pgTable("tax_calculation_snapshots",
   calculatedAt: timestamp("calculated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const insertInvoiceSchema = createInsertSchema(invoicesTable).omit({ createdAt: true, updatedAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoicesTable).omit({
+  fixtureOwner: true,
+  createdAt: true,
+  updatedAt: true,
+});
 export const insertTaxRuleVersionSchema = createInsertSchema(taxRuleVersionsTable).omit({ createdAt: true });
-export const insertTaxCalculationSnapshotSchema = createInsertSchema(taxCalculationSnapshotsTable).omit({ calculatedAt: true });
+export const insertTaxCalculationSnapshotSchema = createInsertSchema(taxCalculationSnapshotsTable).omit({
+  fixtureOwner: true,
+  calculatedAt: true,
+});
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoicesTable.$inferSelect;
 export type InsertTaxRuleVersion = z.infer<typeof insertTaxRuleVersionSchema>;

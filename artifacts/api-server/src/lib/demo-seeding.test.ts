@@ -20,6 +20,8 @@ const runId = randomUUID();
 const nonDemoProjectId = `test-demo-seed-project-${runId}`;
 const nonDemoInvoiceId = `test-demo-seed-invoice-${runId}`;
 const nonDemoSnapshotId = `test-demo-seed-snapshot-${runId}`;
+const collidingInvoiceId = demoInvoices[0].id;
+const collidingSnapshotId = `tax-${collidingInvoiceId}`;
 let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
 
 before(async () => {
@@ -30,13 +32,88 @@ after(async () => {
   try {
     await db.delete(taxCalculationSnapshotsTable)
       .where(eq(taxCalculationSnapshotsTable.id, nonDemoSnapshotId));
+    await db.delete(taxCalculationSnapshotsTable)
+      .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
     await db.delete(invoicesTable).where(eq(invoicesTable.id, nonDemoInvoiceId));
+    await db.delete(invoicesTable).where(eq(invoicesTable.id, collidingInvoiceId));
     await db.delete(projectsTable).where(eq(projectsTable.id, nonDemoProjectId));
   } finally {
     if (databaseSuiteLockClient) {
       await releasePersistenceDatabaseSuiteLock(databaseSuiteLockClient);
     }
   }
+});
+
+test("demo seeding does not change non-demo rows that collide with fixture IDs", async () => {
+  await seedDemoData();
+  await db.delete(taxCalculationSnapshotsTable)
+    .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
+  await db.delete(invoicesTable).where(eq(invoicesTable.id, collidingInvoiceId));
+
+  await db.insert(invoicesTable).values({
+    id: collidingInvoiceId,
+    number: `INV/COLLISION/${runId}`,
+    projectId: "prj-001",
+    projectCode: "USER-OWNED",
+    projectName: "User-owned collision",
+    period: "September 2026",
+    dpp: 2_000_000,
+    ppn: 220_000,
+    pphFinal: 50_000,
+    retention: 100_000,
+    total: 2_070_000,
+    status: "DRAFT",
+    issuedAt: "2026-09-17",
+    taxRuleVersionId: null,
+    fixtureOwner: null,
+  });
+
+  const [invoiceBeforeSeedWithoutSnapshot] = await db.select().from(invoicesTable)
+    .where(eq(invoicesTable.id, collidingInvoiceId));
+  await seedDemoData();
+  const [invoiceAfterSeedWithoutSnapshot] = await db.select().from(invoicesTable)
+    .where(eq(invoicesTable.id, collidingInvoiceId));
+  const [snapshotAfterSeedWithoutSnapshot] = await db.select()
+    .from(taxCalculationSnapshotsTable)
+    .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
+  assert.deepEqual(invoiceAfterSeedWithoutSnapshot, invoiceBeforeSeedWithoutSnapshot);
+  assert.equal(snapshotAfterSeedWithoutSnapshot, undefined);
+
+  await db.insert(taxCalculationSnapshotsTable).values({
+    id: collidingSnapshotId,
+    invoiceId: collidingInvoiceId,
+    taxRuleVersionId: null,
+    fixtureOwner: null,
+    ruleVersion: "USER-OWNED",
+    regulatorySource: "User-owned collision regression fixture",
+    ruleSnapshot: { fixture: "user-owned" },
+    dpp: 2_000_000,
+    integrated: false,
+    dppLainRateBasisPoints: 10_000,
+    ppnRateBasisPoints: 1_100,
+    pphRateBasisPoints: 250,
+    retentionPercentBasisPoints: 500,
+    ppn: 220_000,
+    pphFinal: 50_000,
+    retention: 100_000,
+  });
+
+  const [snapshotBefore] = await db.select().from(taxCalculationSnapshotsTable)
+    .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
+
+  await seedDemoData();
+
+  const [invoiceAfter] = await db.select().from(invoicesTable)
+    .where(eq(invoicesTable.id, collidingInvoiceId));
+  const [snapshotAfter] = await db.select().from(taxCalculationSnapshotsTable)
+    .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
+  assert.deepEqual(invoiceAfter, invoiceBeforeSeedWithoutSnapshot);
+  assert.deepEqual(snapshotAfter, snapshotBefore);
+
+  await db.delete(taxCalculationSnapshotsTable)
+    .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
+  await db.delete(invoicesTable).where(eq(invoicesTable.id, collidingInvoiceId));
+  await seedDemoData();
 });
 
 test("demo data seeding requires development mode and explicit opt-in", () => {
@@ -110,10 +187,16 @@ test("demo seeding is idempotent and leaves non-demo tax references unchanged", 
   const demoIds = demoInvoices.map(({ id }) => id);
   const demoSnapshotIds = demoIds.map((id) => `tax-${id}`);
   await db.update(invoicesTable)
-    .set({ taxRuleVersionId: null })
+    .set({
+      taxRuleVersionId: null,
+      fixtureOwner: "construction-erp-demo-v1",
+    })
     .where(inArray(invoicesTable.id, demoIds));
   await db.update(taxCalculationSnapshotsTable)
-    .set({ taxRuleVersionId: null })
+    .set({
+      taxRuleVersionId: null,
+      fixtureOwner: "construction-erp-demo-v1",
+    })
     .where(inArray(taxCalculationSnapshotsTable.id, demoSnapshotIds));
 
   await seedDemoData();
