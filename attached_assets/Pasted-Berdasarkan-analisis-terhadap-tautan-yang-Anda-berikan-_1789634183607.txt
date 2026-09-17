@@ -1,0 +1,28 @@
+Berdasarkan analisis terhadap tautan yang Anda berikan, berikut adalah ringkasan informasi yang **relevan** dengan konteks aplikasi yang sedang kita kembangkan (mengabaikan parameter pelacakan iklan dan *marketing fluff*):
+
+### **Inti Aplikasi**
+Aplikasi ini adalah sistem manajemen proyek/konstruksi yang berfokus pada otomatisasi dan akurasi **Rencana Anggaran Biaya (RAB)** berbasis **AHSP** (Analisa Harga Satuan Pekerjaan) untuk estimator dan kontraktor.
+
+### **Fitur & Fungsionalitas Utama yang Relevan**
+1. **RAB & Kalkulasi Parametrik**: 
+   - Input dimensi dari gambar kerja langsung menghasilkan perhitungan volume (beton, pembesian, bekisting) yang otomatis masuk ke RAB.
+   - Menggunakan *Master Analisa* (koefisien AHSP resmi) dikalikan dengan *Master Harga* milik pengguna (termasuk overhead dan profit).
+2. **Rekapitulasi & Perpajakan**: 
+   - Perhitungan berjenjang dari Modal (RAP) → Margin → **PPN (Pajak)** → Nilai Kontrak.
+3. **Manajemen Invoice & Termin**: 
+   - Mendukung skema DP, Termin 2–5, Retensi, dan Pelunasan.
+   - Plafon nilai kontrak dijaga secara otomatis dan penomoran invoice berjalan sendiri *(sangat relevan dengan Task #64, #65, #68 sebelumnya)*.
+4. **Tracking Progres & Kurva S**: 
+   - Progres fisik per item RAB yang tertimbang bobot nilai, membandingkan rencana vs aktual beserta deviasinya.
+5. **Logistik & Rekonsiliasi Keuangan**: 
+   - Kebutuhan bahan dan tenaga kerja (OH) dari komponen AHSP di-*reconcile* (direkonsiliasi) dengan pemakaian gudang dan kas proyek *(sangat relevan dengan Task #69 dan #71 tentang rekonsiliasi)*.
+6. **Integrasi AI (Opsional namun Terkontrol)**: 
+   - AI dapat menyusun draft RAB atau membaca denah, tetapi **setiap keluaran AI wajib divalidasi** melalui database AHSP dan Master Harga pengguna. AI tidak diperbolehkan mengarang harga.
+
+### **Korelasi dengan Pengembangan Saat Ini**
+Informasi ini mengonfirmasi mengapa fitur-fitur yang sedang kita kerjakan sangat kritis:
+- **Versi RAB & Riwayat (Task #65, #68)**: Penting karena RAB adalah *baseline* yang berubah seiring revisi gambar kerja atau negosiasi margin.
+- **Keamanan Data Demo & Pajak (Task #64)**: Krusial karena perhitungan PPN dan margin harus akurat dan tidak boleh tertimpa oleh data *dummy*.
+- **Rekonsiliasi & Locking (Task #69, #71)**: Wajib ada karena sistem harus menjamin konsistensi data antara RAB, invoice termin, dan kas proyek meskipun ada banyak proses yang berjalan bersamaan atau *crash*.
+
+Apakah ada aspek tertentu dari temuan ini yang ingin Anda dalami atau jadikan acuan untuk task berikutnya? Saya tetap siaga.

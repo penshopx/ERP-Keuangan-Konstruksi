@@ -49,3 +49,4 @@ _Populate as you build — sharp edges, "always run X before Y" rules._
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
 - See `docs/references/odoo-construction-erp.md` for the curated process reference extracted from uploaded Odoo construction materials; it is not a product specification or regulatory authority.
+- See `docs/references/erabe-rab-project-workflow.md` for curated RAB, progress, field access, and reconciliation patterns from ERAbe; vendor claims and example values are not authoritative.
