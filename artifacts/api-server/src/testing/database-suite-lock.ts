@@ -2,6 +2,7 @@ import { pool } from "@workspace/db";
 
 export const persistenceDatabaseSuiteLockName = "api-server:persistence-integration-shared-fixtures";
 export const defaultPersistenceDatabaseSuiteLockTimeoutMs = 120_000;
+export const defaultDatabaseSuiteStatementTimeoutMs = 60_000;
 const databaseSuiteLockPollMs = 250;
 
 export type DatabaseSuiteLockClient = {
@@ -14,6 +15,28 @@ export type DatabaseSuiteLockOptions = {
   suiteName: string;
   timeoutMs: number;
 };
+
+export function isDatabaseStatementTimeout(error: unknown): boolean {
+  let current = error;
+  const visited = new Set<unknown>();
+  while (current && typeof current === "object" && !visited.has(current)) {
+    visited.add(current);
+    if ("code" in current && current.code === "57014") return true;
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return false;
+}
+
+export async function setDatabaseSuiteStatementTimeout(
+  client: DatabaseSuiteLockClient,
+  suiteName: string,
+  timeoutMs: number,
+) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isInteger(timeoutMs)) {
+    throw new Error(`${suiteName} database statement timeout must be a positive integer; received ${timeoutMs}`);
+  }
+  await client.query(`SET statement_timeout = ${timeoutMs}`);
+}
 
 export async function acquireDatabaseSuiteLock({
   lockName,

@@ -4,9 +4,12 @@ import { after, test } from "node:test";
 import { pool } from "@workspace/db";
 import {
   acquireDatabaseSuiteLock,
+  defaultDatabaseSuiteStatementTimeoutMs,
   defaultPersistenceDatabaseSuiteLockTimeoutMs,
+  isDatabaseStatementTimeout,
   persistenceDatabaseSuiteLockName,
   releaseDatabaseSuiteLock,
+  setDatabaseSuiteStatementTimeout,
 } from "../testing/database-suite-lock";
 
 type ExplainPlanNode = {
@@ -18,6 +21,9 @@ type ExplainPlanNode = {
 
 const databaseSuiteLockTimeoutMs = Number(
   process.env.ACTIVITY_QUERY_PLAN_TEST_LOCK_TIMEOUT_MS ?? defaultPersistenceDatabaseSuiteLockTimeoutMs,
+);
+const databaseStatementTimeoutMs = Number(
+  process.env.ACTIVITY_QUERY_PLAN_TEST_STATEMENT_TIMEOUT_MS ?? defaultDatabaseSuiteStatementTimeoutMs,
 );
 const databaseSuiteLockOptions = {
   lockName: persistenceDatabaseSuiteLockName,
@@ -47,7 +53,13 @@ test("activity timeline uses its timestamp index at representative volume", asyn
     ...databaseSuiteLockOptions,
     timeoutMs: databaseSuiteLockTimeoutMs,
   });
+  let testError: unknown;
   try {
+    await setDatabaseSuiteStatementTimeout(
+      client,
+      databaseSuiteLockOptions.suiteName,
+      databaseStatementTimeoutMs,
+    );
     await client.query("DELETE FROM audit_logs WHERE actor_user_id ~ $1", [regressionUserIdPattern]);
     await client.query(
       `INSERT INTO audit_logs (
@@ -92,12 +104,38 @@ test("activity timeline uses its timestamp index at representative volume", asyn
       false,
       `Activity timeline regressed to a sequential scan: ${JSON.stringify(plan)}`,
     );
+  } catch (error) {
+    testError = isDatabaseStatementTimeout(error)
+      ? new Error(
+        `Activity query-plan database query exceeded the ${databaseStatementTimeoutMs}ms statement timeout`,
+        { cause: error },
+      )
+      : error;
   } finally {
+    const cleanupErrors: unknown[] = [];
     try {
       await client.query("DELETE FROM audit_logs WHERE actor_user_id = $1", [actorUserId]);
       await client.query("ANALYZE audit_logs");
+    } catch (error) {
+      cleanupErrors.push(error);
     } finally {
-      await releaseDatabaseSuiteLock(client, databaseSuiteLockOptions);
+      try {
+        await releaseDatabaseSuiteLock(client, databaseSuiteLockOptions);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (testError) {
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(
+          [testError, ...cleanupErrors],
+          testError instanceof Error ? testError.message : "Activity query-plan validation failed",
+        );
+      }
+      throw testError;
+    }
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(cleanupErrors, "Activity query-plan cleanup or lock release failed");
     }
   }
 });
