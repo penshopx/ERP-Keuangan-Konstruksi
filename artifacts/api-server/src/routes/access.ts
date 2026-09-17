@@ -145,8 +145,10 @@ router.get("/access/invitations", async (req, res) => {
     }
   }
   if (!verificationFailed && clerkInvitationsChecked > 0) {
-    recordSuccessfulClerkVerification();
+    await recordSuccessfulClerkVerification();
   }
+  const lastSuccessfulVerificationAt =
+    await getLastSuccessfulClerkVerificationAt();
   const wasVerificationDegraded = req.app.locals.invitationListVerificationDegraded === true;
   if (verificationFailed && !wasVerificationDegraded) {
     requestLogger.warn({
@@ -170,12 +172,12 @@ router.get("/access/invitations", async (req, res) => {
       ? {
           status: "DEGRADED",
           message: "Sebagian status undangan tidak dapat diverifikasi. Undangan tersebut disembunyikan sementara agar status aktif yang belum pasti tidak ditampilkan.",
-          lastSuccessfulVerificationAt: getLastSuccessfulClerkVerificationAt(),
+          lastSuccessfulVerificationAt,
         }
       : {
           status: "VERIFIED",
           message: "Semua status undangan telah diverifikasi.",
-          lastSuccessfulVerificationAt: getLastSuccessfulClerkVerificationAt(),
+          lastSuccessfulVerificationAt,
         },
   }));
 });

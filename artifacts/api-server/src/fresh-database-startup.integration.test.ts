@@ -13,11 +13,13 @@ const workspaceRoot = path.resolve(
 const requiredMigrations = [
   "0001_prevent_overlapping_tax_rule_periods.sql",
   "0002_preserve_multiple_bounded_tax_overrides.sql",
+  "0003_add_operational_state.sql",
 ];
 const expectedTables = [
   "app_migrations",
   "audit_logs",
   "invoices",
+  "operational_state",
   "project_assignments",
   "projects",
   "rab_baselines",
@@ -309,6 +311,19 @@ test("API exits before opening its port when mandatory migrations are missing", 
     ["--filter", "@workspace/api-server", "run", "build"],
     startupEnv,
   );
+  await runCommand(
+    "pnpm",
+    ["--filter", "@workspace/db", "run", "setup"],
+    startupEnv,
+  );
+  await runPsql(
+    `
+    DROP TABLE operational_state;
+    DELETE FROM app_migrations
+    WHERE name = '0003_add_operational_state.sql';
+    `,
+    databaseName,
+  );
 
   const port = await reservePort();
   let apiOutput = "";
@@ -338,7 +353,7 @@ test("API exits before opening its port when mandatory migrations are missing", 
   assert.equal(exit.signal, null);
   assert.match(
     apiOutput,
-    /Mandatory database migration .* is not fully applied/,
+    /Mandatory database migrations? .* (?:is|are) not fully applied/,
   );
   await assert.rejects(
     fetch(`http://127.0.0.1:${port}/api/healthz`),

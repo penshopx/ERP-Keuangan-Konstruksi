@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
+  operationalStateTable,
   staffInvitationsTable,
   tryWithDatabaseAdvisoryLock,
 } from "@workspace/db";
@@ -100,7 +101,8 @@ let reconciliationHealth: InvitationReconciliationHealth = {
   },
 };
 
-let lastSuccessfulClerkVerificationAt: string | null = null;
+export const clerkInvitationVerificationStateKey =
+  "clerk-invitation-verification";
 
 function recordReconciliationFailure() {
   reconciliationHealth = {
@@ -187,13 +189,35 @@ export function getInvitationReconciliationHealth(): InvitationReconciliationHea
   return { ...reconciliationHealth };
 }
 
-export function recordSuccessfulClerkVerification(at = new Date()): string {
-  lastSuccessfulClerkVerificationAt = at.toISOString();
-  return lastSuccessfulClerkVerificationAt;
+export async function recordSuccessfulClerkVerification(
+  at = new Date(),
+): Promise<string> {
+  const [state] = await db.insert(operationalStateTable)
+    .values({
+      key: clerkInvitationVerificationStateKey,
+      lastSuccessfulAt: at,
+    })
+    .onConflictDoUpdate({
+      target: operationalStateTable.key,
+      set: {
+        lastSuccessfulAt: sql`greatest(${operationalStateTable.lastSuccessfulAt}, excluded.last_successful_at)`,
+        updatedAt: new Date(),
+      },
+    })
+    .returning({ lastSuccessfulAt: operationalStateTable.lastSuccessfulAt });
+  if (!state) {
+    throw new Error("Waktu verifikasi Clerk tidak dapat disimpan");
+  }
+  return state.lastSuccessfulAt.toISOString();
 }
 
-export function getLastSuccessfulClerkVerificationAt(): string | null {
-  return lastSuccessfulClerkVerificationAt;
+export async function getLastSuccessfulClerkVerificationAt(): Promise<string | null> {
+  const [state] = await db.select({
+    lastSuccessfulAt: operationalStateTable.lastSuccessfulAt,
+  }).from(operationalStateTable)
+    .where(eq(operationalStateTable.key, clerkInvitationVerificationStateKey))
+    .limit(1);
+  return state?.lastSuccessfulAt.toISOString() ?? null;
 }
 
 const scheduledActor: ReconciliationActor = {

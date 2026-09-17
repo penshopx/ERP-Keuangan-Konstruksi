@@ -8,6 +8,7 @@ import {
   auditLogsTable,
   db,
   invoicesTable,
+  operationalStateTable,
   pool,
   projectAssignmentsTable,
   projectsTable,
@@ -25,6 +26,7 @@ import {
 import { createApiRouter } from "./index";
 import type { AccessPersistenceHooks, AccessRouterDependencies } from "./access";
 import {
+  clerkInvitationVerificationStateKey,
   getInvitationReconciliationHealth,
   reconcilePendingInvitations,
   runScheduledInvitationReconciliation,
@@ -902,6 +904,62 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     const [storedAfter] = await db.select().from(staffInvitationsTable)
       .where(eq(staffInvitationsTable.id, invitation.id));
     assert.equal(storedAfter.status, "PENDING");
+  });
+
+  await t.test("Clerk verification time survives restart, is shared, and is unchanged by failures", async () => {
+    const email = `${prefix}-persistent-verification@example.test`;
+    const creator = await startServer(staticAccessMiddleware());
+    const created = await postInvite(creator.baseUrl, email);
+    assert.equal(created.status, 201);
+    await creator.close();
+
+    const firstInstance = await startServer(staticAccessMiddleware());
+    let persistedAt: string;
+    try {
+      const response = await fetch(`${firstInstance.baseUrl}/access/invitations`);
+      assert.equal(response.status, 200);
+      const body = await response.json() as {
+        verification: { lastSuccessfulVerificationAt: string | null };
+      };
+      assert.ok(body.verification.lastSuccessfulVerificationAt);
+      persistedAt = body.verification.lastSuccessfulVerificationAt;
+    } finally {
+      await firstInstance.close();
+    }
+
+    const [stored] = await db.select().from(operationalStateTable)
+      .where(eq(operationalStateTable.key, clerkInvitationVerificationStateKey));
+    assert.equal(stored.lastSuccessfulAt.toISOString(), persistedAt);
+
+    const failingDependencies: AccessRouterDependencies = {
+      ...clerkDependencies,
+      getClerkInvitation: async () => {
+        throw new Error("Injected Clerk outage after API restart");
+      },
+    };
+    const restartedInstance = await startServer(
+      staticAccessMiddleware(),
+      {},
+      failingDependencies,
+    );
+    try {
+      const response = await fetch(`${restartedInstance.baseUrl}/access/invitations`);
+      assert.equal(response.status, 200);
+      const body = await response.json() as {
+        verification: {
+          status: string;
+          lastSuccessfulVerificationAt: string | null;
+        };
+      };
+      assert.equal(body.verification.status, "DEGRADED");
+      assert.equal(body.verification.lastSuccessfulVerificationAt, persistedAt);
+    } finally {
+      await restartedInstance.close();
+    }
+
+    const [unchanged] = await db.select().from(operationalStateTable)
+      .where(eq(operationalStateTable.key, clerkInvitationVerificationStateKey));
+    assert.equal(unchanged.lastSuccessfulAt.toISOString(), persistedAt);
   });
 
   await t.test("scheduled reconciliation retries failures and writes one truthful audit", async () => {
