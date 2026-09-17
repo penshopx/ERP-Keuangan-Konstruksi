@@ -28,13 +28,17 @@ let invitationQuery: {
   };
   isError: boolean;
 };
+let userQuery: {
+  data?: [];
+  isLoading: boolean;
+};
 
 vi.mock("@workspace/api-client-react", async (importOriginal) => {
   const original = await importOriginal<typeof import("@workspace/api-client-react")>();
   const idleMutation = () => ({ mutate: vi.fn(), isPending: false });
   return {
     ...original,
-    useListAccessUsers: () => ({ data: [], isLoading: false }),
+    useListAccessUsers: () => userQuery,
     useListAccessInvitations: () => invitationQuery,
     useListProjects: () => ({ data: [] }),
     useCreateAccessInvitation: idleMutation,
@@ -63,6 +67,7 @@ afterEach(() => {
 
 describe("status verifikasi daftar undangan", () => {
   test("menampilkan peringatan gangguan Clerk dan undangan yang sudah terverifikasi", () => {
+    userQuery = { data: [], isLoading: false };
     invitationQuery = {
       data: {
         invitations: [verifiedInvitation],
@@ -86,6 +91,7 @@ describe("status verifikasi daftar undangan", () => {
   });
 
   test("menampilkan pesan kegagalan request yang berbeda dari peringatan degradasi", () => {
+    userQuery = { data: [], isLoading: false };
     invitationQuery = {
       data: undefined,
       isError: true,
@@ -96,5 +102,28 @@ describe("status verifikasi daftar undangan", () => {
     const alert = screen.getByRole("alert");
     expect(within(alert).getByText("Daftar undangan tidak dapat dimuat. Coba lagi beberapa saat.")).toBeTruthy();
     expect(screen.queryByText("Status undangan belum dapat dipastikan")).toBeNull();
+  });
+
+  test("tetap menampilkan peringatan degradasi saat daftar pengguna masih dimuat", () => {
+    userQuery = { data: undefined, isLoading: true };
+    invitationQuery = {
+      data: {
+        invitations: [verifiedInvitation],
+        verification: {
+          status: "DEGRADED",
+          message: "Clerk sedang tidak dapat dijangkau. Hanya undangan terverifikasi yang ditampilkan.",
+          lastSuccessfulVerificationAt: null,
+        },
+      },
+      isError: false,
+    };
+
+    renderPage();
+
+    const alert = screen.getByRole("alert");
+    expect(within(alert).getByText("Status undangan belum dapat dipastikan")).toBeTruthy();
+    expect(within(alert).getByText(/Hanya undangan terverifikasi yang ditampilkan/)).toBeTruthy();
+    expect(screen.getByText("Memuat pengguna...")).toBeTruthy();
+    expect(screen.getByText("Staf Terverifikasi")).toBeTruthy();
   });
 });

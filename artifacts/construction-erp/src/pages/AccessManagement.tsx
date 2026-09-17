@@ -37,7 +37,6 @@ export default function AccessManagement() {
   const { data: invitationList, isError: invitationListFailed } = useListAccessInvitations();
   const { data: projects } = useListProjects();
   const invitations = invitationList?.invitations;
-  if (isLoading) return <div>Memuat pengguna...</div>;
   return <div className="space-y-6"><div><h1 className="text-3xl font-bold">Hak Akses</h1><p className="text-muted-foreground">Undang staf dan siapkan jabatan serta proyek sebelum mereka pertama kali masuk.</p></div>
     <InviteCard projects={projects ?? []} />
     {invitationList?.verification.status === "DEGRADED" && <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
@@ -55,7 +54,9 @@ export default function AccessManagement() {
     {invitations && invitations.length > 0 && <Card><CardHeader><CardTitle className="text-base">Undangan staf</CardTitle></CardHeader><CardContent className="grid gap-3">
       {invitations.map((invite) => <InvitationRow key={invite.id} invite={invite} />)}
     </CardContent></Card>}
-    <div className="grid gap-4">{users?.map((user) => <AccessCard key={user.userId} user={user} projects={projects ?? []} />)}</div>
+    {isLoading
+      ? <div>Memuat pengguna...</div>
+      : <div className="grid gap-4">{users?.map((user) => <AccessCard key={user.userId} user={user} projects={projects ?? []} />)}</div>}
   </div>;
 }
 
