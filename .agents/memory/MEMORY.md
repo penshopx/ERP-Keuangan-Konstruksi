@@ -8,3 +8,4 @@
 - [Tracked SQL migrations](tracked-sql-migrations.md) — declare migration-history objects in Drizzle and keep SQL-only constraints protected from schema push.
 - [Composite package declarations](composite-package-declarations.md) — rebuild emitted declarations after merges before consumers run TypeScript validation.
 - [Database timeout errors](database-timeout-errors.md) — transaction-local PostgreSQL timeouts may surface through wrapped causes; preserve rollback and inspect the error chain.
+- [Child-process test lifecycle](child-process-test-lifecycle.md) — close stdin readers, servers, and database pools explicitly so integration workers terminate reliably.

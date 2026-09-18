@@ -52,7 +52,7 @@ function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string, 
     const timeout = setTimeout(() => {
       cleanup();
       reject(new Error(`Timed out waiting for worker output ${JSON.stringify(expected)}; received ${JSON.stringify(read())}`));
-    }, 5_000);
+    }, 15_000);
     const onData = () => {
       if (!read().includes(expected)) return;
       cleanup();

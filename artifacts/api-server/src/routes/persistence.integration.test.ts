@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { after, before, mock, test } from "node:test";
@@ -43,6 +44,10 @@ const preventOverlappingTaxRulesMigrationUrl = new URL(
 );
 const preserveMultipleBoundedTaxOverridesMigrationUrl = new URL(
   "../../../../lib/db/migrations/0002_preserve_multiple_bounded_tax_overrides.sql",
+  import.meta.url,
+);
+const rabImportProcessWorkerUrl = new URL(
+  "../testing/rab-import-process.worker.ts",
   import.meta.url,
 );
 const restrictProjectStatusMigrationUrl = new URL(
@@ -107,6 +112,75 @@ async function requestJson(baseUrl: string, path: string, init?: RequestInit) {
   const body = await response.json();
   assert.ok(response.ok, `${init?.method ?? "GET"} ${path} failed (${response.status}): ${JSON.stringify(body)}`);
   return body as Record<string, unknown>;
+}
+
+function startRabImportProcess(
+  mode: "fail" | "succeed",
+  projectId: string,
+  templateId: string,
+  priceFactor: number,
+) {
+  const child = spawn(process.execPath, [
+    "--import",
+    "tsx",
+    rabImportProcessWorkerUrl.pathname,
+    mode,
+    projectId,
+    templateId,
+    String(priceFactor),
+    `test-user-${randomUUID()}`,
+  ], { cwd: process.cwd(), env: process.env });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+    stdout += chunk;
+  });
+  child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+  const result = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+  return { child, stdout: () => stdout, stderr: () => stderr, result };
+}
+
+function waitForWorkerOutput(
+  child: ChildProcessWithoutNullStreams,
+  expected: RegExp,
+  read: () => string,
+) {
+  return new Promise<RegExpMatchArray>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for ${expected}; stdout: ${read()}`));
+    }, 10_000);
+    const onData = () => {
+      const match = read().match(expected);
+      if (!match) return;
+      cleanup();
+      resolve(match);
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error(`Worker exited before ${expected}; stdout: ${read()}`));
+    };
+    const cleanup = () => {
+      clearTimeout(timeout);
+      child.stdout.off("data", onData);
+      child.off("close", onClose);
+    };
+    child.stdout.on("data", onData);
+    child.once("close", onClose);
+    onData();
+  });
+}
+
+async function stopRabImportProcess(worker: ReturnType<typeof startRabImportProcess>) {
+  if (worker.child.exitCode === null && worker.child.signalCode === null) {
+    worker.child.kill("SIGTERM");
+  }
+  await worker.result;
 }
 
 async function cleanupRegressionData() {
@@ -1406,6 +1480,205 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
           const entityIds = [concurrentProjectId, failedBaselineId, ...baselines.map(({ id }) => id)]
             .filter(Boolean);
           await tx.delete(auditLogsTable).where(inArray(auditLogsTable.entityId, entityIds));
+          await tx.delete(projectsTable).where(eq(projectsTable.id, concurrentProjectId));
+        }
+        await tx.delete(rabTemplatesTable).where(inArray(
+          rabTemplatesTable.id,
+          templateFixtures.map(({ id }) => id),
+        ));
+      });
+    }
+  });
+
+  await t.test("separate API processes keep a failed and successful concurrent RAB import atomic", async () => {
+    const concurrentProjectCode = `TST-${randomUUID().slice(0, 8)}`;
+    const failedTemplate = {
+      id: `test-rab-import-${randomUUID()}`,
+      name: "Template Process RAB Gagal",
+      priceFactor: 1.2,
+      items: [{
+        code: "TEST.PROCESS.FAIL.1",
+        name: "Item proses gagal",
+        category: "GAGAL",
+        unit: "ls",
+        quantity: 4,
+        unitPrice: 125_000,
+        materialCost: 75_000,
+        laborCost: 40_000,
+        equipmentCost: 10_000,
+        parentCode: null,
+        level: 1,
+      }],
+    };
+    const successfulTemplate = {
+      id: `test-rab-import-${randomUUID()}`,
+      name: "Template Process RAB Berhasil",
+      priceFactor: 1.25,
+      items: [
+        {
+          code: "TEST.PROCESS.SUCCESS.1",
+          name: "Item proses sukses utama",
+          category: "SUKSES",
+          unit: "m2",
+          quantity: 2,
+          unitPrice: 400_000,
+          materialCost: 250_000,
+          laborCost: 100_000,
+          equipmentCost: 50_000,
+          parentCode: null,
+          level: 1,
+        },
+        {
+          code: "TEST.PROCESS.SUCCESS.2",
+          name: "Item proses sukses tambahan",
+          category: "SUKSES",
+          unit: "ls",
+          quantity: 3,
+          unitPrice: 200_000,
+          materialCost: 125_000,
+          laborCost: 50_000,
+          equipmentCost: 25_000,
+          parentCode: null,
+          level: 1,
+        },
+      ],
+    };
+    const templateFixtures = [failedTemplate, successfulTemplate];
+    let concurrentProjectId = "";
+    let failedWorker: ReturnType<typeof startRabImportProcess> | undefined;
+    let successfulWorker: ReturnType<typeof startRabImportProcess> | undefined;
+    const setupServer = await startTestServer();
+
+    await db.insert(rabTemplatesTable).values(templateFixtures.map((template) => ({
+      id: template.id,
+      name: template.name,
+      projectType: "TEST",
+      description: "Fixture unik untuk konkurensi impor RAB lintas proses",
+      sourceNote: "Regression test",
+      items: template.items,
+    })));
+
+    try {
+      const created = await requestJson(setupServer.baseUrl, "/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          code: concurrentProjectCode,
+          name: "Proyek Concurrent RAB Lintas Proses",
+          owner: "Regression Test",
+          contractValue: 100_000_000,
+          endDate: "2027-12-31",
+        }),
+      });
+      concurrentProjectId = String(created.id);
+      await setupServer.close();
+
+      failedWorker = startRabImportProcess(
+        "fail",
+        concurrentProjectId,
+        failedTemplate.id,
+        failedTemplate.priceFactor,
+      );
+      successfulWorker = startRabImportProcess(
+        "succeed",
+        concurrentProjectId,
+        successfulTemplate.id,
+        successfulTemplate.priceFactor,
+      );
+      await Promise.all([
+        waitForWorkerOutput(failedWorker.child, /^READY \d+$/m, failedWorker.stdout),
+        waitForWorkerOutput(successfulWorker.child, /^READY \d+$/m, successfulWorker.stdout),
+      ]);
+
+      failedWorker.child.stdin.write("START\n");
+      const failedVersionMatch = await waitForWorkerOutput(
+        failedWorker.child,
+        /^AFTER_VERSION ([0-9a-f-]+) (\d+)$/m,
+        failedWorker.stdout,
+      );
+      const failedBaselineId = failedVersionMatch[1]!;
+      const failedVersion = Number(failedVersionMatch[2]);
+
+      successfulWorker.child.stdin.write("START\n");
+      await waitForWorkerOutput(successfulWorker.child, /^BEFORE_LOCK$/m, successfulWorker.stdout);
+      failedWorker.child.stdin.write("CONTINUE\n");
+      successfulWorker.child.stdin.write("CONTINUE\n");
+
+      const [failedResultMatch, successfulResultMatch] = await Promise.all([
+        waitForWorkerOutput(failedWorker.child, /^RESULT (\d+) ([A-Za-z0-9+/=]+)$/m, failedWorker.stdout),
+        waitForWorkerOutput(successfulWorker.child, /^RESULT (\d+) ([A-Za-z0-9+/=]+)$/m, successfulWorker.stdout),
+      ]);
+      const [failedExit, successfulExit] = await Promise.all([
+        failedWorker.result,
+        successfulWorker.result,
+      ]);
+      assert.equal(failedExit.code, 0, failedWorker.stderr());
+      assert.equal(successfulExit.code, 0, successfulWorker.stderr());
+      assert.equal(Number(failedResultMatch[1]), 500);
+      assert.equal(Number(successfulResultMatch[1]), 201);
+      const successfulImport = JSON.parse(
+        Buffer.from(successfulResultMatch[2]!, "base64").toString("utf8"),
+      ) as Record<string, unknown>;
+      assert.equal(Number(successfulImport.version), failedVersion);
+
+      const baselines = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.projectId, concurrentProjectId));
+      assert.equal(baselines.length, 2);
+      const successfulBaseline = baselines.find(({ version }) => version === failedVersion);
+      assert.ok(successfulBaseline);
+      assert.notEqual(successfulBaseline.id, failedBaselineId);
+
+      const expectedBudgets = [1_000_000, 750_000];
+      const expectedTotalBudget = expectedBudgets.reduce((sum, budget) => sum + budget, 0);
+      const storedItems = await db.select().from(rabItemsTable)
+        .where(eq(rabItemsTable.baselineId, successfulBaseline.id))
+        .orderBy(rabItemsTable.code);
+      assert.deepEqual(storedItems.map(({ code }) => code), successfulTemplate.items.map(({ code }) => code));
+      assert.deepEqual(storedItems.map(({ budget }) => budget), expectedBudgets);
+
+      const [storedProject] = await db.select().from(projectsTable)
+        .where(eq(projectsTable.id, concurrentProjectId));
+      assert.ok(storedProject);
+      assert.equal(storedProject.budget, expectedTotalBudget);
+      assert.equal(storedProject.wbsCount, successfulTemplate.items.length);
+
+      const successfulAudits = await db.select().from(auditLogsTable).where(and(
+        eq(auditLogsTable.entity, "RAB"),
+        eq(auditLogsTable.entityId, successfulBaseline.id),
+        eq(auditLogsTable.action, "DIIMPOR"),
+      ));
+      assert.equal(successfulAudits.length, 1);
+      assert.deepEqual(successfulAudits[0]!.metadata, {
+        templateId: successfulTemplate.id,
+        priceFactor: successfulTemplate.priceFactor,
+        itemCount: successfulTemplate.items.length,
+      });
+
+      const [failedBaseline] = await db.select().from(rabBaselinesTable)
+        .where(eq(rabBaselinesTable.id, failedBaselineId));
+      const failedItems = await db.select().from(rabItemsTable)
+        .where(eq(rabItemsTable.baselineId, failedBaselineId));
+      const failedAudits = await db.select().from(auditLogsTable)
+        .where(eq(auditLogsTable.entityId, failedBaselineId));
+      assert.equal(failedBaseline, undefined);
+      assert.deepEqual(failedItems, []);
+      assert.deepEqual(failedAudits, []);
+    } finally {
+      failedWorker?.child.stdin.write("CONTINUE\n");
+      successfulWorker?.child.stdin.write("CONTINUE\n");
+      await Promise.allSettled([
+        setupServer.close(),
+        ...(failedWorker ? [stopRabImportProcess(failedWorker)] : []),
+        ...(successfulWorker ? [stopRabImportProcess(successfulWorker)] : []),
+      ]);
+      await db.transaction(async (tx) => {
+        if (concurrentProjectId) {
+          const baselines = await tx.select({ id: rabBaselinesTable.id })
+            .from(rabBaselinesTable)
+            .where(eq(rabBaselinesTable.projectId, concurrentProjectId));
+          await tx.delete(auditLogsTable).where(inArray(
+            auditLogsTable.entityId,
+            [concurrentProjectId, ...baselines.map(({ id }) => id)],
+          ));
           await tx.delete(projectsTable).where(eq(projectsTable.id, concurrentProjectId));
         }
         await tx.delete(rabTemplatesTable).where(inArray(
