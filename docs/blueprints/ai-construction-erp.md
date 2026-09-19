@@ -223,6 +223,107 @@ Fondasi tersebut dipertahankan dan diperluas, bukan diganti oleh framework AI.
 - investigasi, filter, export, dan retention;
 - anomaly dan policy violation detection.
 
+### 6.11 Four-way cost control
+
+Pengendalian biaya menggunakan empat lapisan yang tidak dicampur:
+
+1. **Baseline budget:** RAB/RAP yang telah disetujui pada versi tertentu.
+2. **Committed cost:** kewajiban dari PO, SPK, kontrak subkon, atau komitmen lain yang telah disetujui tetapi belum seluruhnya dibayar.
+3. **Actual cost:** penerimaan, invoice vendor, payroll, pemakaian persediaan, kas keluar, atau jurnal yang telah diakui.
+4. **Forecast at completion:** estimasi total biaya akhir berdasarkan aktual, komitmen terbuka, sisa pekerjaan, dan asumsi forecast berversi.
+
+Metrik minimum per proyek, WBS, cost code, dan periode:
+
+- original budget;
+- approved changes;
+- current budget;
+- committed;
+- actual;
+- remaining commitment;
+- estimate to complete;
+- estimate at completion;
+- variance at completion;
+- available budget.
+
+Hubungan dasarnya:
+
+```text
+Current Budget = Approved Baseline + Approved Change Orders
+Projected Exposure = Actual + Remaining Commitment + Estimate to Complete
+Variance at Completion = Current Budget - Estimate at Completion
+```
+
+Formula rinci harus dikonfigurasi dan diberi versi. Sistem tidak boleh menghitung actual hanya dari kas keluar karena penerimaan barang/jasa dan kewajiban vendor dapat terjadi sebelum pembayaran.
+
+### 6.12 Rekonsiliasi material dan kas
+
+Rekonsiliasi aktif membandingkan:
+
+- kebutuhan teoritis dari volume × koefisien analisa;
+- approved procurement quantity;
+- quantity yang diterima;
+- quantity yang dikeluarkan dari gudang;
+- return, transfer, dan stock adjustment;
+- installed/verified quantity;
+- invoice vendor serta pembayaran;
+- nilai biaya aktual pada WBS/cost code.
+
+Selisih tidak otomatis dianggap kehilangan. Sistem mengklasifikasikan kemungkinan penyebab seperti:
+
+- waste yang masih dalam toleransi;
+- perubahan desain;
+- pekerjaan ulang;
+- salah alokasi proyek/WBS;
+- keterlambatan pencatatan;
+- stok dalam perjalanan;
+- unit conversion;
+- kerusakan atau kehilangan.
+
+Toleransi waste harus effective-dated dan dapat berbeda menurut material, jenis pekerjaan, proyek, serta metode kerja. Exception menghasilkan temuan untuk ditinjau, bukan koreksi transaksi otomatis.
+
+### 6.13 Rantai data dan kebijakan rekalkulasi
+
+Rantai konseptual:
+
+```text
+Dimensi/Gambar
+→ Quantity
+→ Analisa dan Koefisien
+→ Master Harga
+→ RAP/RAB
+→ Margin dan Pajak
+→ Nilai Kontrak
+→ Progress
+→ Billing
+→ Payment
+→ Actual Cost dan Forecast
+```
+
+“Single source of truth” tidak berarti satu perubahan mengubah semua histori secara langsung. Aturannya:
+
+- perubahan input draft boleh menghitung ulang projection secara real-time;
+- perubahan pada data approved membuat versi atau change order baru;
+- invoice, snapshot pajak, pembayaran, dan jurnal posted tidak dihitung ulang diam-diam;
+- setiap turunan menyimpan ID/versi sumber serta formula yang digunakan;
+- dampak perubahan ditampilkan sebelum approval;
+- event hilir yang memerlukan tindakan dibuat sebagai exception atau task, bukan overwrite.
+
+Dengan demikian sistem memiliki satu lineage data tanpa merusak bukti audit.
+
+### 6.14 Budget-gap dan anomaly alerts
+
+Alert dapat dipicu ketika:
+
+- actual + remaining commitment melewati ambang current budget;
+- estimate at completion melewati current budget;
+- penggunaan material melewati kebutuhan + toleransi;
+- progres fisik tertinggal dari biaya yang dikeluarkan;
+- billing melebihi progres atau plafon;
+- komitmen tidak memiliki penerimaan/invoice setelah batas waktu;
+- transaksi tidak dapat direkonsiliasi ke proyek, WBS, atau dokumen sumber.
+
+Threshold merupakan konfigurasi berversi, bukan konstanta permanen. Alert harus memiliki severity, owner, evidence, status, acknowledgement, resolution, dan audit history. Deduplication serta routing menggunakan kanal operasional terpadu.
+
 ## 7. Project Brain
 
 Konsep Gustafta “Brain Project” diadopsi sebagai pola vendor-neutral bernama **Project Brain**.
@@ -339,8 +440,12 @@ Contoh tools:
 - `compareRabVersions`
 - `calculateRabDraft`
 - `getCostVariance`
+- `getFourWayCostPosition`
+- `forecastCostAtCompletion`
+- `findBudgetGapExceptions`
 - `draftPurchaseRequest`
 - `reconcileMaterialUsage`
+- `explainMaterialVariance`
 - `calculateInvoicePreview`
 - `draftProgressBilling`
 - `getTaxSummary`
@@ -473,7 +578,9 @@ Metrik:
 - lengkapi error handling;
 - audit pagination dan drill-down;
 - monitoring dan notifikasi operasional;
-- procurement/actual-cost minimum viable flow.
+- tetapkan cost code/WBS sebagai dimensi bersama;
+- procurement/actual-cost minimum viable flow;
+- pisahkan baseline, committed, actual, dan forecast pada kontrak data.
 
 Gate: kontrak API stabil, semua mutation memiliki policy dan audit, serta laporan tidak bergantung pada data contoh.
 
@@ -533,13 +640,15 @@ Gate: tidak ada agent yang dapat membuat sekaligus menyetujui transaksi material
 ## 18. Urutan prioritas produk
 
 1. Keamanan dan konsistensi ERP core.
-2. Procurement, inventory, actual cost, dan progress data.
-3. Document control dan Project Brain.
-4. AI copilot read-only.
-5. Draft agents.
-6. Multi-agent analytics.
-7. Controlled execution.
-8. AI parametrik/vision untuk gambar setelah dataset dan review workflow matang.
+2. WBS/cost code bersama dan four-way cost model.
+3. Procurement, inventory, actual cost, dan progress data.
+4. Rekonsiliasi material/kas serta budget-gap alerting.
+5. Document control dan Project Brain.
+6. AI copilot read-only.
+7. Draft agents.
+8. Multi-agent analytics.
+9. Controlled execution.
+10. AI parametrik/vision untuk gambar setelah dataset dan review workflow matang.
 
 ## 19. Keputusan arsitektur
 
@@ -571,7 +680,11 @@ Blueprint berhasil ketika:
 
 - `docs/references/odoo-construction-erp.md`: referensi proses ERP konstruksi.
 - `docs/references/erabe-rab-project-workflow.md`: referensi alur RAB, progres, billing, dan field access.
+- `attached_assets/Pasted--Benar-sekali-Anda-sangat-tepat-menangkap-perbedaan-men_1789781422378.txt`: sintesis Qwen mengenai batas antara alat RAB dan ERP.
+- `attached_assets/Pasted-Berikut-adalah-rangkuman-sintesis-dari-fitur-fitur-pali_1789781440454.txt`: sintesis Qwen mengenai data lineage, four-way cost, guardrail AI, dan rekonsiliasi.
 - `https://gustafta.my.id`: referensi domain untuk knowledge, dokumen, tender, compliance, dan project intelligence.
 - Hermes Agent, OpenClaw, serta proyek MultiClaw: referensi runtime dan pola orkestrasi agent.
 
 Seluruh sumber eksternal digunakan untuk pola dan terminologi. Klaim vendor, tarif, regulasi, harga, integrasi, serta kemampuan teknis wajib diverifikasi sebelum menjadi requirement atau konfigurasi produksi.
+
+Catatan koreksi: penyebutan task rekonsiliasi undangan pada sintesis Qwen tidak membuktikan adanya rekonsiliasi gudang atau kas. Rekonsiliasi material, biaya, dan kas tetap merupakan kapabilitas ERP terpisah yang belum dapat dianggap terimplementasi hanya karena mekanisme lock/alert untuk undangan sudah tersedia.
