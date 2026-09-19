@@ -11,8 +11,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, AlertTriangle, GitCompareArrows, History } from "lucide-react"
+import { ArrowLeft, AlertTriangle, Download, GitCompareArrows, History } from "lucide-react"
 import { formatRupiah, formatPercent } from "@/lib/utils"
+import { downloadRabComparisonCsv, getRabComparisonRows } from "@/lib/rab-comparison-export"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -70,21 +71,7 @@ export default function ProjectRab() {
   const comparisonFrom = comparisonFromQuery.data
   const comparisonTo = comparisonToQuery.data
   const comparisonItems = comparisonFrom && comparisonTo
-    ? (() => {
-        const fromByCode = new Map(comparisonFrom.items.map((item) => [item.code, item]))
-        const toByCode = new Map(comparisonTo.items.map((item) => [item.code, item]))
-        return Array.from(new Set([...fromByCode.keys(), ...toByCode.keys()])).sort().map((code) => {
-        const from = fromByCode.get(code)
-        const to = toByCode.get(code)
-        const status = !from ? "ADDED" : !to ? "REMOVED" : (
-          from.quantity !== to.quantity ||
-          from.unitPrice !== to.unitPrice ||
-          from.budget !== to.budget ||
-          from.name !== to.name
-        ) ? "CHANGED" : "UNCHANGED"
-        return { code, from, to, status }
-      }).filter((item) => item.status !== "UNCHANGED")
-      })()
+    ? getRabComparisonRows(comparisonFrom, comparisonTo)
     : []
 
   if (comparisonVersions) {
@@ -118,6 +105,26 @@ export default function ProjectRab() {
               testId="select-rab-comparison-to"
               onChange={(to) => setComparisonVersions((current) => current ? { ...current, to } : null)}
             />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                comparisonLoading ||
+                comparisonError ||
+                !comparisonFrom ||
+                !comparisonTo ||
+                comparisonVersions.from === comparisonVersions.to
+              }
+              onClick={() => {
+                if (comparisonFrom && comparisonTo) {
+                  downloadRabComparisonCsv(comparisonFrom, comparisonTo)
+                }
+              }}
+              data-testid="button-download-rab-comparison"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Unduh CSV
+            </Button>
           </div>
         </div>
 

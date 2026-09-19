@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createElement } from "react"
 import type { ReactNode } from "react"
-import { afterEach, beforeAll, describe, expect, test, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest"
 import ProjectRab from "./ProjectRab"
 
 const latestRab = {
@@ -88,6 +88,11 @@ beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = () => undefined
 })
 
+beforeEach(() => {
+  URL.createObjectURL = vi.fn(() => "blob:rab-comparison")
+  URL.revokeObjectURL = vi.fn()
+})
+
 afterEach(() => {
   cleanup()
 })
@@ -127,5 +132,6 @@ describe("riwayat versi RAB", () => {
     expect(screen.getByTestId("row-rab-comparison-A.1").textContent).toContain("12")
     expect(screen.getByTestId("row-rab-comparison-B.1").textContent).toContain("DIHAPUS")
     expect(screen.getByTestId("row-rab-comparison-C.1").textContent).toContain("BARU")
+    expect(screen.getByTestId("button-download-rab-comparison")).not.toHaveProperty("disabled", true)
   })
 })
