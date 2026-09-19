@@ -10,6 +10,10 @@ import {
 import { shouldSeedDemoData } from "./lib/demo-seeding";
 import { getClerkInvitationState } from "./routes/access";
 import { clerkClient } from "@clerk/express";
+import {
+  resolveOperationalAlertConfig,
+  sendOperationalAlert,
+} from "@workspace/db/operational-alert";
 
 const rawPort = process.env["PORT"];
 
@@ -25,7 +29,6 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const alertWebhookUrl = process.env["INVITATION_RECONCILIATION_ALERT_WEBHOOK_URL"];
 const rawFailureThreshold =
   process.env["INVITATION_RECONCILIATION_ALERT_FAILURE_THRESHOLD"] ?? "3";
 const alertFailureThreshold = Number(rawFailureThreshold);
@@ -42,25 +45,24 @@ if (!Number.isInteger(completionStaleAfterMs) || completionStaleAfterMs <= 0) {
     "INVITATION_RECONCILIATION_ALERT_STALE_AFTER_MS must be a positive integer",
   );
 }
-const rawAlertTimeoutMs =
-  process.env["INVITATION_RECONCILIATION_ALERT_TIMEOUT_MS"] ?? "5000";
-const alertTimeoutMs = Number(rawAlertTimeoutMs);
-if (!Number.isInteger(alertTimeoutMs) || alertTimeoutMs <= 0) {
-  throw new Error(
-    "INVITATION_RECONCILIATION_ALERT_TIMEOUT_MS must be a positive integer",
-  );
-}
+const invitationAlertConfig = resolveOperationalAlertConfig({
+  channelWebhookUrl:
+    process.env["INVITATION_RECONCILIATION_ALERT_WEBHOOK_URL"],
+  channelTimeoutMs:
+    process.env["INVITATION_RECONCILIATION_ALERT_TIMEOUT_MS"],
+});
 
 async function sendInvitationReconciliationAlert(
   alert: InvitationReconciliationAlert,
 ) {
-  if (!alertWebhookUrl) return;
-  const response = await fetch(alertWebhookUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    signal: AbortSignal.timeout(alertTimeoutMs),
-    body: JSON.stringify({
+  const result = await sendOperationalAlert({
+    config: invitationAlertConfig,
+    log: logger,
+    alert: {
       source: "invitation-reconciliation",
+      event: alert.type === "DEGRADED"
+        ? "invitation_reconciliation_degraded"
+        : "invitation_reconciliation_recovered",
       severity: alert.type === "DEGRADED" ? "error" : "info",
       message: alert.type === "DEGRADED"
         ? alert.reason === "NO_RECENT_COMPLETION"
@@ -68,11 +70,9 @@ async function sendInvitationReconciliationAlert(
           : `Rekonsiliasi undangan gagal ${alert.consecutiveFailures} kali berturut-turut`
         : "Rekonsiliasi undangan telah pulih",
       ...alert,
-    }),
+    },
   });
-  if (!response.ok) {
-    throw new Error(`Alert webhook returned HTTP ${response.status}`);
-  }
+  if (!result.delivered && result.reason === "delivery_failed") throw result.error;
 }
 
 await assertRequiredDatabaseMigrations();

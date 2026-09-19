@@ -5,7 +5,11 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./operational-alert": {
+      "types": "./src/operational-alert.d.ts",
+      "default": "./src/operational-alert.mjs"
+    }
   },
   "scripts": {
     "migrate": "node ./scripts/migrate.mjs",
