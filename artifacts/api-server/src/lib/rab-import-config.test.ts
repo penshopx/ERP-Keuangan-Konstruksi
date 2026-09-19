@@ -4,6 +4,7 @@ import {
   defaultRabImportLockTimeoutMs,
   getRabImportLockTimeoutMs,
   logRabImportLockTimeout,
+  maxRabImportLockTimeoutMs,
 } from "./rab-import-config";
 
 function captureConfigLog(environment: NodeJS.ProcessEnv) {
@@ -27,6 +28,38 @@ test("RAB import lock timeout accepts a configured positive integer", () => {
   assert.equal(
     getRabImportLockTimeoutMs({ RAB_IMPORT_LOCK_TIMEOUT_MS: "12500" }),
     12_500,
+  );
+});
+
+test("RAB import lock timeout accepts the maximum operational value", () => {
+  assert.equal(
+    getRabImportLockTimeoutMs({
+      RAB_IMPORT_LOCK_TIMEOUT_MS: String(maxRabImportLockTimeoutMs),
+    }),
+    maxRabImportLockTimeoutMs,
+  );
+});
+
+test("RAB import lock timeout rejects a value immediately above the maximum", () => {
+  assert.throws(
+    () => getRabImportLockTimeoutMs({
+      RAB_IMPORT_LOCK_TIMEOUT_MS: String(maxRabImportLockTimeoutMs + 1),
+    }),
+    new RegExp(
+      `RAB_IMPORT_LOCK_TIMEOUT_MS must be a safe integer between 1 and ${maxRabImportLockTimeoutMs} milliseconds; received "${maxRabImportLockTimeoutMs + 1}"`,
+    ),
+  );
+});
+
+test("RAB import lock timeout rejects an integer outside JavaScript's safe range", () => {
+  const unsafeInteger = "9007199254740992";
+  assert.throws(
+    () => getRabImportLockTimeoutMs({
+      RAB_IMPORT_LOCK_TIMEOUT_MS: unsafeInteger,
+    }),
+    new RegExp(
+      `RAB_IMPORT_LOCK_TIMEOUT_MS must be a safe integer between 1 and ${maxRabImportLockTimeoutMs} milliseconds; received "${unsafeInteger}"`,
+    ),
   );
 });
 
@@ -63,7 +96,7 @@ for (const invalidValue of ["", "0", "-1", "1.5", "invalid"]) {
         RAB_IMPORT_LOCK_TIMEOUT_MS: invalidValue,
       }),
       new RegExp(
-        `RAB_IMPORT_LOCK_TIMEOUT_MS must be a positive integer; received`,
+        `RAB_IMPORT_LOCK_TIMEOUT_MS must be a safe integer between 1 and ${maxRabImportLockTimeoutMs} milliseconds; received`,
       ),
     );
   });

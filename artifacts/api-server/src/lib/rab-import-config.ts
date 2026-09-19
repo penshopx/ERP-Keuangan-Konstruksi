@@ -1,4 +1,10 @@
 export const defaultRabImportLockTimeoutMs = 5_000;
+/**
+ * RAB imports may wait at most one minute for the project advisory lock.
+ * This leaves room for slow operations while keeping requests within a
+ * bounded operational wait when the environment value is misconfigured.
+ */
+export const maxRabImportLockTimeoutMs = 60_000;
 
 type RabImportConfigLogger = {
   info(
@@ -17,9 +23,13 @@ export function getRabImportLockTimeoutMs(
   if (rawValue === undefined) return defaultRabImportLockTimeoutMs;
 
   const timeoutMs = Number(rawValue);
-  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+  if (
+    !Number.isSafeInteger(timeoutMs)
+    || timeoutMs <= 0
+    || timeoutMs > maxRabImportLockTimeoutMs
+  ) {
     throw new Error(
-      `RAB_IMPORT_LOCK_TIMEOUT_MS must be a positive integer; received "${rawValue}"`,
+      `RAB_IMPORT_LOCK_TIMEOUT_MS must be a safe integer between 1 and ${maxRabImportLockTimeoutMs} milliseconds; received "${rawValue}"`,
     );
   }
 
