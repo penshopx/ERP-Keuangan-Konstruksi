@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { after, test } from "node:test";
+import { pool } from "@workspace/db";
+import {
+  acquireDatabaseSuiteLock,
+  isDatabaseStatementTimeout,
+  releaseDatabaseSuiteLock,
+  setDatabaseSuiteStatementTimeout,
+} from "./database-suite-lock";
 
 const workerUrl = new URL("./database-suite-lock.worker.ts", import.meta.url);
 
@@ -9,6 +17,10 @@ type WorkerResult = {
   stdout: string;
   stderr: string;
 };
+
+after(async () => {
+  await pool.end();
+});
 
 function startWorker(hold: number | "signal", timeoutMs: number) {
   const child = spawn(
@@ -114,4 +126,49 @@ test("database suite advisory lock exits non-zero with an explicit timeout", asy
   } finally {
     await Promise.all([stopWorker(holder), ...(timedOut ? [stopWorker(timedOut)] : [])]);
   }
+});
+
+test("statement timeout still cleans fixtures and releases the database suite lock", async () => {
+  const runId = randomUUID();
+  const lockOptions = {
+    lockName: `api-server:statement-timeout-lock-regression:${runId}`,
+    suiteName: "statement-timeout lock regression",
+  };
+  const statementTimeoutMs = 50;
+  const fixtureId = `timeout-fixture-${runId}`;
+  const client = await acquireDatabaseSuiteLock({ ...lockOptions, timeoutMs: 5_000 });
+  let testError: unknown;
+
+  try {
+    await setDatabaseSuiteStatementTimeout(client, lockOptions.suiteName, statementTimeoutMs);
+    await client.query("CREATE TEMP TABLE database_suite_lock_timeout_fixtures (id text PRIMARY KEY)");
+    await client.query("INSERT INTO database_suite_lock_timeout_fixtures (id) VALUES ($1)", [fixtureId]);
+    await client.query("SELECT pg_sleep(1)");
+    assert.fail("Expected PostgreSQL to cancel pg_sleep at the configured statement timeout");
+  } catch (error) {
+    testError = isDatabaseStatementTimeout(error)
+      ? new Error(
+        `Statement-timeout lock regression query exceeded the ${statementTimeoutMs}ms statement timeout`,
+        { cause: error },
+      )
+      : error;
+  } finally {
+    await client.query("DELETE FROM database_suite_lock_timeout_fixtures WHERE id = $1", [fixtureId]);
+    const remainingFixtures = await client.query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM database_suite_lock_timeout_fixtures WHERE id = $1",
+      [fixtureId],
+    );
+    assert.equal(remainingFixtures.rows[0]?.count, "0", "timeout fixture was not cleaned up");
+    await releaseDatabaseSuiteLock(client, lockOptions);
+  }
+
+  assert.ok(testError instanceof Error);
+  assert.match(
+    testError.message,
+    /Statement-timeout lock regression query exceeded the 50ms statement timeout/,
+  );
+  assert.equal(isDatabaseStatementTimeout(testError), true);
+
+  const reacquiredClient = await acquireDatabaseSuiteLock({ ...lockOptions, timeoutMs: 1_000 });
+  await releaseDatabaseSuiteLock(reacquiredClient, lockOptions);
 });
