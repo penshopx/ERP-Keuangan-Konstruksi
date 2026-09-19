@@ -30,6 +30,7 @@ import {
   UpdateProjectResponse,
 } from "@workspace/api-zod";
 import { canAccessProject, requirePermission } from "../middlewares/access";
+import { getRabImportLockTimeoutMs } from "../lib/rab-import-config";
 
 export type ProjectPersistenceHooks = {
   beforeBaselineInsert?: (projectId: string) => Promise<void>;
@@ -40,7 +41,7 @@ export type ProjectPersistenceHooks = {
   rabImportLockTimeoutMs?: number;
 };
 
-const defaultRabImportLockTimeoutMs = 5_000;
+const configuredRabImportLockTimeoutMs = getRabImportLockTimeoutMs(process.env);
 
 function isLockTimeout(error: unknown): boolean {
   let current = error;
@@ -351,7 +352,7 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
   let version: number;
   try {
     version = await db.transaction(async (tx) => {
-      const lockTimeoutMs = hooks.rabImportLockTimeoutMs ?? defaultRabImportLockTimeoutMs;
+      const lockTimeoutMs = hooks.rabImportLockTimeoutMs ?? configuredRabImportLockTimeoutMs;
       await tx.execute(sql`select set_config('lock_timeout', ${`${lockTimeoutMs}ms`}, true)`);
       await hooks.beforeRabImportVersionLock?.(project.id, baselineId);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${project.id}))`);
