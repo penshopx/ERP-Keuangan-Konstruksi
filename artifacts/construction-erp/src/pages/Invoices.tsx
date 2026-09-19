@@ -20,6 +20,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { hasPermission, useAccess } from "@/lib/access"
+import { getJakartaCalendarDate } from "@/lib/indonesia-date"
 import { Check, X } from "lucide-react"
 
 export default function Invoices() {
@@ -47,7 +48,7 @@ export default function Invoices() {
     period: "",
     dpp: "",
     retentionPercent: "5",
-    issuedAt: new Date().toISOString().slice(0, 10),
+    issuedAt: getJakartaCalendarDate(),
     qualification: "KECIL",
   })
 
@@ -75,7 +76,7 @@ export default function Invoices() {
     }, {
       onSuccess: () => {
         setIsDialogOpen(false)
-        setNewInv({ projectId: "", period: "", dpp: "", retentionPercent: "5", issuedAt: new Date().toISOString().slice(0, 10), qualification: "KECIL" })
+        setNewInv({ projectId: "", period: "", dpp: "", retentionPercent: "5", issuedAt: getJakartaCalendarDate(), qualification: "KECIL" })
         queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() })
       }
     })
