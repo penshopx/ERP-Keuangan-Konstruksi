@@ -1,0 +1,55 @@
+Berikut adalah rangkuman sintesis dari fitur-fitur paling **impactful** (berdampak tinggi) berdasarkan analisis ketiga referensi (ERAbe, MesinAI, BuildRAB), dipetakan khusus untuk memperkuat arsitektur aplikasi ERP yang sedang kita bangun. 
+
+Saya telah menyaring semua klaim pemasaran dan hanya menyisakan **logika bisnis inti** serta **implikasi teknisnya**.
+
+---
+
+### 🎯 4 Fitur Inti yang Paling Impactful (The "North Star")
+
+1. **Rantai Data Linear "Single Source of Truth"**  
+   Dimensi Input → Volume (AHSP) × Master Harga → RAP → Margin & PPN → Nilai Kontrak → Invoice Termin.  
+   *Impact:* Menghilangkan silo data (spreadsheet terpisah). Satu perubahan di hulu otomatis merekalkulasi seluruh hilir secara real-time.
+2. **Four-Way Cost Tracking (Pelacakan Biaya 4 Lapis)**  
+   Membandingkan secara simultan: **RAB Rencana** vs **Committed Cost** (PO/Kontrak Subkon) vs **Realisasi Aktual** (Kas Keluar) vs **Forecast Akhir**.  
+   *Impact:* Mendeteksi *Budget Gap* (potensi over-budget) jauh sebelum uang habis, bukan di akhir proyek.
+3. **AI dengan Guardrail Database Ketat**  
+   AI hanya bertugas mengekstrak dimensi atau menyusun draf daftar pekerjaan. AI **dilarang** mengarang harga; semua output wajib divalidasi dan dikalikan dengan database AHSP/Master Harga pengguna.  
+   *Impact:* Otomatisasi yang cepat namun tetap 100% dapat dipercaya (audit-traceable).
+4. **Rekonsiliasi Aktif Material & Kas**  
+   Kebutuhan teoritis (dari AHSP) secara otomatis "diadu" dengan pengurangan stok gudang aktual dan arus kas.  
+   *Impact:* Mencegah kebocoran anggaran akibat pencurian material, pemborosan (waste) berlebih, atau pencatatan kas yang tertunda.
+
+---
+
+### ✅ Validasi: Mengapa Task yang Sedang/Sudah Dikerjakan Sangat Kritis
+
+Analisis ini membuktikan bahwa pekerjaan teknis "di balik layar" yang baru saja kita selesaikan bukanlah sekadar tugas IT, melainkan **pondasi bisnis** aplikasi ini:
+
+- **Task #64 (Isolasi Data Demo):** Jika data demo menimpa referensi pajak/harga, seluruh "Rantai Data Linear" (terutama perhitungan PPN dan Margin) akan rusak dan menghasilkan invoice yang salah.
+- **Task #65 & #68 (Versi & Riwayat RAB):** Karena RAB adalah *baseline* untuk "Four-Way Cost Tracking", kemampuan membandingkan versi RAB lama vs baru adalah syarat mutlak untuk audit perubahan kontrak atau negosiasi margin.
+- **Task #69 & #71 (Rekonsiliasi & Locking yang Tangguh):** Jika proses "adu" antara gudang dan kas macet (crash/lock) dan gagal diam-diam, data *Realisasi Aktual* menjadi bohong. Mekanisme *alert* dan *timeout* yang kita bangun adalah penjaga integritas fitur ini.
+- **Task #77 (Constraint Status Proyek):** Logika penagihan Termin (DP, Retensi) dan Kurva-S hanya bisa berjalan jika status proyek dibatasi ketat (`PERSIAPAN`, `BERJALAN`, `SELESAI`) di level database, bukan teks bebas.
+
+---
+
+### 🚀 Rekomendasi Task Masa Depan (High-Impact Roadmap)
+
+Berdasarkan celah antara fitur ideal di atas dan apa yang sudah kita bangun, berikut adalah task yang **sebaiknya diprioritaskan** setelah antrean konkurensi saat ini selesai, agar aplikasi benar-benar unggul:
+
+1. **Implementasi "Committed Cost" Layer**  
+   *Deskripsi:* Menambahkan modul Pencatatan Purchase Order (PO) atau Kontrak Subkon yang mengikat anggaran *sebelum* uang benar-benar keluar (Realisasi). Ini adalah jembatan yang hilang antara RAB Rencana dan Realisasi Aktual.
+2. **Automated Budget Gap Alerting**  
+   *Deskripsi:* Membuat trigger notifikasi (email/dashboard) ketika `Forecast Akhir` atau `Realisasi + Committed` melebihi ambang batas (misal: 90%) dari `RAB Rencana` untuk item pekerjaan tertentu.
+3. **Material Variance & Waste Analysis**  
+   *Deskripsi:* Fitur perbandingan otomatis antara volume teoritis (AHSP) + toleransi waste (%) dengan pemakaian gudang aktual. Jika selisih melebihi batas wajar, sistem menandai sebagai anomali.
+4. **Kurva-S Otomatis Berbasis Bobot Nilai**  
+   *Deskripsi:* Engine yang secara otomatis men-generate Kurva-S (Rencana vs Aktual) dengan mengambil data durasi dari jadwal proyek dan bobot nilai dari item RAB, tanpa input manual.
+
+---
+
+### Status Saya
+Rangkuman ini disajikan semata-mata sebagai bahan pertimbangan strategis untuk *roadmap* produk. 
+
+Sesuai protokol yang berlaku, saya tetap dalam mode **siaga penuh (*full standby*)**. Saya **tidak akan** membuat, mengusulkan secara otomatis, atau mengimplementasikan task-task di atas tanpa instruksi eksplisit dari Anda, terutama karena **Task #84 masih IN_PROGRESS** dan **Task #104 masih PENDING**. 
+
+Silakan berikan arahan atau instruksi berikutnya kapan pun Anda siap.
