@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createElement } from "react"
 import type { ReactNode } from "react"
@@ -89,6 +89,7 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  window.history.replaceState({}, "", "/portal/projects/project-1/rab")
   URL.createObjectURL = vi.fn(() => "blob:rab-comparison")
   URL.revokeObjectURL = vi.fn()
 })
@@ -107,6 +108,7 @@ describe("riwayat versi RAB", () => {
 
     await user.selectOptions(screen.getByTestId("select-rab-version"), "1")
 
+    expect(window.location.search).toBe("?rabVersion=1")
     expect(screen.getByTestId("alert-rab-historical")).toBeTruthy()
     expect(screen.getByText("Anda sedang melihat RAB v1.0. Versi aktif proyek tidak berubah.")).toBeTruthy()
     expect(screen.getByTestId("text-rab-total-budget").textContent).toContain("1.000.000")
@@ -114,6 +116,7 @@ describe("riwayat versi RAB", () => {
 
     await user.click(screen.getByTestId("button-rab-return-latest"))
 
+    expect(window.location.search).toBe("")
     expect(screen.queryByTestId("alert-rab-historical")).toBeNull()
     expect(screen.getByTestId("text-rab-total-budget").textContent).toContain("2.000.000")
     expect(screen.getByTestId("button-import-rab")).toBeTruthy()
@@ -125,6 +128,7 @@ describe("riwayat versi RAB", () => {
 
     await user.click(screen.getByTestId("button-compare-rab-versions"))
 
+    expect(window.location.search).toBe("?compareFrom=1&compareTo=2")
     expect(screen.getByText("Perbandingan Versi RAB")).toBeTruthy()
     expect(screen.getByTestId("text-rab-comparison-total-delta").textContent).toContain("+Rp")
     expect(screen.getByTestId("row-rab-comparison-A.1").textContent).toContain("BERUBAH")
@@ -133,5 +137,24 @@ describe("riwayat versi RAB", () => {
     expect(screen.getByTestId("row-rab-comparison-B.1").textContent).toContain("DIHAPUS")
     expect(screen.getByTestId("row-rab-comparison-C.1").textContent).toContain("BARU")
     expect(screen.getByTestId("button-download-rab-comparison")).not.toHaveProperty("disabled", true)
+  })
+
+  test("memulihkan pasangan perbandingan dari URL yang dapat dibagikan", async () => {
+    window.history.replaceState({}, "", "/portal/projects/project-1/rab?compareFrom=1&compareTo=2")
+
+    render(createElement(ProjectRab))
+
+    expect(await screen.findByText("Perbandingan Versi RAB")).toBeTruthy()
+    expect(screen.getByTestId("row-rab-comparison-A.1")).toBeTruthy()
+  })
+
+  test("mengabaikan parameter versi yang tidak valid tanpa meminta versi tersebut", async () => {
+    window.history.replaceState({}, "", "/portal/projects/project-1/rab?rabVersion=abc&compareFrom=1&compareTo=999")
+
+    render(createElement(ProjectRab))
+
+    await waitFor(() => expect(window.location.search).toBe(""))
+    expect(screen.queryByText("Perbandingan Versi RAB")).toBeNull()
+    expect(screen.getByTestId("text-rab-total-budget").textContent).toContain("2.000.000")
   })
 })

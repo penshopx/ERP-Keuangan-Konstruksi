@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   getGetProjectRabVersionQueryKey,
   getListProjectRabVersionsQueryKey,
@@ -54,6 +54,52 @@ export default function ProjectRab() {
   const rab = isHistorical ? historicalQuery.data : latestQuery.data
   const isLoading = isHistorical ? historicalQuery.isLoading : latestQuery.isLoading
   const isError = isHistorical ? historicalQuery.isError : latestQuery.isError
+  const availableVersionKey = versionsQuery.data?.map(({ version }) => version).join(",") ?? null
+
+  useEffect(() => {
+    if (!versionsQuery.data) return
+
+    const params = new URLSearchParams(window.location.search)
+    const availableVersions = new Set(versionsQuery.data.map(({ version }) => version))
+    const requestedVersion = parseVersionParam(params.get("rabVersion"))
+    const requestedFrom = parseVersionParam(params.get("compareFrom"))
+    const requestedTo = parseVersionParam(params.get("compareTo"))
+
+    if (requestedVersion !== null && availableVersions.has(requestedVersion)) {
+      setSelectedVersion(requestedVersion === latestQuery.data?.version ? null : requestedVersion)
+    } else {
+      setSelectedVersion(null)
+      params.delete("rabVersion")
+    }
+
+    if (
+      requestedFrom !== null &&
+      requestedTo !== null &&
+      availableVersions.has(requestedFrom) &&
+      availableVersions.has(requestedTo)
+    ) {
+      setComparisonVersions({ from: requestedFrom, to: requestedTo })
+    } else {
+      setComparisonVersions(null)
+      params.delete("compareFrom")
+      params.delete("compareTo")
+    }
+
+    replaceSearchParams(params)
+  }, [availableVersionKey, latestQuery.data?.version, projectId])
+
+  const selectVersion = (version: number | null) => {
+    setSelectedVersion(version)
+    updateRabSearchParams({ rabVersion: version })
+  }
+
+  const selectComparisonVersions = (versions: { from: number; to: number } | null) => {
+    setComparisonVersions(versions)
+    updateRabSearchParams({
+      compareFrom: versions?.from ?? null,
+      compareTo: versions?.to ?? null,
+    })
+  }
 
   if (isLoading) {
     return (
@@ -80,7 +126,7 @@ export default function ProjectRab() {
     return (
       <div className="flex flex-col gap-6 animate-in fade-in duration-500">
         <div className="flex flex-wrap items-center gap-4">
-          <Button type="button" variant="outline" size="icon" onClick={() => setComparisonVersions(null)} data-testid="button-close-rab-comparison">
+          <Button type="button" variant="outline" size="icon" onClick={() => selectComparisonVersions(null)} data-testid="button-close-rab-comparison">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -96,14 +142,14 @@ export default function ProjectRab() {
               value={comparisonVersions.from}
               versions={versions}
               testId="select-rab-comparison-from"
-              onChange={(from) => setComparisonVersions((current) => current ? { ...current, from } : null)}
+              onChange={(from) => selectComparisonVersions({ ...comparisonVersions, from })}
             />
             <VersionSelect
               label="Versi pembanding"
               value={comparisonVersions.to}
               versions={versions}
               testId="select-rab-comparison-to"
-              onChange={(to) => setComparisonVersions((current) => current ? { ...current, to } : null)}
+              onChange={(to) => selectComparisonVersions({ ...comparisonVersions, to })}
             />
             <Button
               type="button"
@@ -199,7 +245,7 @@ export default function ProjectRab() {
             type="button"
             variant="outline"
             disabled={!canCompare}
-            onClick={() => setComparisonVersions({ from: versions[1].version, to: versions[0].version })}
+            onClick={() => selectComparisonVersions({ from: versions[1].version, to: versions[0].version })}
             data-testid="button-compare-rab-versions"
           >
             <GitCompareArrows className="mr-2 h-4 w-4" />
@@ -207,7 +253,7 @@ export default function ProjectRab() {
           </Button>
           <Select
             value={selectedVersion === null ? "latest" : String(selectedVersion)}
-            onValueChange={(value) => setSelectedVersion(value === "latest" ? null : Number(value))}
+            onValueChange={(value) => selectVersion(value === "latest" ? null : Number(value))}
           >
             <SelectTrigger className="w-[220px]" data-testid="select-rab-version">
               <History className="mr-2 h-4 w-4" />
@@ -244,7 +290,7 @@ export default function ProjectRab() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setSelectedVersion(null)}
+              onClick={() => selectVersion(null)}
               data-testid="button-rab-return-latest"
             >
               Kembali ke versi terbaru
@@ -346,6 +392,29 @@ export default function ProjectRab() {
       </Card>
     </div>
   )
+}
+
+function parseVersionParam(value: string | null) {
+  if (value === null || !/^[1-9]\d*$/.test(value)) return null
+  const version = Number(value)
+  return Number.isSafeInteger(version) ? version : null
+}
+
+function replaceSearchParams(params: URLSearchParams) {
+  const search = params.toString()
+  const nextUrl = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`
+  if (nextUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+    window.history.replaceState(window.history.state, "", nextUrl)
+  }
+}
+
+function updateRabSearchParams(updates: Record<string, number | null>) {
+  const params = new URLSearchParams(window.location.search)
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === null) params.delete(key)
+    else params.set(key, String(value))
+  })
+  replaceSearchParams(params)
 }
 
 function VersionSelect({ label, value, versions, testId, onChange }: {
