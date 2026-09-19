@@ -1009,6 +1009,17 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       .where(eq(auditLogsTable.id, partialFailure.id));
     assert.equal(resolvedFailure.metadata?.reconciliationRequired, false);
     assert.equal(resolvedFailure.metadata?.reconciliationOutcome, "REVOKED");
+
+    const reconciliationLookups: string[] = [];
+    const idempotentReconciliation = await reconcilePendingInvitations({
+      getClerkInvitation: async (clerkInvitationId) => {
+        reconciliationLookups.push(clerkInvitationId);
+        return clerkDependencies.getClerkInvitation(clerkInvitationId);
+      },
+      revokeClerkInvitation: clerkDependencies.revokeClerkInvitation,
+    });
+    assert.equal(idempotentReconciliation.updated, 0);
+    assert.equal(reconciliationLookups.includes(replacementClerkId), false);
   });
   await t.test("partial revoke failure is reconciled and audited", async () => {
     const email = `${prefix}-reconcile@example.test`;

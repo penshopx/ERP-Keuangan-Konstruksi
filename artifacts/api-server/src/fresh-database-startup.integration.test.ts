@@ -17,6 +17,7 @@ const requiredMigrations = [
   "0004_restrict_project_status.sql",
   "0005_add_fixture_ownership.sql",
   "0006_add_shared_invitation_reconciliation_state.sql",
+  "0007_index_pending_resend_compensation_audits.sql",
 ];
 const expectedTables = [
   "app_migrations",
@@ -324,9 +325,9 @@ test("API exits before opening its port when mandatory migrations are missing", 
   );
   await runPsql(
     `
-    DROP TABLE invitation_reconciliation_state;
+    DROP INDEX audit_logs_pending_resend_compensation_idx;
     DELETE FROM app_migrations
-    WHERE name = '0006_add_shared_invitation_reconciliation_state.sql';
+    WHERE name = '0007_index_pending_resend_compensation_audits.sql';
     `,
     databaseName,
   );

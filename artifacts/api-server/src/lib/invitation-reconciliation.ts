@@ -468,7 +468,10 @@ export async function reconcilePendingInvitations(
 
   if (dependencies.revokeClerkInvitation) {
     const partialFailures = await db.select().from(auditLogsTable)
-      .where(eq(auditLogsTable.action, replacementRevokeFailureAction));
+      .where(and(
+        eq(auditLogsTable.action, replacementRevokeFailureAction),
+        sql`${auditLogsTable.metadata}->>'reconciliationRequired' = 'true'`,
+      ));
     for (const partialFailure of partialFailures) {
       const metadata = partialFailure.metadata;
       if (
