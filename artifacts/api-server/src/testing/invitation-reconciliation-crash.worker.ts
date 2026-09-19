@@ -1,13 +1,33 @@
 import {
+  db,
   pool,
+  staffInvitationsTable,
   tryWithDatabaseAdvisoryLock,
 } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
+  reconcileInvitationFromClerk,
   runScheduledInvitationReconciliation,
   scheduledReconciliationLockName,
 } from "../lib/invitation-reconciliation";
 
 const mode = process.argv[2];
+const invitationId = process.argv[3];
+
+const crashTestActor = {
+  userId: "system:invitation-reconciliation-crash-test",
+  displayName: "Sistem Rekonsiliasi Undangan",
+  role: "SYSTEM",
+};
+
+async function loadInvitation() {
+  if (!invitationId) throw new Error("Invitation id is required");
+  const [invitation] = await db.select().from(staffInvitationsTable)
+    .where(eq(staffInvitationsTable.id, invitationId))
+    .limit(1);
+  if (!invitation) throw new Error(`Invitation ${invitationId} was not found`);
+  return invitation;
+}
 
 if (mode === "hold") {
   await tryWithDatabaseAdvisoryLock(
@@ -17,6 +37,46 @@ if (mode === "hold") {
       await new Promise(() => {});
     },
   );
+} else if (mode === "reconcile-hold") {
+  try {
+    await reconcileInvitationFromClerk(
+      await loadInvitation(),
+      { status: "expired" },
+      crashTestActor,
+      "SCHEDULED_CHECK",
+      {
+        afterStatusUpdate: async () => {
+          process.stdout.write("STATUS_UPDATED\n");
+          await new Promise(() => {});
+        },
+      },
+    );
+  } catch (error) {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  } finally {
+    await pool.end();
+  }
+} else if (mode === "reconcile") {
+  try {
+    const before = await loadInvitation();
+    const after = await reconcileInvitationFromClerk(
+      before,
+      { status: "expired" },
+      crashTestActor,
+      "SCHEDULED_CHECK",
+    );
+    process.stdout.write(`RECONCILED ${before.status} ${after.status}\n`);
+  } catch (error) {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  } finally {
+    await pool.end();
+  }
 } else if (mode === "run") {
   const deadline = Date.now() + 2_000;
   let attempts = 0;

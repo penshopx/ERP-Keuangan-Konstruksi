@@ -23,6 +23,10 @@ export type InvitationReconciliationReason =
   | "PARTIAL_REVOKE_FAILURE"
   | "SCHEDULED_CHECK";
 
+export type InvitationReconciliationTransactionHooks = {
+  afterStatusUpdate?: () => Promise<void>;
+};
+
 export type ScheduledInvitationReconciliationDependencies = {
   getClerkInvitation: (invitationId: string) => Promise<ClerkInvitationState>;
   revokeClerkInvitation?: (invitationId: string) => Promise<unknown>;
@@ -238,6 +242,7 @@ export async function reconcileInvitationFromClerk(
   clerkState: ClerkInvitationState,
   actor: ReconciliationActor,
   reason: InvitationReconciliationReason,
+  transactionHooks: InvitationReconciliationTransactionHooks = {},
 ) {
   const clerkStatus = clerkState.status.toLowerCase();
   if (invitation.status !== "PENDING" || !inactiveClerkStatuses.has(clerkStatus)) {
@@ -257,6 +262,7 @@ export async function reconcileInvitationFromClerk(
         .where(eq(staffInvitationsTable.id, invitation.id)).limit(1);
       return current ?? invitation;
     }
+    await transactionHooks.afterStatusUpdate?.();
 
     const audit: typeof auditLogsTable.$inferInsert = {
       id: randomUUID(),
