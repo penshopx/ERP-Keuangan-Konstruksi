@@ -266,6 +266,159 @@ export interface InvoiceInput {
   governmentCollector: boolean;
 }
 
+export type PettyCashRequestStatus = typeof PettyCashRequestStatus[keyof typeof PettyCashRequestStatus];
+
+
+export const PettyCashRequestStatus = {
+  DIAJUKAN: 'DIAJUKAN',
+  DISETUJUI: 'DISETUJUI',
+  DITOLAK: 'DITOLAK',
+  DICAIRKAN: 'DICAIRKAN',
+  DIPERTANGGUNGJAWABKAN: 'DIPERTANGGUNGJAWABKAN',
+  DIREKONSILIASI: 'DIREKONSILIASI',
+} as const;
+
+export interface PettyCashExpense {
+  id: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  expenseDate: string;
+  description: string;
+  amount: number;
+  receiptReference: string;
+}
+
+export interface PettyCashRequest {
+  id: string;
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  requesterUserId: string;
+  requesterName: string;
+  purpose: string;
+  costCode: string;
+  requestedAmount: number;
+  /** @nullable */
+  approvedAmount?: number | null;
+  /** @nullable */
+  disbursedAmount?: number | null;
+  /** @nullable */
+  spentAmount?: number | null;
+  /** @nullable */
+  returnedAmount?: number | null;
+  /** @nullable */
+  physicalCashAmount?: number | null;
+  status: PettyCashRequestStatus;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  requestedAt: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  evidenceDueAt: string;
+  policyVersion: string;
+  /** @nullable */
+  approverName?: string | null;
+  /** @nullable */
+  approvalNote?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  disburserName?: string | null;
+  /** @nullable */
+  disbursementReference?: string | null;
+  /** @nullable */
+  disbursedAt?: string | null;
+  /** @nullable */
+  settledAt?: string | null;
+  /** @nullable */
+  reconcilerName?: string | null;
+  /** @nullable */
+  reconciliationNote?: string | null;
+  /** @nullable */
+  reconciledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  expenses: PettyCashExpense[];
+}
+
+export interface PettyCashRequestInput {
+  projectId: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  purpose: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  costCode: string;
+  /** @minimum 1 */
+  requestedAmount: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  requestedAt: string;
+}
+
+export type PettyCashDecisionInputDecision = typeof PettyCashDecisionInputDecision[keyof typeof PettyCashDecisionInputDecision];
+
+
+export const PettyCashDecisionInputDecision = {
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT',
+} as const;
+
+export interface PettyCashDecisionInput {
+  decision: PettyCashDecisionInputDecision;
+  /** @minimum 1 */
+  approvedAmount?: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  note: string;
+}
+
+export interface PettyCashDisbursementInput {
+  /** @minimum 1 */
+  amount: number;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  reference: string;
+}
+
+export interface PettyCashExpenseInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  expenseDate: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  description: string;
+  /** @minimum 1 */
+  amount: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  receiptReference: string;
+}
+
+export interface PettyCashSettlementInput {
+  /** @minimum 0 */
+  returnedAmount: number;
+  /** @minItems 1 */
+  expenses: PettyCashExpenseInput[];
+}
+
+export interface PettyCashReconciliationInput {
+  /** @minimum 0 */
+  physicalCashAmount: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  note: string;
+}
+
 export interface TaxReconciliationDetail {
   invoiceId: string;
   invoiceNumber: string;
@@ -572,6 +725,11 @@ search?: string;
 export type ListInvoicesParams = {
 status?: string;
 projectId?: string;
+};
+
+export type ListPettyCashRequestsParams = {
+projectId?: string;
+status?: string;
 };
 
 export type GetTaxSummaryParams = {

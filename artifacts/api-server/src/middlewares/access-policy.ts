@@ -2,10 +2,10 @@ export const roles = ["DIRECTOR", "PROJECT_MANAGER", "SITE_MANAGER", "FINANCE", 
 export type Role = typeof roles[number];
 
 export const rolePermissions: Record<Role, readonly string[]> = {
-  DIRECTOR: ["projects:view", "projects:write", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view"],
-  PROJECT_MANAGER: ["projects:view", "projects:write", "invoices:view", "invoices:approve"],
-  SITE_MANAGER: ["projects:view", "invoices:view"],
-  FINANCE: ["projects:view", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view"],
+  DIRECTOR: ["projects:view", "projects:write", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view", "petty-cash:view", "petty-cash:request", "petty-cash:approve", "petty-cash:disburse", "petty-cash:settle", "petty-cash:reconcile"],
+  PROJECT_MANAGER: ["projects:view", "projects:write", "invoices:view", "invoices:approve", "petty-cash:view", "petty-cash:approve"],
+  SITE_MANAGER: ["projects:view", "invoices:view", "petty-cash:view", "petty-cash:request", "petty-cash:settle"],
+  FINANCE: ["projects:view", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view", "petty-cash:view", "petty-cash:approve", "petty-cash:disburse", "petty-cash:reconcile"],
   TAX_STAFF: ["invoices:view", "tax:view", "audit:view"],
   PROCUREMENT: ["projects:view"],
 };

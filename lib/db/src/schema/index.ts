@@ -6,3 +6,4 @@ export * from "./projects";
 export * from "./rab";
 export * from "./rab-templates";
 export * from "./access-control";
+export * from "./petty-cash";

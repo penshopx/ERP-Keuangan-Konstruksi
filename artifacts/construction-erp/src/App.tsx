@@ -30,6 +30,7 @@ import TaxSummary from '@/pages/TaxSummary';
 import TaxRules from '@/pages/TaxRules';
 import AuditActivity from '@/pages/AuditActivity';
 import AccessManagement from '@/pages/AccessManagement';
+import PettyCash from '@/pages/PettyCash';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +86,7 @@ function Portal() {
           <Route path="/portal/projects/:id" component={ProjectDetail} />
           <Route path="/portal/projects/:id/rab" component={ProjectRab} />
           <Route path="/portal/invoices" component={Invoices} />
+          <Route path="/portal/petty-cash" component={PettyCash} />
           <Route path="/portal/tax" component={TaxSummary} />
           <Route path="/portal/tax-rules" component={TaxRules} />
           <Route path="/portal/audit" component={AuditActivity} />

@@ -9,6 +9,7 @@ import {
   Settings,
   Bell
 } from "lucide-react"
+import { WalletCards } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useClerk } from "@clerk/react"
 import { hasPermission, useAccess } from "@/lib/access"
@@ -18,6 +19,7 @@ const navigation = [
   { name: "Dashboard", href: "/portal", icon: LayoutDashboard },
   { name: "Projects", href: "/portal/projects", icon: Building2, permission: "projects:view" },
   { name: "Invoices", href: "/portal/invoices", icon: ReceiptText, permission: "invoices:view" },
+  { name: "Kas Kecil", href: "/portal/petty-cash", icon: WalletCards, permission: "petty-cash:view" },
   { name: "Tax & Recon", href: "/portal/tax", icon: Calculator, permission: "tax:view", exact: true },
   { name: "Aturan Pajak", href: "/portal/tax-rules", icon: Scale, permission: "tax-rules:manage" },
   { name: "Audit Trail", href: "/portal/audit", icon: History, permission: "audit:view" },

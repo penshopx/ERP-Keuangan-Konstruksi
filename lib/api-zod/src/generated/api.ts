@@ -439,6 +439,392 @@ export const CreateInvoiceResponse = zod.object({
 
 
 /**
+ * @summary List petty cash requests
+ */
+export const ListPettyCashRequestsQueryParams = zod.object({
+  "projectId": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional()
+})
+
+export const listPettyCashRequestsResponseRequestedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const listPettyCashRequestsResponseEvidenceDueAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const listPettyCashRequestsResponseExpensesItemExpenseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const ListPettyCashRequestsResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectCode": zod.string(),
+  "projectName": zod.string(),
+  "requesterUserId": zod.string(),
+  "requesterName": zod.string(),
+  "purpose": zod.string(),
+  "costCode": zod.string(),
+  "requestedAmount": zod.number(),
+  "approvedAmount": zod.number().nullish(),
+  "disbursedAmount": zod.number().nullish(),
+  "spentAmount": zod.number().nullish(),
+  "returnedAmount": zod.number().nullish(),
+  "physicalCashAmount": zod.number().nullish(),
+  "status": zod.enum(['DIAJUKAN', 'DISETUJUI', 'DITOLAK', 'DICAIRKAN', 'DIPERTANGGUNGJAWABKAN', 'DIREKONSILIASI']),
+  "requestedAt": zod.string().regex(listPettyCashRequestsResponseRequestedAtRegExp),
+  "evidenceDueAt": zod.string().regex(listPettyCashRequestsResponseEvidenceDueAtRegExp),
+  "policyVersion": zod.string(),
+  "approverName": zod.string().nullish(),
+  "approvalNote": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "disburserName": zod.string().nullish(),
+  "disbursementReference": zod.string().nullish(),
+  "disbursedAt": zod.coerce.date().nullish(),
+  "settledAt": zod.coerce.date().nullish(),
+  "reconcilerName": zod.string().nullish(),
+  "reconciliationNote": zod.string().nullish(),
+  "reconciledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expenses": zod.array(zod.object({
+  "id": zod.string(),
+  "expenseDate": zod.string().regex(listPettyCashRequestsResponseExpensesItemExpenseDateRegExp),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "receiptReference": zod.string()
+}))
+})
+export const ListPettyCashRequestsResponse = zod.array(ListPettyCashRequestsResponseItem)
+
+
+/**
+ * @summary Request project petty cash
+ */
+export const createPettyCashRequestBodyPurposeMin = 3;
+export const createPettyCashRequestBodyPurposeMax = 500;
+
+export const createPettyCashRequestBodyCostCodeMax = 100;
+
+
+export const createPettyCashRequestBodyRequestedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const CreatePettyCashRequestBody = zod.object({
+  "projectId": zod.string(),
+  "purpose": zod.string().min(createPettyCashRequestBodyPurposeMin).max(createPettyCashRequestBodyPurposeMax),
+  "costCode": zod.string().min(1).max(createPettyCashRequestBodyCostCodeMax),
+  "requestedAmount": zod.number().min(1),
+  "requestedAt": zod.string().regex(createPettyCashRequestBodyRequestedAtRegExp)
+})
+
+export const createPettyCashRequestResponseRequestedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createPettyCashRequestResponseEvidenceDueAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createPettyCashRequestResponseExpensesItemExpenseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const CreatePettyCashRequestResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectCode": zod.string(),
+  "projectName": zod.string(),
+  "requesterUserId": zod.string(),
+  "requesterName": zod.string(),
+  "purpose": zod.string(),
+  "costCode": zod.string(),
+  "requestedAmount": zod.number(),
+  "approvedAmount": zod.number().nullish(),
+  "disbursedAmount": zod.number().nullish(),
+  "spentAmount": zod.number().nullish(),
+  "returnedAmount": zod.number().nullish(),
+  "physicalCashAmount": zod.number().nullish(),
+  "status": zod.enum(['DIAJUKAN', 'DISETUJUI', 'DITOLAK', 'DICAIRKAN', 'DIPERTANGGUNGJAWABKAN', 'DIREKONSILIASI']),
+  "requestedAt": zod.string().regex(createPettyCashRequestResponseRequestedAtRegExp),
+  "evidenceDueAt": zod.string().regex(createPettyCashRequestResponseEvidenceDueAtRegExp),
+  "policyVersion": zod.string(),
+  "approverName": zod.string().nullish(),
+  "approvalNote": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "disburserName": zod.string().nullish(),
+  "disbursementReference": zod.string().nullish(),
+  "disbursedAt": zod.coerce.date().nullish(),
+  "settledAt": zod.coerce.date().nullish(),
+  "reconcilerName": zod.string().nullish(),
+  "reconciliationNote": zod.string().nullish(),
+  "reconciledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expenses": zod.array(zod.object({
+  "id": zod.string(),
+  "expenseDate": zod.string().regex(createPettyCashRequestResponseExpensesItemExpenseDateRegExp),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "receiptReference": zod.string()
+}))
+})
+
+
+/**
+ * @summary Approve or reject a petty cash request
+ */
+export const DecidePettyCashRequestParams = zod.object({
+  "requestId": zod.coerce.string()
+})
+
+
+export const decidePettyCashRequestBodyNoteMax = 500;
+
+
+
+export const DecidePettyCashRequestBody = zod.object({
+  "decision": zod.enum(['APPROVE', 'REJECT']),
+  "approvedAmount": zod.number().min(1).optional(),
+  "note": zod.string().min(1).max(decidePettyCashRequestBodyNoteMax)
+})
+
+export const decidePettyCashRequestResponseRequestedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const decidePettyCashRequestResponseEvidenceDueAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const decidePettyCashRequestResponseExpensesItemExpenseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const DecidePettyCashRequestResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectCode": zod.string(),
+  "projectName": zod.string(),
+  "requesterUserId": zod.string(),
+  "requesterName": zod.string(),
+  "purpose": zod.string(),
+  "costCode": zod.string(),
+  "requestedAmount": zod.number(),
+  "approvedAmount": zod.number().nullish(),
+  "disbursedAmount": zod.number().nullish(),
+  "spentAmount": zod.number().nullish(),
+  "returnedAmount": zod.number().nullish(),
+  "physicalCashAmount": zod.number().nullish(),
+  "status": zod.enum(['DIAJUKAN', 'DISETUJUI', 'DITOLAK', 'DICAIRKAN', 'DIPERTANGGUNGJAWABKAN', 'DIREKONSILIASI']),
+  "requestedAt": zod.string().regex(decidePettyCashRequestResponseRequestedAtRegExp),
+  "evidenceDueAt": zod.string().regex(decidePettyCashRequestResponseEvidenceDueAtRegExp),
+  "policyVersion": zod.string(),
+  "approverName": zod.string().nullish(),
+  "approvalNote": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "disburserName": zod.string().nullish(),
+  "disbursementReference": zod.string().nullish(),
+  "disbursedAt": zod.coerce.date().nullish(),
+  "settledAt": zod.coerce.date().nullish(),
+  "reconcilerName": zod.string().nullish(),
+  "reconciliationNote": zod.string().nullish(),
+  "reconciledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expenses": zod.array(zod.object({
+  "id": zod.string(),
+  "expenseDate": zod.string().regex(decidePettyCashRequestResponseExpensesItemExpenseDateRegExp),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "receiptReference": zod.string()
+}))
+})
+
+
+/**
+ * @summary Record approved petty cash disbursement
+ */
+export const DisbursePettyCashRequestParams = zod.object({
+  "requestId": zod.coerce.string()
+})
+
+
+export const disbursePettyCashRequestBodyReferenceMax = 200;
+
+
+
+export const DisbursePettyCashRequestBody = zod.object({
+  "amount": zod.number().min(1),
+  "reference": zod.string().min(1).max(disbursePettyCashRequestBodyReferenceMax)
+})
+
+export const disbursePettyCashRequestResponseRequestedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disbursePettyCashRequestResponseEvidenceDueAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disbursePettyCashRequestResponseExpensesItemExpenseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const DisbursePettyCashRequestResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectCode": zod.string(),
+  "projectName": zod.string(),
+  "requesterUserId": zod.string(),
+  "requesterName": zod.string(),
+  "purpose": zod.string(),
+  "costCode": zod.string(),
+  "requestedAmount": zod.number(),
+  "approvedAmount": zod.number().nullish(),
+  "disbursedAmount": zod.number().nullish(),
+  "spentAmount": zod.number().nullish(),
+  "returnedAmount": zod.number().nullish(),
+  "physicalCashAmount": zod.number().nullish(),
+  "status": zod.enum(['DIAJUKAN', 'DISETUJUI', 'DITOLAK', 'DICAIRKAN', 'DIPERTANGGUNGJAWABKAN', 'DIREKONSILIASI']),
+  "requestedAt": zod.string().regex(disbursePettyCashRequestResponseRequestedAtRegExp),
+  "evidenceDueAt": zod.string().regex(disbursePettyCashRequestResponseEvidenceDueAtRegExp),
+  "policyVersion": zod.string(),
+  "approverName": zod.string().nullish(),
+  "approvalNote": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "disburserName": zod.string().nullish(),
+  "disbursementReference": zod.string().nullish(),
+  "disbursedAt": zod.coerce.date().nullish(),
+  "settledAt": zod.coerce.date().nullish(),
+  "reconcilerName": zod.string().nullish(),
+  "reconciliationNote": zod.string().nullish(),
+  "reconciledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expenses": zod.array(zod.object({
+  "id": zod.string(),
+  "expenseDate": zod.string().regex(disbursePettyCashRequestResponseExpensesItemExpenseDateRegExp),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "receiptReference": zod.string()
+}))
+})
+
+
+/**
+ * @summary Submit petty cash usage, receipts, and returned balance
+ */
+export const SettlePettyCashRequestParams = zod.object({
+  "requestId": zod.coerce.string()
+})
+
+export const settlePettyCashRequestBodyReturnedAmountMin = 0;
+
+export const settlePettyCashRequestBodyExpensesItemExpenseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const settlePettyCashRequestBodyExpensesItemDescriptionMax = 300;
+
+
+export const settlePettyCashRequestBodyExpensesItemReceiptReferenceMax = 500;
+
+
+
+
+export const SettlePettyCashRequestBody = zod.object({
+  "returnedAmount": zod.number().min(settlePettyCashRequestBodyReturnedAmountMin),
+  "expenses": zod.array(zod.object({
+  "expenseDate": zod.string().regex(settlePettyCashRequestBodyExpensesItemExpenseDateRegExp),
+  "description": zod.string().min(1).max(settlePettyCashRequestBodyExpensesItemDescriptionMax),
+  "amount": zod.number().min(1),
+  "receiptReference": zod.string().min(1).max(settlePettyCashRequestBodyExpensesItemReceiptReferenceMax)
+})).min(1)
+})
+
+export const settlePettyCashRequestResponseRequestedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const settlePettyCashRequestResponseEvidenceDueAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const settlePettyCashRequestResponseExpensesItemExpenseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const SettlePettyCashRequestResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectCode": zod.string(),
+  "projectName": zod.string(),
+  "requesterUserId": zod.string(),
+  "requesterName": zod.string(),
+  "purpose": zod.string(),
+  "costCode": zod.string(),
+  "requestedAmount": zod.number(),
+  "approvedAmount": zod.number().nullish(),
+  "disbursedAmount": zod.number().nullish(),
+  "spentAmount": zod.number().nullish(),
+  "returnedAmount": zod.number().nullish(),
+  "physicalCashAmount": zod.number().nullish(),
+  "status": zod.enum(['DIAJUKAN', 'DISETUJUI', 'DITOLAK', 'DICAIRKAN', 'DIPERTANGGUNGJAWABKAN', 'DIREKONSILIASI']),
+  "requestedAt": zod.string().regex(settlePettyCashRequestResponseRequestedAtRegExp),
+  "evidenceDueAt": zod.string().regex(settlePettyCashRequestResponseEvidenceDueAtRegExp),
+  "policyVersion": zod.string(),
+  "approverName": zod.string().nullish(),
+  "approvalNote": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "disburserName": zod.string().nullish(),
+  "disbursementReference": zod.string().nullish(),
+  "disbursedAt": zod.coerce.date().nullish(),
+  "settledAt": zod.coerce.date().nullish(),
+  "reconcilerName": zod.string().nullish(),
+  "reconciliationNote": zod.string().nullish(),
+  "reconciledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expenses": zod.array(zod.object({
+  "id": zod.string(),
+  "expenseDate": zod.string().regex(settlePettyCashRequestResponseExpensesItemExpenseDateRegExp),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "receiptReference": zod.string()
+}))
+})
+
+
+/**
+ * @summary Verify settlement and reconcile physical cash
+ */
+export const ReconcilePettyCashRequestParams = zod.object({
+  "requestId": zod.coerce.string()
+})
+
+export const reconcilePettyCashRequestBodyPhysicalCashAmountMin = 0;
+
+export const reconcilePettyCashRequestBodyNoteMax = 500;
+
+
+
+export const ReconcilePettyCashRequestBody = zod.object({
+  "physicalCashAmount": zod.number().min(reconcilePettyCashRequestBodyPhysicalCashAmountMin),
+  "note": zod.string().min(1).max(reconcilePettyCashRequestBodyNoteMax)
+})
+
+export const reconcilePettyCashRequestResponseRequestedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const reconcilePettyCashRequestResponseEvidenceDueAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const reconcilePettyCashRequestResponseExpensesItemExpenseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const ReconcilePettyCashRequestResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectCode": zod.string(),
+  "projectName": zod.string(),
+  "requesterUserId": zod.string(),
+  "requesterName": zod.string(),
+  "purpose": zod.string(),
+  "costCode": zod.string(),
+  "requestedAmount": zod.number(),
+  "approvedAmount": zod.number().nullish(),
+  "disbursedAmount": zod.number().nullish(),
+  "spentAmount": zod.number().nullish(),
+  "returnedAmount": zod.number().nullish(),
+  "physicalCashAmount": zod.number().nullish(),
+  "status": zod.enum(['DIAJUKAN', 'DISETUJUI', 'DITOLAK', 'DICAIRKAN', 'DIPERTANGGUNGJAWABKAN', 'DIREKONSILIASI']),
+  "requestedAt": zod.string().regex(reconcilePettyCashRequestResponseRequestedAtRegExp),
+  "evidenceDueAt": zod.string().regex(reconcilePettyCashRequestResponseEvidenceDueAtRegExp),
+  "policyVersion": zod.string(),
+  "approverName": zod.string().nullish(),
+  "approvalNote": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "disburserName": zod.string().nullish(),
+  "disbursementReference": zod.string().nullish(),
+  "disbursedAt": zod.coerce.date().nullish(),
+  "settledAt": zod.coerce.date().nullish(),
+  "reconcilerName": zod.string().nullish(),
+  "reconciliationNote": zod.string().nullish(),
+  "reconciledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expenses": zod.array(zod.object({
+  "id": zod.string(),
+  "expenseDate": zod.string().regex(reconcilePettyCashRequestResponseExpensesItemExpenseDateRegExp),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "receiptReference": zod.string()
+}))
+})
+
+
+/**
  * @summary Get monthly tax summary
  */
 export const GetTaxSummaryQueryParams = zod.object({

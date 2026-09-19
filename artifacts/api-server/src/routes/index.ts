@@ -9,6 +9,7 @@ import { createAccessRouter, type AccessPersistenceHooks, type AccessRouterDepen
 import rabTemplatesRouter from "./rab-templates";
 import { requireAccess } from "../middlewares/access";
 import aiControlPlaneRouter from "./ai-control-plane";
+import pettyCashRouter from "./petty-cash";
 
 export function createApiRouter(
   accessMiddleware: RequestHandler = requireAccess,
@@ -25,6 +26,7 @@ export function createApiRouter(
   router.use(dashboardRouter);
   router.use(createInvoicesRouter(invoicePersistenceHooks));
   router.use(createProjectsRouter(projectPersistenceHooks));
+  router.use(pettyCashRouter);
   router.use(rabTemplatesRouter);
   router.use(taxRouter);
   router.use(aiControlPlaneRouter);

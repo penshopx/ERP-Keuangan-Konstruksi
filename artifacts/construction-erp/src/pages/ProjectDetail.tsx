@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { formatRupiah, formatPercent, formatDate } from "@/lib/utils"
-import { Building2, Calendar, FileText, ArrowLeft, TrendingUp, AlertTriangle } from "lucide-react"
+import { Building2, Calendar, FileText, ArrowLeft, TrendingUp, AlertTriangle, WalletCards } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getProjectStatusBadgeVariant, isProjectCompleted } from "@/lib/project-status"
@@ -53,6 +53,12 @@ export default function ProjectDetail() {
           </p>
         </div>
         <div className="ml-auto flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href={`/portal/petty-cash?projectId=${project.id}`}>
+              <WalletCards className="mr-2 h-4 w-4" />
+              Kas Kecil
+            </Link>
+          </Button>
           <Button variant="outline" asChild>
             <Link href={`/projects/${project.id}/rab`}>
               <FileText className="mr-2 h-4 w-4" />
