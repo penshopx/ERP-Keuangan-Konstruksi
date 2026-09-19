@@ -41,7 +41,7 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { formatRupiah } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, CopyPlus, Info, CheckCircle2 } from "lucide-react"
+import { AlertTriangle, CopyPlus, Info, CheckCircle2, RefreshCw } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 const importSchema = z.object({
@@ -51,8 +51,31 @@ const importSchema = z.object({
 
 type ImportFormValues = z.infer<typeof importSchema>
 
+type ImportError = {
+  status?: unknown
+  data?: {
+    retryable?: unknown
+  } | null
+  message?: unknown
+}
+
+function isRetryableBusyError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false
+
+  const importError = error as ImportError
+  return importError.status === 503 && importError.data?.retryable === true
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined
+
+  const message = (error as ImportError).message
+  return typeof message === "string" ? message : undefined
+}
+
 export function ImportTemplateSheet({ projectId, currentTotal }: { projectId: string; currentTotal: number }) {
   const [open, setOpen] = useState(false)
+  const [isImportBusy, setIsImportBusy] = useState(false)
   const { data: templates, isLoading: loadingTemplates } = useListRabTemplates({
     query: {
       enabled: open,
@@ -77,6 +100,7 @@ export function ImportTemplateSheet({ projectId, currentTotal }: { projectId: st
   const adjustedTotal = selectedTemplate ? selectedTemplate.totalBudget * priceFactor : 0
 
   const onSubmit = (data: ImportFormValues) => {
+    setIsImportBusy(false)
     importTemplate.mutate({
       projectId,
       data: {
@@ -95,10 +119,15 @@ export function ImportTemplateSheet({ projectId, currentTotal }: { projectId: st
         setOpen(false)
         form.reset()
       },
-      onError: (err: any) => {
+      onError: (err: unknown) => {
+        if (isRetryableBusyError(err)) {
+          setIsImportBusy(true)
+          return
+        }
+
         toast({
           title: "Gagal Mengimpor",
-          description: err.message || "Terjadi kesalahan saat memproses template.",
+          description: getErrorMessage(err) || "Terjadi kesalahan saat memproses template.",
           variant: "destructive"
         })
       }
@@ -222,6 +251,16 @@ export function ImportTemplateSheet({ projectId, currentTotal }: { projectId: st
                   </AlertDescription>
                 </Alert>
               )}
+
+              {isImportBusy && (
+                <Alert className="border-amber-500/40 bg-amber-500/10">
+                  <RefreshCw className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertTitle className="ml-1 text-sm font-semibold">Impor RAB sedang sibuk</AlertTitle>
+                  <AlertDescription className="ml-1 mt-2 text-sm">
+                    Impor lain sedang diproses untuk proyek ini. Tunggu beberapa saat, lalu coba lagi dengan template dan faktor harga yang sama.
+                  </AlertDescription>
+                </Alert>
+              )}
             </form>
           </Form>
         </ScrollArea>
@@ -232,7 +271,7 @@ export function ImportTemplateSheet({ projectId, currentTotal }: { projectId: st
               Batal
             </Button>
             <Button type="submit" form="import-template-form" disabled={importTemplate.isPending || !selectedTemplate} className="w-full sm:w-auto">
-              {importTemplate.isPending ? "Memproses..." : "Terapkan Draft WBS"}
+              {importTemplate.isPending ? "Memproses..." : isImportBusy ? "Coba Lagi" : "Terapkan Draft WBS"}
             </Button>
           </SheetFooter>
         </div>
