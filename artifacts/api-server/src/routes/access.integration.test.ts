@@ -51,8 +51,10 @@ const projectId = `${prefix}-project`;
 const otherProjectId = `${prefix}-other-project`;
 const unassignedId = `${prefix}-unassigned`;
 const projectManagerId = `${prefix}-project-manager`;
+const siteManagerId = `${prefix}-site-manager`;
 const taxStaffId = `${prefix}-tax-staff`;
 const financeId = `${prefix}-finance`;
+const procurementId = `${prefix}-procurement`;
 const createdClerkIds: string[] = [];
 const revokedClerkIds: string[] = [];
 const clerkStatuses = new Map<string, string>();
@@ -265,6 +267,11 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       displayName: "Integration Project Manager",
     },
     {
+      userId: siteManagerId,
+      role: "SITE_MANAGER",
+      displayName: "Integration Site Manager",
+    },
+    {
       userId: taxStaffId,
       role: "TAX_STAFF",
       displayName: "Integration Tax Staff",
@@ -273,6 +280,11 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       userId: financeId,
       role: "FINANCE",
       displayName: "Integration Finance",
+    },
+    {
+      userId: procurementId,
+      role: "PROCUREMENT",
+      displayName: "Integration Procurement",
     },
   ]);
   await db.insert(projectAssignmentsTable).values({
@@ -286,6 +298,10 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
         email: `${projectManagerId}@example.test`,
         name: "Integration Project Manager",
       },
+      [siteManagerId]: {
+        email: `${siteManagerId}@example.test`,
+        name: "Integration Site Manager",
+      },
       [taxStaffId]: {
         email: `${taxStaffId}@example.test`,
         name: "Integration Tax Staff",
@@ -293,6 +309,10 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       [financeId]: {
         email: `${financeId}@example.test`,
         name: "Integration Finance",
+      },
+      [procurementId]: {
+        email: `${procurementId}@example.test`,
+        name: "Integration Procurement",
       },
     };
     const server = await startServer(clerkAccessMiddleware(users));
@@ -419,6 +439,31 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
         () => taxRuleMutation(projectManagerId, pmTaxVersion),
         () => db.select().from(taxRuleVersionsTable).where(eq(taxRuleVersionsTable.version, pmTaxVersion)),
       );
+
+      for (const [userId, label] of [
+        [siteManagerId, "site-manager"],
+        [procurementId, "procurement"],
+      ] as const) {
+        const projectName = `${prefix}-${label}-project`;
+        await assertForbiddenWithoutDatabaseChanges(
+          userId,
+          () => projectMutation(userId, projectName),
+          () => db.select().from(projectsTable).where(eq(projectsTable.id, projectId)),
+        );
+        const invoicePeriod = `${prefix}-${label}-invoice`;
+        await assertForbiddenWithoutDatabaseChanges(
+          userId,
+          () => invoiceMutation(userId, invoicePeriod),
+          () => db.select().from(invoicesTable).where(eq(invoicesTable.period, invoicePeriod)),
+        );
+        const taxRuleVersion = `${prefix}-${label}-tax`;
+        await assertForbiddenWithoutDatabaseChanges(
+          userId,
+          () => taxRuleMutation(userId, taxRuleVersion),
+          () => db.select().from(taxRuleVersionsTable)
+            .where(eq(taxRuleVersionsTable.version, taxRuleVersion)),
+        );
+      }
 
       const taxStaffProjectName = `${prefix}-tax-project`;
       await assertForbiddenWithoutDatabaseChanges(
