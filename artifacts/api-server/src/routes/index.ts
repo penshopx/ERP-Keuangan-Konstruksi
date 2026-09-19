@@ -8,6 +8,7 @@ import taxRouter from "./tax";
 import { createAccessRouter, type AccessPersistenceHooks, type AccessRouterDependencies } from "./access";
 import rabTemplatesRouter from "./rab-templates";
 import { requireAccess } from "../middlewares/access";
+import aiControlPlaneRouter from "./ai-control-plane";
 
 export function createApiRouter(
   accessMiddleware: RequestHandler = requireAccess,
@@ -26,6 +27,7 @@ export function createApiRouter(
   router.use(createProjectsRouter(projectPersistenceHooks));
   router.use(rabTemplatesRouter);
   router.use(taxRouter);
+  router.use(aiControlPlaneRouter);
   return router;
 }
 
