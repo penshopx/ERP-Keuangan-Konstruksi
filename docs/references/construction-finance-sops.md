@@ -1,6 +1,6 @@
 # Referensi SOP Keuangan dan Administrasi Konstruksi
 
-Ditinjau dari delapan SOP yang diunggah pada 20 September 2026 dan sintesis Qwen yang menyertainya. Dokumen ini menerjemahkan SOP menjadi kebutuhan produk, kontrol internal, dan workflow. SOP sumber merupakan contoh kebijakan organisasi, bukan sumber hukum, tarif, atau konfigurasi produksi.
+Ditinjau dari delapan SOP serta enam contoh dokumen ketenagakerjaan yang diunggah pada 20 September 2026, dan sintesis Qwen yang menyertainya. Dokumen ini menerjemahkan sumber tersebut menjadi kebutuhan produk, kontrol internal, dan workflow. Seluruh sumber merupakan contoh kebijakan atau administrasi organisasi, bukan sumber hukum, tarif, klausul kontrak, atau konfigurasi produksi.
 
 ## Sumber
 
@@ -12,6 +12,12 @@ Ditinjau dari delapan SOP yang diunggah pada 20 September 2026 dan sintesis Qwen
 - `17._SOP_Lembur_Karyawan_1789853435705.pdf`
 - `37._Staff_Admin_1789853451083.pdf`
 - `38._Staff_Keuangan_1789853451084.pdf`
+- `1._Contoh_PKWT_(Perjanjian_Kerja_Waktu_Tertentu)_1789855612845.pdf`
+- `2._Contoh_PKWTT-Operator_1789855612846.pdf`
+- `3._Contoh_PKWTT-Staff_1789855612847.pdf`
+- `4._Perjanjian_Kerja_Masa_Percobaan_1789855612847.doc`
+- `5._Contoh_PKWT_(versi_2)_1789855612848.doc`
+- `6._SURAT_PENGANGKATAN_KARYAWAN_TETAP_1789855612849.doc`
 - `Pasted--Prompt-Replit-untuk-Aplikasi-ERP-Keuangan-Konstruksi-B_1789853237722.txt`
 
 ## Prinsip penerjemahan SOP
@@ -256,7 +262,57 @@ Dokumen membutuhkan nomor, jenis, proyek, pihak, tanggal, revisi, status, confid
 - auto-match menghasilkan candidate match yang dapat direview;
 - cash forecast menyimpan asumsi dan versi.
 
-## 9. Integrasi aplikasi lapangan
+## 9. Kontrak kerja dan pengangkatan karyawan
+
+### Lifecycle yang relevan
+
+```text
+Candidate/worker identity
+→ Employment offer or agreement draft
+→ HR/legal review
+→ Employee acknowledgement and signatures
+→ Active employment
+→ Probation evaluation, bila sah dan berlaku
+→ Appointment, extension, change, or separation
+→ Payroll/benefit activation or adjustment
+→ Archive and retention
+```
+
+Sistem harus membedakan setidaknya PKWT, PKWTT, masa percobaan, dan surat keputusan pengangkatan. Dokumen baru tidak boleh menimpa perjanjian sebelumnya; perubahan jabatan, grade, penempatan, upah, fasilitas, masa kerja, atau status hubungan kerja dibuat sebagai versi atau keputusan baru dengan periode berlaku.
+
+### Data minimum
+
+- identitas pekerja dan perusahaan, dengan akses sangat terbatas;
+- jenis hubungan kerja dan dasar dokumen;
+- nomor, versi, status, tanggal dibuat, tanggal ditandatangani, serta periode berlaku;
+- posisi, grade, departemen/section, atasan, proyek/lokasi, dan titik rekrutmen;
+- tanggal mulai kerja, akhir kontrak, dan tanggal efektif pengangkatan;
+- komponen upah, tunjangan, fasilitas, pajak, jaminan sosial, serta policy version;
+- pola hari/jam kerja dan referensi aturan lembur;
+- masa evaluasi, evaluator, kriteria, hasil, dan keputusan;
+- pihak penandatangan, kapasitas kewenangan, acknowledgement, dan bukti tanda tangan;
+- referensi peraturan perusahaan/PKB serta dokumen yang menggantikan atau memperpanjang;
+- alasan perubahan/pengakhiran dan bukti proses yang diwajibkan.
+
+### Kontrol
+
+- kontrak menggunakan template berversi dan field terstruktur, bukan salin-tempel dokumen lama;
+- HR menyiapkan, pejabat berwenang menyetujui, pekerja mengakui, dan perubahan status diaudit;
+- tanggal mulai, akhir, durasi, dan tanggal efektif harus konsisten secara otomatis;
+- aktivasi payroll dan benefit mengikuti tanggal efektif serta keputusan yang telah disetujui;
+- pengingat kedaluwarsa tidak otomatis memperpanjang atau mengakhiri hubungan kerja;
+- hasil evaluasi tidak otomatis menjadi pengangkatan atau PHK tanpa keputusan dan dokumen sah;
+- data upah, alamat, identitas, evaluasi, dan dokumen kontrak diperlakukan sebagai data personal rahasia;
+- akses dokumen mengikuti purpose, role, legal hold, retention policy, dan audit download;
+- tanda tangan, meterai, rangkap dokumen, dan penyelesaian perselisihan harus mengikuti aturan yang telah diverifikasi.
+
+### Perlu verifikasi
+
+Contoh sumber berasal terutama dari 2005–2010 dan tidak boleh dipakai sebagai template legal tanpa review. Istilah Jamsostek, masa percobaan, kompensasi, pemutusan hubungan kerja, perpanjangan PKWT, pajak, jam kerja, lembur, penempatan, kerahasiaan, serta klausul pelanggaran harus diverifikasi terhadap regulasi, PKB/peraturan perusahaan, dan praktik organisasi yang berlaku.
+
+Salah satu contoh PKWT menyatakan masa dua tahun tetapi rentang tanggalnya melampaui dua tahun. Sistem perlu menolak ketidakkonsistenan semacam ini. Nama, perusahaan, alamat, nomor identitas, nominal, serta klausul pada contoh hanya data ilustratif dan tidak boleh dijadikan master data atau default produksi.
+
+## 10. Integrasi aplikasi lapangan
 
 Pola dua aplikasi—ERP finansial dan aplikasi site—relevan, tetapi kontrak integrasi harus netral terhadap produk.
 
@@ -285,12 +341,14 @@ Setiap event integrasi membutuhkan:
 
 API key + HMAC pada prompt hanyalah salah satu opsi. Desain akhir perlu rotasi credential, replay protection, timestamp/nonce, rate limit, dan audit.
 
-## 10. Peran AI
+## 11. Peran AI
 
 AI dapat:
 
 - mengklasifikasi dokumen;
 - mengekstrak field dan mendeteksi kekurangan;
+- membandingkan draft kontrak dengan template yang disetujui dan menandai deviasi;
+- mendeteksi konflik tanggal, field kosong, dan referensi kebijakan yang kedaluwarsa;
 - menyarankan cost code;
 - mencocokkan kandidat PO/receipt/invoice;
 - menjelaskan variance;
@@ -299,6 +357,9 @@ AI dapat:
 
 AI tidak boleh:
 
+- menentukan jenis hubungan kerja atau keabsahan klausul;
+- menyetujui kontrak, pengangkatan, perpanjangan, atau pemutusan kerja;
+- menetapkan upah, benefit, masa percobaan, atau kompensasi;
 - menyetujui pembayaran;
 - menetapkan tarif/regulasi;
 - membuat journal posted;
@@ -307,7 +368,7 @@ AI tidak boleh:
 - mengubah period close;
 - memperluas permission.
 
-## 11. Urutan implementasi yang direkomendasikan
+## 12. Urutan implementasi yang direkomendasikan
 
 1. WBS/cost code dan four-way cost model.
 2. Committed cost melalui PO/SPK/kontrak subkon.
@@ -316,16 +377,19 @@ AI tidak boleh:
 5. Petty cash dan project cash.
 6. Bank reconciliation dan treasury forecast.
 7. Progress billing dan AR collection.
-8. Payroll/overtime.
+8. Worker master, kontrak kerja berversi, dan payroll/overtime.
 9. General ledger, period close, dan laporan akrual.
 10. Tax filing workspace.
 11. Site integration events.
 12. AI document/exception assistant.
 
-## 12. Bagian yang tidak diadopsi langsung
+## 13. Bagian yang tidak diadopsi langsung
 
 - Pergantian stack aplikasi ke Next.js, Prisma, atau NextAuth.
 - Tarif pajak, UMR, retensi, threshold budget, approval, OTP, dan batas hari sebagai konstanta.
+- Nama, alamat, nomor identitas, nominal upah, dan identitas perusahaan dari contoh kontrak.
+- Klausul ketenagakerjaan lama, termasuk istilah jaminan sosial, masa percobaan, kompensasi, dan PHK, tanpa review HR/legal.
+- Aktivasi, perpanjangan, pengangkatan, atau pengakhiran hubungan kerja hanya berdasarkan kalender atau keputusan AI.
 - Klaim masa simpan sepuluh tahun tanpa verifikasi resmi.
 - GPS wajib untuk seluruh bukti petty cash.
 - Anggapan bahwa satu persentase opname otomatis cukup untuk invoice.
@@ -336,6 +400,7 @@ AI tidak boleh:
 ## Aturan penggunaan
 
 - Perlakukan SOP sebagai input desain workflow, bukan sumber regulasi.
+- Perlakukan contoh kontrak sebagai referensi struktur dokumen, bukan template legal siap pakai.
 - Verifikasi kebijakan perusahaan dan aturan pemerintah sebelum implementasi.
 - Gunakan konfigurasi effective-dated untuk seluruh nilai yang berubah.
 - Simpan versi workflow/policy pada setiap transaksi.

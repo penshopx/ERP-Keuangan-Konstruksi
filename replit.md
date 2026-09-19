@@ -49,6 +49,6 @@ _Populate as you build — sharp edges, "always run X before Y" rules._
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
 - See `docs/blueprints/ai-construction-erp.md` for the vendor-neutral AI Construction ERP architecture, governance model, module scope, and phased roadmap.
-- See `docs/references/construction-finance-sops.md` for curated finance, petty cash, payroll, billing, tax, document-control, and treasury workflows; policy values require verification and effective dating.
+- See `docs/references/construction-finance-sops.md` for curated finance, petty cash, payroll, employment-contract, billing, tax, document-control, and treasury workflows; policy values and legal clauses require verification and effective dating.
 - See `docs/references/odoo-construction-erp.md` for the curated process reference extracted from uploaded Odoo construction materials; it is not a product specification or regulatory authority.
 - See `docs/references/erabe-rab-project-workflow.md` for curated RAB, progress, field access, and reconciliation patterns from ERAbe; vendor claims and example values are not authoritative.

@@ -684,7 +684,7 @@ Blueprint berhasil ketika:
 
 - `docs/references/odoo-construction-erp.md`: referensi proses ERP konstruksi.
 - `docs/references/erabe-rab-project-workflow.md`: referensi alur RAB, progres, billing, dan field access.
-- `docs/references/construction-finance-sops.md`: referensi workflow pelaporan, petty cash, payroll/lembur, billing, pajak, administrasi, dan treasury dari SOP yang diunggah.
+- `docs/references/construction-finance-sops.md`: referensi workflow pelaporan, petty cash, payroll/lembur, kontrak kerja dan pengangkatan, billing, pajak, administrasi, dan treasury dari SOP serta contoh dokumen yang diunggah.
 - `attached_assets/Pasted--Benar-sekali-Anda-sangat-tepat-menangkap-perbedaan-men_1789781422378.txt`: sintesis Qwen mengenai batas antara alat RAB dan ERP.
 - `attached_assets/Pasted-Berikut-adalah-rangkuman-sintesis-dari-fitur-fitur-pali_1789781440454.txt`: sintesis Qwen mengenai data lineage, four-way cost, guardrail AI, dan rekonsiliasi.
 - `https://gustafta.my.id`: referensi domain untuk knowledge, dokumen, tender, compliance, dan project intelligence.
