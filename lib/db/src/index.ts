@@ -49,6 +49,7 @@ const REQUIRED_MIGRATIONS = [
   "0001_prevent_overlapping_tax_rule_periods.sql",
   "0003_add_operational_state.sql",
   "0004_restrict_project_status.sql",
+  "0006_add_shared_invitation_reconciliation_state.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -69,6 +70,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     overlap_constraint: boolean;
     project_status_constraint: boolean;
     operational_state_shape: boolean;
+    invitation_reconciliation_state_shape: boolean;
   }>(`
     SELECT
       EXISTS (
@@ -99,7 +101,45 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
               AND is_nullable = 'NO'
             )
           )
-      ) AS operational_state_shape
+      ) AS operational_state_shape,
+      (
+        SELECT count(*) = 9
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'invitation_reconciliation_state'
+          AND (
+            (
+              column_name = 'key'
+              AND data_type = 'text'
+              AND is_nullable = 'NO'
+            )
+            OR (
+              column_name = 'consecutive_failures'
+              AND data_type = 'integer'
+              AND is_nullable = 'NO'
+            )
+            OR (
+              column_name IN (
+                'last_failure_at',
+                'last_success_at',
+                'last_completed_at',
+                'last_run_at'
+              )
+              AND data_type = 'timestamp with time zone'
+              AND is_nullable = 'YES'
+            )
+            OR (
+              column_name = 'last_run'
+              AND data_type = 'jsonb'
+              AND is_nullable = 'YES'
+            )
+            OR (
+              column_name IN ('monitoring_started_at', 'updated_at')
+              AND data_type = 'timestamp with time zone'
+              AND is_nullable = 'NO'
+            )
+          )
+      ) AS invitation_reconciliation_state_shape
   `);
 
   const status = result.rows[0];
@@ -109,7 +149,8 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     !status.valid_period_constraint ||
     !status.overlap_constraint ||
     !status.project_status_constraint ||
-    !status.operational_state_shape
+    !status.operational_state_shape ||
+    !status.invitation_reconciliation_state_shape
   ) {
     throw new Error(
       `Mandatory database migrations ${REQUIRED_MIGRATIONS.join(", ")} are not fully applied. ` +

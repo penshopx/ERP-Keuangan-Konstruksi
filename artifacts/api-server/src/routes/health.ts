@@ -4,13 +4,17 @@ import { getInvitationReconciliationHealth } from "../lib/invitation-reconciliat
 
 const router: IRouter = Router();
 
-router.get("/healthz", (_req, res) => {
-  const invitationReconciliation = getInvitationReconciliationHealth();
-  const data = HealthCheckResponse.parse({
-    status: invitationReconciliation.status === "HEALTHY" ? "ok" : "degraded",
-    invitationReconciliation,
-  });
-  res.json(data);
+router.get("/healthz", async (_req, res, next) => {
+  try {
+    const invitationReconciliation = await getInvitationReconciliationHealth();
+    const data = HealthCheckResponse.parse({
+      status: invitationReconciliation.status === "HEALTHY" ? "ok" : "degraded",
+      invitationReconciliation,
+    });
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
 });
 
 export default router;

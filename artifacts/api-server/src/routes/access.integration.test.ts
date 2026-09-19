@@ -1362,14 +1362,14 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
 
     const failedPass = await reconcilePendingInvitations(dependencies);
     assert.equal(failedPass.failed, 1);
-    const healthAfterFailure = getInvitationReconciliationHealth();
+    const healthAfterFailure = await getInvitationReconciliationHealth();
     assert.equal(healthAfterFailure.status, "DEGRADED");
     assert.ok(healthAfterFailure.consecutiveFailures >= 1);
     assert.ok(healthAfterFailure.lastFailureAt);
 
     const repeatedFailurePass = await reconcilePendingInvitations(dependencies);
     assert.equal(repeatedFailurePass.failed, 1);
-    const healthAfterRepeatedFailure = getInvitationReconciliationHealth();
+    const healthAfterRepeatedFailure = await getInvitationReconciliationHealth();
     assert.equal(healthAfterRepeatedFailure.status, "DEGRADED");
     assert.equal(
       healthAfterRepeatedFailure.consecutiveFailures,
@@ -1410,7 +1410,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
 
     const retryPass = await reconcilePendingInvitations(dependencies);
     assert.equal(retryPass.updated, 1);
-    const healthAfterRecovery = getInvitationReconciliationHealth();
+    const healthAfterRecovery = await getInvitationReconciliationHealth();
     assert.equal(healthAfterRecovery.status, "HEALTHY");
     assert.equal(healthAfterRecovery.consecutiveFailures, 0);
     assert.ok(healthAfterRecovery.lastSuccessAt);
@@ -1456,7 +1456,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     });
 
     await lookupStarted;
-    const healthBeforeSkip = getInvitationReconciliationHealth();
+    const healthBeforeSkip = await getInvitationReconciliationHealth();
     const competingEvents: string[] = [];
     const alerts: InvitationReconciliationAlert[] = [];
     await new Promise((resolve) => setTimeout(resolve, 2));
@@ -1475,7 +1475,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     });
     assert.deepEqual(competingRun, { skipped: true });
     assert.deepEqual(competingEvents, ["RUNNING", "SKIPPED"]);
-    const healthAfterSkip = getInvitationReconciliationHealth();
+    const healthAfterSkip = await getInvitationReconciliationHealth();
     assert.equal(healthAfterSkip.lastRun.outcome, "SKIPPED");
     assert.equal(healthAfterSkip.status, "DEGRADED");
     assert.equal(healthAfterSkip.completionOverdue, true);
@@ -1489,6 +1489,9 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     releaseFirstLookup();
     const completedFirstRun = await firstRun;
     assert.equal(completedFirstRun.skipped, false);
+    const healthAfterCompletion = await getInvitationReconciliationHealth();
+    assert.equal(healthAfterCompletion.lastRun.outcome, "COMPLETED");
+    assert.equal(healthAfterCompletion.consecutiveFailures, healthBeforeSkip.consecutiveFailures);
 
     const nextRun = await runScheduledInvitationReconciliation({
       getClerkInvitation: async () => ({ status: "pending" }),
@@ -1518,7 +1521,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       },
       alerting: {
         failureThreshold: 3,
-        completionStaleAfterMs: 10,
+        completionStaleAfterMs: 100,
         notify: async (alert) => {
           alerts.push(alert);
         },
@@ -1528,7 +1531,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     });
 
     await lookupStarted;
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await new Promise((resolve) => setTimeout(resolve, 150));
     assert.deepEqual(
       alerts.map(({ type, reason }) => [type, reason]),
       [["DEGRADED", "NO_RECENT_COMPLETION"]],
@@ -1541,7 +1544,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     assert.deepEqual(alerts.map(({ type }) => type), ["DEGRADED", "RECOVERED"]);
-    assert.equal(getInvitationReconciliationHealth().completionOverdue, false);
+    assert.equal((await getInvitationReconciliationHealth()).completionOverdue, false);
   });
 
   await t.test("invited role and projects are applied atomically on first login", async () => {

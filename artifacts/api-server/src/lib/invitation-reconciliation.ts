@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
+  invitationReconciliationStateTable,
   operationalStateTable,
   staffInvitationsTable,
   tryWithDatabaseAdvisoryLock,
@@ -115,6 +116,7 @@ let reconciliationHealth: InvitationReconciliationHealth = {
   },
 };
 const reconciliationMonitoringStartedAt = Date.now();
+const invitationReconciliationStateKey = "scheduled-invitation-reconciliation";
 
 export const clerkInvitationVerificationStateKey =
   "clerk-invitation-verification";
@@ -240,8 +242,107 @@ export async function updateInvitationReconciliationAlert(
   }
 }
 
-export function getInvitationReconciliationHealth(): InvitationReconciliationHealth {
-  return { ...reconciliationHealth };
+async function ensureSharedReconciliationState() {
+  await db.insert(invitationReconciliationStateTable).values({
+    key: invitationReconciliationStateKey,
+    monitoringStartedAt: new Date(reconciliationMonitoringStartedAt),
+  }).onConflictDoNothing();
+}
+
+async function persistSharedRunEvent(event: InvitationReconciliationRunEvent) {
+  if (event.outcome === "NEVER_RUN") return;
+  const occurredAt = new Date(event.occurredAt);
+  await ensureSharedReconciliationState();
+  await db.update(invitationReconciliationStateTable).set({
+    lastRunAt: occurredAt,
+    lastRun: event,
+    updatedAt: new Date(),
+  }).where(and(
+    eq(invitationReconciliationStateTable.key, invitationReconciliationStateKey),
+    sql`(
+      ${invitationReconciliationStateTable.lastRunAt} is null
+      or ${invitationReconciliationStateTable.lastRunAt} <= ${occurredAt}
+    )`,
+  ));
+}
+
+async function persistSharedReconciliationFailure(at: Date) {
+  await ensureSharedReconciliationState();
+  await db.update(invitationReconciliationStateTable).set({
+    consecutiveFailures: sql`${invitationReconciliationStateTable.consecutiveFailures} + 1`,
+    lastFailureAt: sql`greatest(
+      ${invitationReconciliationStateTable.lastFailureAt},
+      ${at}
+    )`,
+    updatedAt: new Date(),
+  }).where(eq(
+    invitationReconciliationStateTable.key,
+    invitationReconciliationStateKey,
+  ));
+}
+
+async function persistSharedReconciliationSuccess(at: Date) {
+  await ensureSharedReconciliationState();
+  await db.update(invitationReconciliationStateTable).set({
+    consecutiveFailures: 0,
+    lastSuccessAt: sql`greatest(
+      ${invitationReconciliationStateTable.lastSuccessAt},
+      ${at}
+    )`,
+    updatedAt: new Date(),
+  }).where(eq(
+    invitationReconciliationStateTable.key,
+    invitationReconciliationStateKey,
+  ));
+}
+
+async function persistSharedReconciliationCompletion(
+  event: Extract<InvitationReconciliationRunEvent, { outcome: "COMPLETED" }>,
+) {
+  const occurredAt = new Date(event.occurredAt);
+  await ensureSharedReconciliationState();
+  await db.update(invitationReconciliationStateTable).set({
+    lastCompletedAt: sql`greatest(
+      ${invitationReconciliationStateTable.lastCompletedAt},
+      ${occurredAt}
+    )`,
+    updatedAt: new Date(),
+  }).where(eq(
+    invitationReconciliationStateTable.key,
+    invitationReconciliationStateKey,
+  ));
+  await persistSharedRunEvent(event);
+}
+
+export async function getInvitationReconciliationHealth(): Promise<InvitationReconciliationHealth> {
+  await ensureSharedReconciliationState();
+  const [shared] = await db.select().from(invitationReconciliationStateTable)
+    .where(eq(
+      invitationReconciliationStateTable.key,
+      invitationReconciliationStateKey,
+    ))
+    .limit(1);
+  if (!shared) throw new Error("Status rekonsiliasi bersama tidak tersedia");
+
+  const completionStaleAfterMs = reconciliationHealth.completionStaleAfterMs;
+  const baseline = shared.lastCompletedAt ?? shared.monitoringStartedAt;
+  const completionOverdue = completionStaleAfterMs !== null
+    && Date.now() - baseline.getTime() >= completionStaleAfterMs;
+  return {
+    status: completionOverdue || shared.consecutiveFailures > 0
+      ? "DEGRADED"
+      : "HEALTHY",
+    consecutiveFailures: shared.consecutiveFailures,
+    lastFailureAt: shared.lastFailureAt?.toISOString() ?? null,
+    lastSuccessAt: shared.lastSuccessAt?.toISOString() ?? null,
+    lastCompletedAt: shared.lastCompletedAt?.toISOString() ?? null,
+    completionOverdue,
+    completionStaleAfterMs,
+    lastRun: (shared.lastRun as InvitationReconciliationRunEvent | null) ?? {
+      outcome: "NEVER_RUN",
+      occurredAt: null,
+    },
+  };
 }
 
 export async function recordSuccessfulClerkVerification(
@@ -415,8 +516,10 @@ export async function reconcilePendingInvitations(
 
   if (failed > 0) {
     recordReconciliationFailure();
+    await persistSharedReconciliationFailure(new Date());
   } else {
     recordReconciliationSuccess();
+    await persistSharedReconciliationSuccess(new Date());
   }
   return { checked, updated, failed };
 }
@@ -442,6 +545,7 @@ export async function runScheduledInvitationReconciliation(
       reason: "COORDINATION_LOCK_UNAVAILABLE",
     };
     reconciliationHealth = { ...reconciliationHealth, lastRun: skippedEvent };
+    await persistSharedRunEvent(skippedEvent);
     dependencies.onRunEvent?.(skippedEvent);
     if (dependencies.alerting) {
       evaluateReconciliationCompletionFreshness(
@@ -461,6 +565,7 @@ export async function runScheduledInvitationReconciliation(
   };
   reconciliationHealth = { ...reconciliationHealth, lastRun: completedEvent };
   recordReconciliationCompletion(completedEvent.occurredAt);
+  await persistSharedReconciliationCompletion(completedEvent);
   if (dependencies.alerting) {
     evaluateReconciliationCompletionFreshness(
       dependencies.alerting.completionStaleAfterMs,
@@ -511,6 +616,8 @@ export function schedulePendingInvitationReconciliation(
         occurredAt: new Date().toISOString(),
       };
       reconciliationHealth = { ...reconciliationHealth, lastRun: failedEvent };
+      await persistSharedReconciliationFailure(new Date(failedEvent.occurredAt));
+      await persistSharedRunEvent(failedEvent);
       dependencies.onRunEvent?.(failedEvent);
       dependencies.onRunError?.(error);
       await updateInvitationReconciliationAlert(
