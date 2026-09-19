@@ -48,6 +48,7 @@ const runId = randomUUID();
 const prefix = `access-test-${runId}`;
 const directorId = `${prefix}-director`;
 const projectId = `${prefix}-project`;
+const otherProjectId = `${prefix}-other-project`;
 const unassignedId = `${prefix}-unassigned`;
 const projectManagerId = `${prefix}-project-manager`;
 const taxStaffId = `${prefix}-tax-staff`;
@@ -205,7 +206,7 @@ after(async () => {
   try {
     try {
       await deleteTestAccessRows();
-      await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+      await db.delete(projectsTable).where(inArray(projectsTable.id, [projectId, otherProjectId]));
     } catch (error) {
       cleanupErrors.push(describeDatabaseSuiteError(error, databaseSuiteName, databaseStatementTimeoutMs));
     }
@@ -232,14 +233,24 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     role: "DIRECTOR",
     displayName: "Integration Director",
   });
-  await db.insert(projectsTable).values({
-    id: projectId,
-    code: `AT-${runId.slice(0, 8)}`,
-    name: "Access Integration Project",
-    owner: "Integration Test",
-    contractValue: 1,
-    endDate: "2099-12-31",
-  });
+  await db.insert(projectsTable).values([
+    {
+      id: projectId,
+      code: `AT-${runId.slice(0, 8)}`,
+      name: "Access Integration Project",
+      owner: "Integration Test",
+      contractValue: 1,
+      endDate: "2099-12-31",
+    },
+    {
+      id: otherProjectId,
+      code: `AT-OTHER-${runId.slice(0, 8)}`,
+      name: "Other Team Project",
+      owner: "Other Integration Team",
+      contractValue: 2,
+      endDate: "2099-12-31",
+    },
+  ]);
 
   await db.insert(userRolesTable).values({
     userId: unassignedId,
@@ -300,8 +311,13 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       "content-type": "application/json",
       "x-test-user-id": userId,
     });
-    const projectMutation = (userId: string, name: string, status?: "BERJALAN") => fetch(
-      `${server.baseUrl}/projects/${projectId}`,
+    const projectMutation = (
+      userId: string,
+      name: string,
+      status?: "BERJALAN",
+      targetProjectId = projectId,
+    ) => fetch(
+      `${server.baseUrl}/projects/${targetProjectId}`,
       {
         method: "PATCH",
         headers: headers(userId),
@@ -376,6 +392,19 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       assert.equal(
         (await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)))[0]?.name,
         projectManagerName,
+      );
+
+      const otherProjectName = `${prefix}-pm-other-project`;
+      await assertForbiddenWithoutDatabaseChanges(
+        projectManagerId,
+        () => projectMutation(projectManagerId, otherProjectName, undefined, otherProjectId),
+        async () => ({
+          project: await db.select().from(projectsTable).where(eq(projectsTable.id, otherProjectId)),
+          audits: await db.select().from(auditLogsTable).where(and(
+            eq(auditLogsTable.entity, "Proyek"),
+            eq(auditLogsTable.entityId, otherProjectId),
+          )),
+        }),
       );
 
       const pmInvoicePeriod = `${prefix}-pm-invoice`;
