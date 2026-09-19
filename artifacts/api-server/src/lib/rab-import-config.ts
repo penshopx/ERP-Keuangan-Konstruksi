@@ -1,5 +1,15 @@
 export const defaultRabImportLockTimeoutMs = 5_000;
 
+type RabImportConfigLogger = {
+  info(
+    bindings: {
+      event: "rab_import_config";
+      rabImportLockTimeoutMs: number;
+    },
+    message: string,
+  ): void;
+};
+
 export function getRabImportLockTimeoutMs(
   environment: NodeJS.ProcessEnv,
 ): number {
@@ -14,4 +24,14 @@ export function getRabImportLockTimeoutMs(
   }
 
   return timeoutMs;
+}
+
+export function logRabImportLockTimeout(
+  log: RabImportConfigLogger,
+  environment: NodeJS.ProcessEnv,
+): void {
+  log.info({
+    event: "rab_import_config",
+    rabImportLockTimeoutMs: getRabImportLockTimeoutMs(environment),
+  }, "RAB import lock timeout configured");
 }

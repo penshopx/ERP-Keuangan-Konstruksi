@@ -14,6 +14,7 @@ import {
   resolveOperationalAlertConfig,
   sendOperationalAlert,
 } from "@workspace/db/operational-alert";
+import { logRabImportLockTimeout } from "./lib/rab-import-config";
 
 const rawPort = process.env["PORT"];
 
@@ -88,6 +89,7 @@ const server = app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  logRabImportLockTimeout(logger, process.env);
 });
 
 const invitationReconciliation = schedulePendingInvitationReconciliation({
