@@ -210,11 +210,14 @@ export const GetProjectRabParams = zod.object({
 
 export const GetProjectRabResponse = zod.object({
   "projectId": zod.string(),
+  "baselineId": zod.string(),
   "version": zod.number().int(),
   "status": zod.string(),
   "totalBudget": zod.number(),
   "committed": zod.number(),
+  "remainingCommitment": zod.number(),
   "actual": zod.number(),
+  "availableBudget": zod.number(),
   "remaining": zod.number(),
   "items": zod.array(zod.object({
   "id": zod.string(),
@@ -232,8 +235,11 @@ export const GetProjectRabResponse = zod.object({
   "budget": zod.number(),
   "committed": zod.number(),
   "actual": zod.number(),
+  "remainingCommitment": zod.number().optional(),
+  "availableBudget": zod.number().optional(),
   "variance": zod.number(),
-  "utilization": zod.number()
+  "utilization": zod.number(),
+  "costCodeId": zod.string().nullish()
 }))
 })
 
@@ -267,11 +273,14 @@ export const GetProjectRabVersionParams = zod.object({
 
 export const GetProjectRabVersionResponse = zod.object({
   "projectId": zod.string(),
+  "baselineId": zod.string(),
   "version": zod.number().int(),
   "status": zod.string(),
   "totalBudget": zod.number(),
   "committed": zod.number(),
+  "remainingCommitment": zod.number(),
   "actual": zod.number(),
+  "availableBudget": zod.number(),
   "remaining": zod.number(),
   "items": zod.array(zod.object({
   "id": zod.string(),
@@ -289,8 +298,11 @@ export const GetProjectRabVersionResponse = zod.object({
   "budget": zod.number(),
   "committed": zod.number(),
   "actual": zod.number(),
+  "remainingCommitment": zod.number().optional(),
+  "availableBudget": zod.number().optional(),
   "variance": zod.number(),
-  "utilization": zod.number()
+  "utilization": zod.number(),
+  "costCodeId": zod.string().nullish()
 }))
 })
 
@@ -314,11 +326,14 @@ export const ImportProjectRabTemplateBody = zod.object({
 
 export const ImportProjectRabTemplateResponse = zod.object({
   "projectId": zod.string(),
+  "baselineId": zod.string(),
   "version": zod.number().int(),
   "status": zod.string(),
   "totalBudget": zod.number(),
   "committed": zod.number(),
+  "remainingCommitment": zod.number(),
   "actual": zod.number(),
+  "availableBudget": zod.number(),
   "remaining": zod.number(),
   "items": zod.array(zod.object({
   "id": zod.string(),
@@ -336,8 +351,176 @@ export const ImportProjectRabTemplateResponse = zod.object({
   "budget": zod.number(),
   "committed": zod.number(),
   "actual": zod.number(),
+  "remainingCommitment": zod.number().optional(),
+  "availableBudget": zod.number().optional(),
   "variance": zod.number(),
-  "utilization": zod.number()
+  "utilization": zod.number(),
+  "costCodeId": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary List project commitments
+ */
+export const ListProjectCommitmentsParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const listProjectCommitmentsResponseLinesItemAmountMin = 0;
+
+export const listProjectCommitmentsResponseLinesItemReceivedAmountMin = 0;
+
+export const listProjectCommitmentsResponseLinesItemInvoicedAmountMin = 0;
+
+
+
+export const ListProjectCommitmentsResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string(),
+  "documentType": zod.enum(['PO', 'SPK', 'SUBKON']),
+  "documentNumber": zod.string(),
+  "vendorName": zod.string(),
+  "status": zod.enum(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED']),
+  "version": zod.number().int(),
+  "totalAmount": zod.number(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "lines": zod.array(zod.object({
+  "id": zod.string(),
+  "costCodeId": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number().min(listProjectCommitmentsResponseLinesItemAmountMin),
+  "receivedAmount": zod.number().min(listProjectCommitmentsResponseLinesItemReceivedAmountMin),
+  "invoicedAmount": zod.number().min(listProjectCommitmentsResponseLinesItemInvoicedAmountMin)
+}))
+})
+export const ListProjectCommitmentsResponse = zod.array(ListProjectCommitmentsResponseItem)
+
+
+/**
+ * @summary Create a draft PO, SPK, or subcontract commitment
+ */
+export const CreateProjectCommitmentParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+export const createProjectCommitmentBodyLinesItemAmountMin = 0;
+
+
+
+
+export const CreateProjectCommitmentBody = zod.object({
+  "baselineId": zod.string(),
+  "documentType": zod.enum(['PO', 'SPK', 'SUBKON']),
+  "documentNumber": zod.string().min(1),
+  "vendorName": zod.string().min(1),
+  "lines": zod.array(zod.object({
+  "costCodeId": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number().min(createProjectCommitmentBodyLinesItemAmountMin),
+  "rabItemId": zod.string().nullish()
+})).min(1)
+})
+
+export const createProjectCommitmentResponseLinesItemAmountMin = 0;
+
+export const createProjectCommitmentResponseLinesItemReceivedAmountMin = 0;
+
+export const createProjectCommitmentResponseLinesItemInvoicedAmountMin = 0;
+
+
+
+export const CreateProjectCommitmentResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string(),
+  "documentType": zod.enum(['PO', 'SPK', 'SUBKON']),
+  "documentNumber": zod.string(),
+  "vendorName": zod.string(),
+  "status": zod.enum(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED']),
+  "version": zod.number().int(),
+  "totalAmount": zod.number(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "lines": zod.array(zod.object({
+  "id": zod.string(),
+  "costCodeId": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number().min(createProjectCommitmentResponseLinesItemAmountMin),
+  "receivedAmount": zod.number().min(createProjectCommitmentResponseLinesItemReceivedAmountMin),
+  "invoicedAmount": zod.number().min(createProjectCommitmentResponseLinesItemInvoicedAmountMin)
+}))
+})
+
+
+/**
+ * @summary Submit, approve, reject, receive, invoice, amend, or reverse a commitment
+ */
+export const TransitionProjectCommitmentParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "commitmentId": zod.coerce.string()
+})
+
+export const transitionProjectCommitmentBodyAmountMin = 0;
+
+export const transitionProjectCommitmentBodyLinesItemAmountMin = 0;
+
+
+
+export const TransitionProjectCommitmentBody = zod.object({
+  "action": zod.enum(['SUBMIT', 'APPROVE', 'REJECT', 'RECEIVE', 'INVOICE', 'CANCEL', 'AMEND']),
+  "amount": zod.number().min(transitionProjectCommitmentBodyAmountMin).optional(),
+  "lineId": zod.string().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "note": zod.string().optional(),
+  "lines": zod.array(zod.object({
+  "costCodeId": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number().min(transitionProjectCommitmentBodyLinesItemAmountMin),
+  "rabItemId": zod.string().nullish()
+})).optional()
+})
+
+export const transitionProjectCommitmentResponseLinesItemAmountMin = 0;
+
+export const transitionProjectCommitmentResponseLinesItemReceivedAmountMin = 0;
+
+export const transitionProjectCommitmentResponseLinesItemInvoicedAmountMin = 0;
+
+
+
+export const TransitionProjectCommitmentResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string(),
+  "documentType": zod.enum(['PO', 'SPK', 'SUBKON']),
+  "documentNumber": zod.string(),
+  "vendorName": zod.string(),
+  "status": zod.enum(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED']),
+  "version": zod.number().int(),
+  "totalAmount": zod.number(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "lines": zod.array(zod.object({
+  "id": zod.string(),
+  "costCodeId": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number().min(transitionProjectCommitmentResponseLinesItemAmountMin),
+  "receivedAmount": zod.number().min(transitionProjectCommitmentResponseLinesItemReceivedAmountMin),
+  "invoicedAmount": zod.number().min(transitionProjectCommitmentResponseLinesItemInvoicedAmountMin)
 }))
 })
 

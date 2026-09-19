@@ -173,17 +173,24 @@ export interface RabItem {
   budget: number;
   committed: number;
   actual: number;
+  remainingCommitment?: number;
+  availableBudget?: number;
   variance: number;
   utilization: number;
+  /** @nullable */
+  costCodeId?: string | null;
 }
 
 export interface RabSummary {
   projectId: string;
+  baselineId: string;
   version: number;
   status: string;
   totalBudget: number;
   committed: number;
+  remainingCommitment: number;
   actual: number;
+  availableBudget: number;
   remaining: number;
   items: RabItem[];
 }
@@ -193,6 +200,122 @@ export interface RabVersion {
   status: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type CommitmentDocumentType = typeof CommitmentDocumentType[keyof typeof CommitmentDocumentType];
+
+
+export const CommitmentDocumentType = {
+  PO: 'PO',
+  SPK: 'SPK',
+  SUBKON: 'SUBKON',
+} as const;
+
+export type CommitmentStatus = typeof CommitmentStatus[keyof typeof CommitmentStatus];
+
+
+export const CommitmentStatus = {
+  DRAFT: 'DRAFT',
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+  CLOSED: 'CLOSED',
+} as const;
+
+export interface CommitmentLine {
+  id: string;
+  costCodeId: string;
+  description: string;
+  /** @minimum 0 */
+  amount: number;
+  /** @minimum 0 */
+  receivedAmount: number;
+  /** @minimum 0 */
+  invoicedAmount: number;
+}
+
+export interface Commitment {
+  id: string;
+  projectId: string;
+  baselineId: string;
+  documentType: CommitmentDocumentType;
+  documentNumber: string;
+  vendorName: string;
+  status: CommitmentStatus;
+  version: number;
+  totalAmount: number;
+  /** @nullable */
+  approvedBy?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  lines: CommitmentLine[];
+}
+
+export type CommitmentInputDocumentType = typeof CommitmentInputDocumentType[keyof typeof CommitmentInputDocumentType];
+
+
+export const CommitmentInputDocumentType = {
+  PO: 'PO',
+  SPK: 'SPK',
+  SUBKON: 'SUBKON',
+} as const;
+
+export type CommitmentInputLinesItem = {
+  costCodeId: string;
+  description: string;
+  /** @minimum 0 */
+  amount: number;
+  /** @nullable */
+  rabItemId?: string | null;
+};
+
+export interface CommitmentInput {
+  baselineId: string;
+  documentType: CommitmentInputDocumentType;
+  /** @minLength 1 */
+  documentNumber: string;
+  /** @minLength 1 */
+  vendorName: string;
+  /** @minItems 1 */
+  lines: CommitmentInputLinesItem[];
+}
+
+export type CommitmentTransitionInputAction = typeof CommitmentTransitionInputAction[keyof typeof CommitmentTransitionInputAction];
+
+
+export const CommitmentTransitionInputAction = {
+  SUBMIT: 'SUBMIT',
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT',
+  RECEIVE: 'RECEIVE',
+  INVOICE: 'INVOICE',
+  CANCEL: 'CANCEL',
+  AMEND: 'AMEND',
+} as const;
+
+export type CommitmentTransitionInputLinesItem = {
+  costCodeId: string;
+  description: string;
+  /** @minimum 0 */
+  amount: number;
+  /** @nullable */
+  rabItemId?: string | null;
+};
+
+export interface CommitmentTransitionInput {
+  action: CommitmentTransitionInputAction;
+  /** @minimum 0 */
+  amount?: number;
+  /** @nullable */
+  lineId?: string | null;
+  /** @nullable */
+  idempotencyKey?: string | null;
+  note?: string;
+  lines?: CommitmentTransitionInputLinesItem[];
 }
 
 export interface RabTemplateItem {

@@ -9,6 +9,10 @@ import {
   rabBaselinesTable,
   rabItemsTable,
   rabTemplatesTable,
+  projectCostCodesTable,
+  commitmentTable,
+  commitmentLinesTable,
+  actualCostAllocationsTable,
 } from "@workspace/db";
 import {
   CreateProjectBody,
@@ -64,22 +68,51 @@ async function rabSummary(projectId: string, baseline: typeof rabBaselinesTable.
   const storedItems = await db.select().from(rabItemsTable)
     .where(eq(rabItemsTable.baselineId, baseline.id))
     .orderBy(rabItemsTable.code);
-  const items = storedItems.map((item) => ({
+  const costCodes = await db.select().from(projectCostCodesTable).where(eq(projectCostCodesTable.projectId, projectId));
+  const codeById = new Map(costCodes.map((code) => [code.id, code.code]));
+  const approved = await db.select({ costCodeId: commitmentLinesTable.costCodeId, amount: sql<number>`coalesce(sum(${commitmentLinesTable.amount} - ${commitmentLinesTable.invoicedAmount}), 0)` })
+    .from(commitmentLinesTable).innerJoin(commitmentTable, eq(commitmentTable.id, commitmentLinesTable.commitmentId))
+    .where(and(
+      eq(commitmentTable.projectId, projectId),
+      eq(commitmentTable.baselineId, baseline.id),
+      eq(commitmentTable.status, "APPROVED"),
+    )).groupBy(commitmentLinesTable.costCodeId);
+  const actualRows = await db.select({ costCodeId: actualCostAllocationsTable.costCodeId, amount: sql<number>`coalesce(sum(${actualCostAllocationsTable.amount}), 0)` })
+    .from(actualCostAllocationsTable).where(and(
+      eq(actualCostAllocationsTable.projectId, projectId),
+      eq(actualCostAllocationsTable.baselineId, baseline.id),
+    )).groupBy(actualCostAllocationsTable.costCodeId);
+  const committedByCode = new Map(approved.map((row) => [row.costCodeId, Number(row.amount)]));
+  const actualByCode = new Map(actualRows.map((row) => [row.costCodeId, Number(row.amount)]));
+  const items = storedItems.map((item) => {
+    const costCodeId = item.costCodeId ?? costCodes.find((code) => code.code === item.code)?.id;
+    const committedAmount = costCodeId ? committedByCode.get(costCodeId) ?? 0 : 0;
+    const actualAmount = costCodeId ? actualByCode.get(costCodeId) ?? 0 : item.actual;
+    return ({
     ...item,
+    committed: committedAmount,
+    actual: actualAmount,
+    costCodeId: costCodeId ?? null,
     quantity: item.quantityBasisPoints / 100,
-    variance: item.budget - item.actual,
-    utilization: item.budget === 0 ? 0 : Number(((item.actual / item.budget) * 100).toFixed(1)),
-  }));
+    remainingCommitment: Math.max(committedAmount, 0),
+    availableBudget: item.budget - committedAmount - actualAmount,
+    variance: item.budget - committedAmount - actualAmount,
+    utilization: item.budget === 0 ? 0 : Number((((committedAmount + actualAmount) / item.budget) * 100).toFixed(1)),
+  }); });
   const totalBudget = items.reduce((sum, item) => sum + item.budget, 0);
   const committed = items.reduce((sum, item) => sum + item.committed, 0);
   const actual = items.reduce((sum, item) => sum + item.actual, 0);
+  const remainingCommitment = items.reduce((sum, item) => sum + item.remainingCommitment, 0);
   return {
     projectId,
+    baselineId: baseline.id,
     version: baseline.version,
     status: baseline.status,
     totalBudget,
     committed,
+    remainingCommitment,
     actual,
+    availableBudget: totalBudget - committed - actual,
     remaining: totalBudget - actual,
     items,
   };
@@ -332,6 +365,7 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
     return {
       id: randomUUID(),
       baselineId,
+      costCodeId: `${project.id}:${item.code}`,
       code: item.code,
       name: item.name,
       category: item.category,
@@ -361,6 +395,9 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
       }).from(rabBaselinesTable).where(eq(rabBaselinesTable.projectId, project.id));
       const lockedVersion = (nextVersion ?? 0) + 1;
       await tx.insert(rabBaselinesTable).values({ id: baselineId, projectId: project.id, version: lockedVersion, status: "DRAF" });
+      await tx.insert(projectCostCodesTable).values(
+        template.items.map((item) => ({ id: `${project.id}:${item.code}`, projectId: project.id, code: item.code, name: item.name })),
+      ).onConflictDoNothing();
       await tx.insert(rabItemsTable).values(importedItems);
       await tx.update(projectsTable).set({ budget: totalBudget, wbsCount: importedItems.length }).where(eq(projectsTable.id, project.id));
       await hooks.beforeRabImportAuditInsert?.(project.id, baselineId, lockedVersion);
@@ -393,14 +430,19 @@ router.post("/projects/:projectId/rab/import", requirePermission("projects:write
     quantity: item.quantityBasisPoints / 100,
     variance: item.budget,
     utilization: 0,
+    remainingCommitment: 0,
+    availableBudget: item.budget,
   }));
   res.status(201).json(ImportProjectRabTemplateResponse.parse({
     projectId: project.id,
+    baselineId,
     version,
     status: "DRAF",
     totalBudget,
     committed: 0,
+    remainingCommitment: 0,
     actual: 0,
+    availableBudget: totalBudget,
     remaining: totalBudget,
     items: responseItems,
   }));

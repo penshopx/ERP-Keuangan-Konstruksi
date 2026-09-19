@@ -27,6 +27,9 @@ import type {
   AccessUserUpdate,
   Activity,
   ApprovalDecisionInput,
+  Commitment,
+  CommitmentInput,
+  CommitmentTransitionInput,
   CurrentUser,
   DashboardSummary,
   GetTaxSummaryParams,
@@ -898,6 +901,263 @@ export const useImportProjectRabTemplate = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getImportProjectRabTemplateMutationOptions(options));
+    }
+
+export const getListProjectCommitmentsUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/commitments`
+}
+
+/**
+ * @summary List project commitments
+ */
+export const listProjectCommitments = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<Commitment[]> => {
+
+  return customFetch<Commitment[]>(getListProjectCommitmentsUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProjectCommitmentsQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/commitments`
+    ] as const;
+    }
+
+
+export const getListProjectCommitmentsQueryOptions = <TData = Awaited<ReturnType<typeof listProjectCommitments>>, TError = ErrorType<unknown>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjectCommitments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProjectCommitmentsQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjectCommitments>>> = ({ signal }) => listProjectCommitments(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjectCommitments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProjectCommitmentsQueryResult = NonNullable<Awaited<ReturnType<typeof listProjectCommitments>>>
+export type ListProjectCommitmentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List project commitments
+ */
+
+export function useListProjectCommitments<TData = Awaited<ReturnType<typeof listProjectCommitments>>, TError = ErrorType<unknown>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjectCommitments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProjectCommitmentsQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateProjectCommitmentUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/commitments`
+}
+
+/**
+ * @summary Create a draft PO, SPK, or subcontract commitment
+ */
+export const createProjectCommitment = async (projectId: string,
+    commitmentInput: CommitmentInput, options?: Parameters<typeof customFetch>[1]): Promise<Commitment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Commitment>(getCreateProjectCommitmentUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(commitmentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectCommitmentMutationKey = () => ['createProjectCommitment'] as const;
+
+export const getCreateProjectCommitmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectCommitment>>, TError,CreateProjectCommitmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectCommitment>>, TError,CreateProjectCommitmentMutationVariables, TContext> => {
+
+const mutationKey = getCreateProjectCommitmentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectCommitment>>, CreateProjectCommitmentMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createProjectCommitment(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectCommitmentMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectCommitment>>>
+    export type CreateProjectCommitmentMutationBody = BodyType<CommitmentInput>
+    export type CreateProjectCommitmentMutationError = ErrorType<unknown>
+    export type CreateProjectCommitmentMutationVariables = {projectId: string;data: BodyType<CommitmentInput>}
+
+    /**
+ * @summary Create a draft PO, SPK, or subcontract commitment
+ */
+export const useCreateProjectCommitment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectCommitment>>, TError,CreateProjectCommitmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectCommitment>>,
+        TError,
+        CreateProjectCommitmentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateProjectCommitmentMutationOptions(options));
+    }
+
+export const getTransitionProjectCommitmentUrl = (projectId: string,
+    commitmentId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/commitments/${commitmentId}/transition`
+}
+
+/**
+ * @summary Submit, approve, reject, receive, invoice, amend, or reverse a commitment
+ */
+export const transitionProjectCommitment = async (projectId: string,
+    commitmentId: string,
+    commitmentTransitionInput: CommitmentTransitionInput, options?: Parameters<typeof customFetch>[1]): Promise<Commitment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Commitment>(getTransitionProjectCommitmentUrl(projectId,commitmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(commitmentTransitionInput)
+  }
+);}
+
+
+
+
+
+export const getTransitionProjectCommitmentMutationKey = () => ['transitionProjectCommitment'] as const;
+
+export const getTransitionProjectCommitmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionProjectCommitment>>, TError,TransitionProjectCommitmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transitionProjectCommitment>>, TError,TransitionProjectCommitmentMutationVariables, TContext> => {
+
+const mutationKey = getTransitionProjectCommitmentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transitionProjectCommitment>>, TransitionProjectCommitmentMutationVariables> = (props) => {
+          const {projectId,commitmentId,data} = props ?? {};
+
+          return  transitionProjectCommitment(projectId,commitmentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransitionProjectCommitmentMutationResult = NonNullable<Awaited<ReturnType<typeof transitionProjectCommitment>>>
+    export type TransitionProjectCommitmentMutationBody = BodyType<CommitmentTransitionInput>
+    export type TransitionProjectCommitmentMutationError = ErrorType<unknown>
+    export type TransitionProjectCommitmentMutationVariables = {projectId: string;commitmentId: string;data: BodyType<CommitmentTransitionInput>}
+
+    /**
+ * @summary Submit, approve, reject, receive, invoice, amend, or reverse a commitment
+ */
+export const useTransitionProjectCommitment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionProjectCommitment>>, TError,TransitionProjectCommitmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transitionProjectCommitment>>,
+        TError,
+        TransitionProjectCommitmentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransitionProjectCommitmentMutationOptions(options));
     }
 
 export const getListRabTemplatesUrl = () => {

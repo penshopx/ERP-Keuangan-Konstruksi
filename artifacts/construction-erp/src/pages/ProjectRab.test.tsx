@@ -77,6 +77,7 @@ vi.mock("@workspace/api-client-react", async (importOriginal) => {
       isError: false,
     }),
     useGetProjectRabVersion: (_projectId: string, version: number) => ({ data: version === 1 ? historicalRab : latestRab, isLoading: false, isError: false }),
+    useListProjectCommitments: () => ({ data: [], isLoading: false, isError: false }),
   }
 })
 

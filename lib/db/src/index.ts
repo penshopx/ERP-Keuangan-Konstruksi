@@ -51,6 +51,7 @@ const REQUIRED_MIGRATIONS = [
   "0004_restrict_project_status.sql",
   "0006_add_shared_invitation_reconciliation_state.sql",
   "0007_index_pending_resend_compensation_audits.sql",
+  "0010_add_commitment_ledger.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -73,6 +74,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     operational_state_shape: boolean;
     invitation_reconciliation_state_shape: boolean;
     pending_resend_compensation_index: boolean;
+    commitment_ledger_shape: boolean;
   }>(`
     SELECT
       EXISTS (
@@ -148,7 +150,13 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
         WHERE schemaname = 'public'
           AND tablename = 'audit_logs'
           AND indexname = 'audit_logs_pending_resend_compensation_idx'
-      ) AS pending_resend_compensation_index
+      ) AS pending_resend_compensation_index,
+      (
+        to_regclass('commitments') IS NOT NULL
+        AND to_regclass('commitment_lines') IS NOT NULL
+        AND to_regclass('project_cost_codes') IS NOT NULL
+        AND to_regclass('actual_cost_allocations') IS NOT NULL
+      ) AS commitment_ledger_shape
   `);
 
   const status = result.rows[0];
@@ -161,6 +169,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     !status.operational_state_shape ||
     !status.invitation_reconciliation_state_shape ||
     !status.pending_resend_compensation_index
+    || !status.commitment_ledger_shape
   ) {
     throw new Error(
       `Mandatory database migrations ${REQUIRED_MIGRATIONS.join(", ")} are not fully applied. ` +

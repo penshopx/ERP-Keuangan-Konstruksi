@@ -199,6 +199,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RabSummary"
+  /projects/{projectId}/commitments:
+    get:
+      operationId: listProjectCommitments
+      tags: [projects]
+      summary: List project commitments
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project commitments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Commitment" }
+    post:
+      operationId: createProjectCommitment
+      tags: [projects]
+      summary: Create a draft PO, SPK, or subcontract commitment
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommitmentInput" }
+      responses:
+        "201":
+          description: Draft commitment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Commitment" }
+  /projects/{projectId}/commitments/{commitmentId}/transition:
+    post:
+      operationId: transitionProjectCommitment
+      tags: [projects]
+      summary: Submit, approve, reject, receive, invoice, amend, or reverse a commitment
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: commitmentId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommitmentTransitionInput" }
+      responses:
+        "200":
+          description: Updated commitment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Commitment" }
   /rab/templates:
     get:
       operationId: listRabTemplates
@@ -757,14 +811,17 @@ components:
                 $ref: "#/components/schemas/Invoice"
     RabSummary:
       type: object
-      required: [projectId, version, status, totalBudget, committed, actual, remaining, items]
+      required: [projectId, baselineId, version, status, totalBudget, committed, remainingCommitment, actual, availableBudget, remaining, items]
       properties:
         projectId: { type: string }
+        baselineId: { type: string }
         version: { type: integer }
         status: { type: string }
         totalBudget: { type: number }
         committed: { type: number }
+        remainingCommitment: { type: number }
         actual: { type: number }
+        availableBudget: { type: number }
         remaining: { type: number }
         items:
           type: array
@@ -797,8 +854,80 @@ components:
         budget: { type: number }
         committed: { type: number }
         actual: { type: number }
+        remainingCommitment: { type: number }
+        availableBudget: { type: number }
         variance: { type: number }
         utilization: { type: number }
+        costCodeId: { type: ["string", "null"] }
+    Commitment:
+      type: object
+      required: [id, projectId, baselineId, documentType, documentNumber, vendorName, status, version, totalAmount, createdBy, createdAt, updatedAt, lines]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        baselineId: { type: string }
+        documentType: { type: string, enum: [PO, SPK, SUBKON] }
+        documentNumber: { type: string }
+        vendorName: { type: string }
+        status: { type: string, enum: [DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED, CLOSED] }
+        version: { type: integer }
+        totalAmount: { type: number }
+        approvedBy: { type: ["string", "null"] }
+        approvedAt: { type: ["string", "null"], format: date-time }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/CommitmentLine" }
+    CommitmentLine:
+      type: object
+      required: [id, costCodeId, description, amount, receivedAmount, invoicedAmount]
+      properties:
+        id: { type: string }
+        costCodeId: { type: string }
+        description: { type: string }
+        amount: { type: number, minimum: 0 }
+        receivedAmount: { type: number, minimum: 0 }
+        invoicedAmount: { type: number, minimum: 0 }
+    CommitmentInput:
+      type: object
+      required: [baselineId, documentType, documentNumber, vendorName, lines]
+      properties:
+        baselineId: { type: string }
+        documentType: { type: string, enum: [PO, SPK, SUBKON] }
+        documentNumber: { type: string, minLength: 1 }
+        vendorName: { type: string, minLength: 1 }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [costCodeId, description, amount]
+            properties:
+              costCodeId: { type: string }
+              description: { type: string }
+              amount: { type: number, minimum: 0 }
+              rabItemId: { type: ["string", "null"] }
+    CommitmentTransitionInput:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [SUBMIT, APPROVE, REJECT, RECEIVE, INVOICE, CANCEL, AMEND] }
+        amount: { type: number, minimum: 0 }
+        lineId: { type: ["string", "null"] }
+        idempotencyKey: { type: ["string", "null"] }
+        note: { type: string }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [costCodeId, description, amount]
+            properties:
+              costCodeId: { type: string }
+              description: { type: string }
+              amount: { type: number, minimum: 0 }
+              rabItemId: { type: ["string", "null"] }
     RabTemplateItem:
       type: object
       required: [code, level, name, category, unit, quantity, unitPrice, materialCost, laborCost, equipmentCost, budget]

@@ -9,11 +9,14 @@ import type { RabItem } from './rabItem';
 
 export interface RabSummary {
   projectId: string;
+  baselineId: string;
   version: number;
   status: string;
   totalBudget: number;
   committed: number;
+  remainingCommitment: number;
   actual: number;
+  availableBudget: number;
   remaining: number;
   items: RabItem[];
 }

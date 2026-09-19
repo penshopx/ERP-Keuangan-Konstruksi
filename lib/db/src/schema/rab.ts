@@ -15,6 +15,7 @@ export const rabBaselinesTable = pgTable("rab_baselines", {
 export const rabItemsTable = pgTable("rab_items", {
   id: text("id").primaryKey(),
   baselineId: text("baseline_id").notNull().references(() => rabBaselinesTable.id, { onDelete: "cascade" }),
+  costCodeId: text("cost_code_id"),
   code: text("code").notNull(),
   name: text("name").notNull(),
   category: text("category").notNull(),

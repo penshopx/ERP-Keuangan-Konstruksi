@@ -23,6 +23,10 @@ export interface RabItem {
   budget: number;
   committed: number;
   actual: number;
+  remainingCommitment?: number;
+  availableBudget?: number;
   variance: number;
   utilization: number;
+  /** @nullable */
+  costCodeId?: string | null;
 }

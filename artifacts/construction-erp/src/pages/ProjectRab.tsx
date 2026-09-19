@@ -18,7 +18,9 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImportTemplateSheet } from "@/components/rab/ImportTemplateSheet"
+import { ProjectCommitments } from "@/components/rab/ProjectCommitments"
 
 export default function ProjectRab() {
   const { id } = useParams()
@@ -320,76 +322,89 @@ export default function ProjectRab() {
         </Card>
         <Card className="bg-muted/30">
           <CardContent className="p-6">
-            <div className="text-sm font-medium text-muted-foreground mb-2">Remaining Budget</div>
-            <div className="text-2xl font-bold">{formatRupiah(rab.remaining)}</div>
+            <div className="text-sm font-medium text-muted-foreground mb-2">Available Budget</div>
+            <div className="text-2xl font-bold">{formatRupiah(rab.availableBudget)}</div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">WBS Code</TableHead>
-              <TableHead>Work Item</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-right">Budget</TableHead>
-              <TableHead className="text-right">Actual + Committed</TableHead>
-              <TableHead className="text-right">Variance</TableHead>
-              <TableHead className="w-[150px]">Utilization</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rab.items.map((item) => {
-              const isOverbudget = item.variance < 0
-              return (
-                <TableRow key={item.id} className={item.level === 0 ? "bg-muted/10" : ""}>
-                  <TableCell className="font-mono text-xs whitespace-nowrap">{item.code}</TableCell>
-                  <TableCell>
-                    <div className="font-medium" style={{ paddingLeft: `${item.level * 1.5}rem` }}>
-                      {item.name}
-                    </div>
-                    {item.quantity > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1" style={{ paddingLeft: `${item.level * 1.5}rem` }}>
-                        {item.quantity.toLocaleString("id-ID")} {item.unit} @ {formatRupiah(item.unitPrice)}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-normal text-xs">{item.category}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">{formatRupiah(item.budget)}</TableCell>
-                  <TableCell className="text-right">{formatRupiah(item.actual + item.committed)}</TableCell>
-                  <TableCell className={`text-right font-medium ${isOverbudget ? 'text-destructive' : 'text-emerald-500 dark:text-emerald-400'}`}>
-                    {isOverbudget && "-"} {formatRupiah(Math.abs(item.variance))}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1 mt-1">
-                      <Progress 
-                        value={Math.min(item.utilization, 100)}
-                        indicatorColor={isOverbudget ? "bg-destructive" : "bg-primary"} 
-                      />
-                      <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-                        <span>{formatPercent(item.utilization)}</span>
-                        {isOverbudget && <AlertTriangle className="h-3 w-3 text-destructive" />}
-                      </div>
-                    </div>
-                  </TableCell>
+      <Tabs defaultValue="wbs" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="wbs" data-testid="tab-wbs">Item RAB (WBS)</TabsTrigger>
+          <TabsTrigger value="commitments" data-testid="tab-commitments">Komitmen (PO/SPK)</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="wbs" className="m-0">
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">WBS Code</TableHead>
+                  <TableHead>Work Item</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Budget</TableHead>
+                  <TableHead className="text-right">Actual + Committed</TableHead>
+                  <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="w-[150px]">Utilization</TableHead>
                 </TableRow>
-              )
-            })}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={3} className="text-right font-bold">Total</TableCell>
-              <TableCell className="text-right font-bold">{formatRupiah(rab.totalBudget)}</TableCell>
-              <TableCell className="text-right font-bold">{formatRupiah(rab.actual + rab.committed)}</TableCell>
-              <TableCell className="text-right font-bold">{formatRupiah(rab.remaining)}</TableCell>
-              <TableCell></TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {rab.items.map((item) => {
+                  const isOverbudget = item.variance < 0
+                  return (
+                    <TableRow key={item.id} className={item.level === 0 ? "bg-muted/10" : ""}>
+                      <TableCell className="font-mono text-xs whitespace-nowrap">{item.code}</TableCell>
+                      <TableCell>
+                        <div className="font-medium" style={{ paddingLeft: `${item.level * 1.5}rem` }}>
+                          {item.name}
+                        </div>
+                        {item.quantity > 0 && (
+                          <div className="text-xs text-muted-foreground mt-1" style={{ paddingLeft: `${item.level * 1.5}rem` }}>
+                            {item.quantity.toLocaleString("id-ID")} {item.unit} @ {formatRupiah(item.unitPrice)}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-normal text-xs">{item.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{formatRupiah(item.budget)}</TableCell>
+                      <TableCell className="text-right">{formatRupiah(item.actual + (item.remainingCommitment ?? item.committed))}</TableCell>
+                      <TableCell className={`text-right font-medium ${isOverbudget ? 'text-destructive' : 'text-emerald-500 dark:text-emerald-400'}`}>
+                        {isOverbudget && "-"} {formatRupiah(Math.abs(item.variance))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1 mt-1">
+                          <Progress
+                            value={Math.min(item.utilization, 100)}
+                            indicatorColor={isOverbudget ? "bg-destructive" : "bg-primary"}
+                          />
+                          <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                            <span>{formatPercent(item.utilization)}</span>
+                            {isOverbudget && <AlertTriangle className="h-3 w-3 text-destructive" />}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right font-bold">Total</TableCell>
+                  <TableCell className="text-right font-bold">{formatRupiah(rab.totalBudget)}</TableCell>
+                  <TableCell className="text-right font-bold">{formatRupiah(rab.actual + rab.remainingCommitment)}</TableCell>
+                  <TableCell className="text-right font-bold">{formatRupiah(rab.availableBudget)}</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="commitments" className="m-0">
+          <ProjectCommitments projectId={projectId} rabVersion={selectedVersion} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
