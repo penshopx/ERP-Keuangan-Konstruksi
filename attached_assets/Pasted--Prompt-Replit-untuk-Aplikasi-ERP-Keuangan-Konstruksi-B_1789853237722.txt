@@ -1,0 +1,369 @@
+# 🎯 Prompt Replit untuk Aplikasi ERP Keuangan Konstruksi
+
+Berikut adalah prompt komprehensif yang bisa Anda langsung copy-paste ke **Replit Agent** untuk membangun aplikasi ERP Keuangan Konstruksi yang terintegrasi dengan SOP:
+
+---
+
+## 📋 PROMPT UTAMA (Copy-Paste ke Replit Agent)
+
+```markdown
+# PROJECT: Construction Financial ERP System (Kontrakta FIN)
+
+## 🎯 CONTEXT & GOAL
+Build a comprehensive Financial ERP application specifically designed for Indonesian Construction Contractors. This is the "Financial Brain" of a 2-app ecosystem. The second app (Project Management / "Kontrakta SITE") handles field operations, and this ERP must integrate with it via API to receive real-time field data (material receipts, progress opname, attendance, equipment usage) and convert them into financial transactions automatically.
+
+The system must ENFORCE 8 Standard Operating Procedures (SOPs) as embedded business logic — meaning users CANNOT bypass the SOPs. The SOPs are not documents; they are the actual workflow rules.
+
+---
+
+## 🛠️ TECH STACK (Recommended)
+- **Frontend**: Next.js 14+ (App Router) + TailwindCSS + Shadcn/UI
+- **Backend**: Next.js API Routes + Prisma ORM
+- **Database**: PostgreSQL
+- **Auth**: NextAuth.js with Role-Based Access Control (RBAC)
+- **Charts**: Recharts or Chart.js
+- **PDF Generation**: jsPDF or react-pdf (for invoices, tax reports, payslips)
+- **Language**: Indonesian (Bahasa Indonesia) for all UI labels, with English code comments
+
+---
+
+## 👥 USER ROLES & PERMISSIONS (RBAC)
+
+| Role | Access |
+|------|--------|
+| **Owner / Director** | Full access, all dashboards, approve large transactions |
+| **CFO / Kepala Keuangan** | All financial modules, approve payments, generate reports |
+| **Staff Keuangan** | Daily transactions, petty cash, reconciliation, invoice processing |
+| **Staff Admin** | Document management, vendor invoice verification, stock admin |
+| **Project Manager** | View-only for their project's financials, approve petty cash |
+| **Site Supervisor** | Submit petty cash requests, submit attendance (read-only financials) |
+| **Auditor** | Read-only access to all transactions and logs |
+
+---
+
+## 📦 CORE MODULES (Based on 8 Integrated SOPs)
+
+### MODULE 1: Project Budget & RAB Management (SOP 30 - Project Manager)
+- Create project with: name, client, contract value, start/end date
+- Define RAB (Rencana Anggaran Biaya) with categories:
+  - Direct Costs (Material, Labor, Equipment, Subcontractor)
+  - Indirect Costs (Overhead, Mobilization)
+  - Contingency
+- Budget vs Actual tracking with real-time variance alerts
+- **Business Rule**: Block any Purchase Order if it exceeds remaining budget by >5%
+
+### MODULE 2: Petty Cash / Kas Kecil (SOP 9)
+**Workflow (MUST be enforced)**:
+1. Site Supervisor/PM submits request → form: purpose, amount, date, project
+2. Kepala Keuangan approves/rejects (with digital signature)
+3. Kasir withdraws from bank → records in cash book
+4. Kasir hands over cash to requester
+5. Requester uploads receipt photo + fills usage form
+6. End-of-month: Kasir does reconciliation (opening balance - expenses = closing balance)
+7. Kepala Keuangan verifies → report to PM
+8. PM evaluates monthly
+
+**Features**:
+- Photo upload for receipts (mandatory, with GPS + timestamp)
+- Auto-reconciliation dashboard
+- Alert if receipt missing after 3 days
+
+### MODULE 3: Payroll / Pembayaran Upah (SOP 10 + SOP 17 Lembur)
+**Workflow**:
+1. Receive attendance data from Kontrakta SITE app (via API)
+2. Receive overtime requests (approved by supervisor)
+3. Auto-calculate: (days × daily rate) + (overtime hours × overtime rate) + allowances - deductions
+4. Generate payslip (slip gaji) with full breakdown
+5. PM + Kepala Keuangan approve (dual signature)
+6. Disburse (bank transfer / cash) with proof upload
+7. Archive for tax compliance
+
+**Features**:
+- Integration endpoint: `POST /api/integration/attendance` (receives from SITE app)
+- Auto-compliance with UMR (minimum wage) validation
+- Tax calculation (PPh 21) automatic
+- Monthly/weekly payroll period selection
+
+### MODULE 4: Invoicing & Accounts Receivable (SOP 11 - Penagihan)
+**Workflow**:
+1. Receive progress opname data from SITE app (e.g., "Project A: 80% complete")
+2. Auto-generate invoice based on contract terms (progress billing / milestone)
+3. Include: invoice number, date, project, description, amount, payment terms
+4. Send to client (email/PDF download)
+5. Monitor payment status (Unpaid / Partial / Paid / Overdue)
+6. Auto-alert if overdue >7 days
+7. Handle retention (retensi) tracking — auto-alert when retention is claimable
+
+**Features**:
+- Integration endpoint: `POST /api/integration/opname`
+- Retention tracking (typically 5% held for maintenance period)
+- Dunning letters auto-generation
+- Cashflow projection based on invoice pipeline
+
+### MODULE 5: Accounts Payable & Vendor Management (SOP 37 - Staff Admin)
+**Workflow**:
+1. Receive "Material Received" confirmation from SITE app (with photo proof)
+2. Match: Purchase Order ↔ Delivery Order ↔ Invoice from vendor (3-way matching)
+3. If mismatch → flag for investigation
+4. If match → create payment request
+5. Project Manager approves → Kepala Keuangan approves
+6. Process payment
+7. Archive documents
+
+**Features**:
+- Integration endpoint: `POST /api/integration/material-receipt`
+- Auto 3-way matching (PO-DO-Invoice)
+- Vendor database with performance rating
+- Payment terms tracking (TOP 30/60/90)
+
+### MODULE 6: Cashflow & Treasury (SOP 38 - Staff Keuangan)
+**Features**:
+- Real-time cash position dashboard (all projects combined + per project)
+- Cashflow projection (30/60/90 days forward)
+- Bank reconciliation (import bank statement CSV, auto-match)
+- Multi-bank account management
+- Petty cash + operational cash separation
+- **Alert System**:
+  - 🔴 Red: Projected negative cashflow in next 30 days
+  - 🟡 Yellow: Budget utilization >90%
+  - 🟢 Green: Healthy
+
+### MODULE 7: Tax Management (SOP 14 - Laporan Pajak Jasa Konstruksi)
+**Features**:
+- Auto-calculate PPh Final Jasa Konstruksi (1.75% - 4% based on qualification)
+- Auto-calculate PPN (11% VAT) for taxable projects
+- Generate e-Faktur format
+- Monthly tax calendar with reminders
+- Document archive: invoices, contracts, SSP (bukti bayar)
+- Export to CSV for tax consultant
+- Audit trail for all tax calculations
+
+### MODULE 8: Financial Reporting (SOP 8 - Laporan Keuangan Konstruksi)
+**Reports to generate**:
+- **Project-level**:
+  - Project P&L (Laba Rugi per Proyek)
+  - Project Cashflow
+  - Budget vs Actual Report
+  - Cost Breakdown Structure
+- **Company-level**:
+  - Balance Sheet (Neraca)
+  - Income Statement (Laba Rugi)
+  - Cash Flow Statement (Arus Kas)
+  - Tax Reports
+- **Operational**:
+  - Aging Report (AR & AP)
+  - Petty Cash Reconciliation
+  - Payroll Summary
+  - Vendor Payment Schedule
+
+**Features**:
+- Export to PDF, Excel, CSV
+- Accrual-basis accounting (not just cash-basis)
+- Chart of Accounts (CoA) customizable for construction
+- Period closing lock (prevent backdated entries after close)
+
+---
+
+## 🔗 INTEGRATION WITH "KONTRAKTA SITE" APP
+
+Build these API endpoints to receive data from the Project Management app:
+
+```
+POST /api/integration/attendance
+  Body: { projectId, date, workers: [{name, id, hours, isOvertime}] }
+  → Auto-creates payroll draft
+
+POST /api/integration/opname
+  Body: { projectId, period, percentage, completedItems: [...] }
+  → Auto-triggers invoice generation
+
+POST /api/integration/material-receipt
+  Body: { projectId, poId, items: [{material, qtyReceived, condition, photoUrl}], receivedBy }
+  → Auto-triggers 3-way matching for AP
+
+POST /api/integration/equipment-usage
+  Body: { projectId, equipment: [{id, hours, operator, fuelCost}] }
+  → Auto-posts to project equipment cost
+
+POST /api/integration/petty-cash-request
+  Body: { projectId, requesterId, amount, purpose, photoUrl }
+  → Creates approval workflow
+
+GET /api/integration/budget-check/:projectId
+  → Returns remaining budget per category (for SITE app to validate PO)
+```
+
+**Security**: All integration endpoints must use API key + HMAC signature verification.
+
+---
+
+## 📊 EXECUTIVE DASHBOARD REQUIREMENTS
+
+**For Owner/Director**:
+- Portfolio value (total active projects contract value)
+- Committed cost vs budget utilization (%)
+- Cash position (total liquidity)
+- Cashflow projection chart (next 90 days)
+- **Action Required** alerts:
+  - Projects with negative cashflow risk
+  - Budget utilization >90%
+  - Retention claimable soon
+  - Overdue invoices
+  - Tax deadline approaching
+
+**For CFO**:
+- AR Aging (who owes us)
+- AP Aging (who we owe)
+- Project profitability ranking
+- Tax obligations this month
+
+---
+
+## 🎨 UI/UX REQUIREMENTS
+
+1. **Mobile-responsive** (CFO checks dashboard from phone)
+2. **Indonesian language** for all labels (e.g., "Arus Kas", "Laba Rugi", "Kas Kecil")
+3. **Color-coded status**: 
+   - Green = healthy/on-track
+   - Yellow = warning (>80% budget used)
+   - Red = critical (over budget, overdue, negative cashflow)
+4. **Audit trail**: Every transaction must log: who, when, what changed, from what value to what value
+5. **Digital signature** for approvals (with OTP verification for high-value transactions >Rp 50 juta)
+6. **Offline-capable** for receipt photo upload (sync when online)
+
+---
+
+## 🗄️ DATABASE SCHEMA HINTS
+
+Key tables:
+- `projects` (id, name, client_id, contract_value, start_date, end_date, status)
+- `rab_items` (project_id, category, description, budgeted_amount)
+- `transactions` (id, project_id, type, amount, date, reference, status)
+- `invoices` (id, project_id, number, amount, due_date, status, retention_amount)
+- `petty_cash` (id, project_id, date, type, amount, photo_url, approved_by)
+- `payroll` (id, project_id, worker_id, period, gross, deductions, net, status)
+- `vendors` (id, name, npwp, bank_account, rating)
+- `purchase_orders` (id, project_id, vendor_id, total, status)
+- `material_receipts` (id, po_id, received_by, photo_url, items_json)
+- `tax_records` (id, project_id, period, pph_final, ppn, status)
+- `audit_logs` (id, user_id, action, table_name, record_id, old_value, new_value, timestamp)
+- `users` (id, name, email, role, project_access[])
+
+---
+
+## 🔒 SECURITY & COMPLIANCE
+
+- All monetary transactions require dual approval if >Rp 10.000.000
+- All approvals require digital signature + timestamp
+- Role-based access control (RBAC) strictly enforced
+- All data encrypted at rest and in transit
+- Backup daily, retention 10 years (Indonesian tax law)
+- Compliance with:
+  - PSAK (Indonesian Financial Accounting Standards)
+  - UU Perpajakan (Tax Law) — PPh Final Jasa Konstruksi
+  - UU Cipta Kerja (Labor Law) for payroll
+
+---
+
+## 🚀 MVP PRIORITY (Build in this order)
+
+**Phase 1 (Week 1-2)**: Core Foundation
+- Auth + RBAC
+- Project + RAB management
+- Dashboard skeleton
+
+**Phase 2 (Week 3-4)**: Cash Management
+- Petty Cash module (SOP 9)
+- Cashflow dashboard
+- Bank reconciliation
+
+**Phase 3 (Week 5-6)**: AP/AR
+- Invoicing (SOP 11)
+- Vendor payments (SOP 37)
+- Integration endpoints
+
+**Phase 4 (Week 7-8)**: Payroll + Tax
+- Payroll (SOP 10 + 17)
+- Tax calculation (SOP 14)
+- Financial reports (SOP 8)
+
+---
+
+## ✅ ACCEPTANCE CRITERIA
+
+1. User cannot create a PO that exceeds project budget without override approval
+2. Invoice cannot be generated without opname data from SITE app
+3. Vendor payment cannot be processed without material receipt confirmation
+4. Petty cash cannot be disbursed without approval + receipt photo
+5. Payroll cannot be processed without attendance data
+6. All reports must balance (assets = liabilities + equity)
+7. All transactions must have audit trail
+8. System must handle multi-project, multi-currency (IDR primary)
+
+---
+
+## 📝 START NOW
+
+Start by scaffolding the Next.js app with:
+1. Database schema (Prisma)
+2. Auth system with RBAC
+3. Project + RAB module
+4. Executive dashboard
+
+Then proceed module by module following the MVP priority.
+
+Make the UI clean, professional, and suitable for Indonesian construction company executives. Use a color palette that conveys trust (navy blue, white, gold accents).
+
+All UI text must be in Bahasa Indonesia. Code comments can be in English.
+
+Begin.
+```
+
+---
+
+## 📌 Cara Menggunakan Prompt Ini di Replit
+
+### Langkah-langkah:
+1. **Buka** [replit.com](https://replit.com) → Login
+2. **Create New Repl** → Pilih template **"Next.js"** atau **"Node.js"**
+3. **Buka Replit Agent** (ikon ✨ atau tombol "AI Agent" di sidebar)
+4. **Paste seluruh prompt di atas** ke chat Agent
+5. **Tekan Enter** dan biarkan Agent bekerja
+
+### Tips Tambahan:
+- **Jika Agent berhenti di tengah jalan**, ketik: *"Continue from where you left off"*
+- **Jika ada error**, paste error message dan minta: *"Fix this error and continue"*
+- **Untuk iterasi**, gunakan prompt lanjutan seperti:
+  - *"Now build the Petty Cash module following SOP 9 workflow"*
+  - *"Add the integration endpoint for material receipt"*
+  - *"Create the executive dashboard with the Action Required alerts"*
+
+### Prompt Lanjutan (Setelah MVP Jadi):
+
+```
+Now add the integration endpoints for Kontrakta SITE app. 
+Create these 5 endpoints with proper validation, API key auth, 
+and auto-trigger the corresponding financial workflows. 
+Show me the Prisma schema updates needed.
+```
+
+```
+Build the Tax module (SOP 14). Auto-calculate PPh Final 
+Jasa Konstruksi based on project qualification (kecil=1.75%, 
+menengah=2.65%, besar=4%). Generate monthly tax calendar 
+with reminders H-7 before deadline.
+```
+
+---
+
+## 🎯 Hasil yang Diharapkan
+
+Setelah prompt ini dijalankan, Anda akan mendapatkan:
+- ✅ Aplikasi ERP Keuangan Konstruksi yang **fungsional**
+- ✅ **8 SOP** sudah tertanam sebagai business rules (bukan sekadar dokumen)
+- ✅ **5 API endpoints** siap menerima data dari aplikasi Manajemen Proyek
+- ✅ **Dashboard eksekutif** dengan alert proaktif
+- ✅ **Audit trail** lengkap untuk kepatuhan
+- ✅ **Multi-role access** yang aman
+
+Aplikasi ini akan menjadi **"Otak & Dompet"** perusahaan kontraktor Anda, sementara aplikasi kedua (Kontrakta SITE) menjadi **"Mata & Tangan"** di lapangan. Keduanya terhubung via API, menciptakan ekosistem **Smart Contractor** yang utuh. 🚀

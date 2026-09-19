@@ -204,6 +204,8 @@ Fondasi tersebut dipertahankan dan diperluas, bukan diganti oleh framework AI.
 - period close dan carry-forward;
 - koreksi posted transaction melalui reversal.
 
+Workflow finansial merujuk pada `docs/references/construction-finance-sops.md`. SOP diterapkan sebagai policy dan workflow berversi, bukan rangkaian konstanta permanen. Setiap transaksi menyimpan versi policy, approval path, dan required-evidence checklist yang digunakan.
+
 ### 6.9 Document control
 
 - kontrak, gambar, SOP, metode kerja, inspeksi, dan pajak;
@@ -466,6 +468,8 @@ Setiap tool wajib mendefinisikan:
 - data sensitivity;
 - audit event.
 
+Tool yang menyentuh petty cash, payroll, AP/AR, treasury, atau tax filing tidak boleh menerima instruksi bebas sebagai pengganti workflow. Agent hanya membuat draft, menemukan exception, atau menyerahkan tindakan ke state transition yang divalidasi backend.
+
 ## 12. Posisi framework
 
 ### Hermes Agent
@@ -680,6 +684,7 @@ Blueprint berhasil ketika:
 
 - `docs/references/odoo-construction-erp.md`: referensi proses ERP konstruksi.
 - `docs/references/erabe-rab-project-workflow.md`: referensi alur RAB, progres, billing, dan field access.
+- `docs/references/construction-finance-sops.md`: referensi workflow pelaporan, petty cash, payroll/lembur, billing, pajak, administrasi, dan treasury dari SOP yang diunggah.
 - `attached_assets/Pasted--Benar-sekali-Anda-sangat-tepat-menangkap-perbedaan-men_1789781422378.txt`: sintesis Qwen mengenai batas antara alat RAB dan ERP.
 - `attached_assets/Pasted-Berikut-adalah-rangkuman-sintesis-dari-fitur-fitur-pali_1789781440454.txt`: sintesis Qwen mengenai data lineage, four-way cost, guardrail AI, dan rekonsiliasi.
 - `https://gustafta.my.id`: referensi domain untuk knowledge, dokumen, tender, compliance, dan project intelligence.
