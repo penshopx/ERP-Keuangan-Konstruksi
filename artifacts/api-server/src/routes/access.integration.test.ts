@@ -28,9 +28,11 @@ import { createApiRouter } from "./index";
 import type { AccessPersistenceHooks, AccessRouterDependencies } from "./access";
 import {
   clerkInvitationVerificationStateKey,
+  type InvitationReconciliationAlert,
   getInvitationReconciliationHealth,
   reconcilePendingInvitations,
   runScheduledInvitationReconciliation,
+  schedulePendingInvitationReconciliation,
 } from "../lib/invitation-reconciliation";
 import {
   acquirePersistenceDatabaseSuiteLock,
@@ -1456,9 +1458,18 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     await lookupStarted;
     const healthBeforeSkip = getInvitationReconciliationHealth();
     const competingEvents: string[] = [];
+    const alerts: InvitationReconciliationAlert[] = [];
+    await new Promise((resolve) => setTimeout(resolve, 2));
     const competingRun = await runScheduledInvitationReconciliation({
       getClerkInvitation: async () => {
         throw new Error("Competing reconciliation must not call Clerk");
+      },
+      alerting: {
+        failureThreshold: 3,
+        completionStaleAfterMs: 1,
+        notify: async (alert) => {
+          alerts.push(alert);
+        },
       },
       onRunEvent: ({ outcome }) => competingEvents.push(outcome),
     });
@@ -1466,7 +1477,10 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     assert.deepEqual(competingEvents, ["RUNNING", "SKIPPED"]);
     const healthAfterSkip = getInvitationReconciliationHealth();
     assert.equal(healthAfterSkip.lastRun.outcome, "SKIPPED");
-    assert.equal(healthAfterSkip.status, healthBeforeSkip.status);
+    assert.equal(healthAfterSkip.status, "DEGRADED");
+    assert.equal(healthAfterSkip.completionOverdue, true);
+    assert.equal(alerts[0]?.type, "DEGRADED");
+    assert.equal(alerts[0]?.reason, "NO_RECENT_COMPLETION");
     assert.equal(
       healthAfterSkip.consecutiveFailures,
       healthBeforeSkip.consecutiveFailures,
@@ -1480,6 +1494,54 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       getClerkInvitation: async () => ({ status: "pending" }),
     });
     assert.equal(nextRun.skipped, false);
+  });
+
+  await t.test("a hung scheduled pass alerts once and recovers after it completes", async () => {
+    let releaseLookup!: () => void;
+    const lookupBlocked = new Promise<void>((resolve) => {
+      releaseLookup = resolve;
+    });
+    let notifyLookupStarted!: () => void;
+    const lookupStarted = new Promise<void>((resolve) => {
+      notifyLookupStarted = resolve;
+    });
+    const alerts: InvitationReconciliationAlert[] = [];
+    let firstLookup = true;
+    const scheduler = schedulePendingInvitationReconciliation({
+      getClerkInvitation: async () => {
+        if (firstLookup) {
+          firstLookup = false;
+          notifyLookupStarted();
+          await lookupBlocked;
+        }
+        return { status: "pending" };
+      },
+      alerting: {
+        failureThreshold: 3,
+        completionStaleAfterMs: 10,
+        notify: async (alert) => {
+          alerts.push(alert);
+        },
+      },
+    }, {
+      intervalMs: 5,
+    });
+
+    await lookupStarted;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.deepEqual(
+      alerts.map(({ type, reason }) => [type, reason]),
+      [["DEGRADED", "NO_RECENT_COMPLETION"]],
+    );
+
+    scheduler.stop();
+    releaseLookup();
+    const recoveryDeadline = Date.now() + 1_000;
+    while (alerts.length < 2 && Date.now() < recoveryDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    assert.deepEqual(alerts.map(({ type }) => type), ["DEGRADED", "RECOVERED"]);
+    assert.equal(getInvitationReconciliationHealth().completionOverdue, false);
   });
 
   await t.test("invited role and projects are applied atomically on first login", async () => {

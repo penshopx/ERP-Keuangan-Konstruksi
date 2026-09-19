@@ -10,3 +10,4 @@
 - [Database timeout errors](database-timeout-errors.md) — transaction-local PostgreSQL timeouts may surface through wrapped causes; preserve rollback and inspect the error chain.
 - [Child-process test lifecycle](child-process-test-lifecycle.md) — close stdin readers, servers, and database pools explicitly so integration workers terminate reliably.
 - [Database suite timeouts](database-suite-timeouts.md) — configure statement limits on the shared pool before lock acquisition so every suite connection inherits them.
+- [Reconciliation liveness](reconciliation-liveness.md) — monitor completed-pass freshness independently from per-pass failures so normal coordination skips do not create false alarms.

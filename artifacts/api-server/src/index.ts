@@ -34,6 +34,14 @@ if (!Number.isInteger(alertFailureThreshold) || alertFailureThreshold <= 0) {
     "INVITATION_RECONCILIATION_ALERT_FAILURE_THRESHOLD must be a positive integer",
   );
 }
+const rawCompletionStaleAfterMs =
+  process.env["INVITATION_RECONCILIATION_ALERT_STALE_AFTER_MS"] ?? "900000";
+const completionStaleAfterMs = Number(rawCompletionStaleAfterMs);
+if (!Number.isInteger(completionStaleAfterMs) || completionStaleAfterMs <= 0) {
+  throw new Error(
+    "INVITATION_RECONCILIATION_ALERT_STALE_AFTER_MS must be a positive integer",
+  );
+}
 const rawAlertTimeoutMs =
   process.env["INVITATION_RECONCILIATION_ALERT_TIMEOUT_MS"] ?? "5000";
 const alertTimeoutMs = Number(rawAlertTimeoutMs);
@@ -55,7 +63,9 @@ async function sendInvitationReconciliationAlert(
       source: "invitation-reconciliation",
       severity: alert.type === "DEGRADED" ? "error" : "info",
       message: alert.type === "DEGRADED"
-        ? `Rekonsiliasi undangan gagal ${alert.consecutiveFailures} kali berturut-turut`
+        ? alert.reason === "NO_RECENT_COMPLETION"
+          ? `Rekonsiliasi undangan belum menyelesaikan putaran dalam ${completionStaleAfterMs} ms`
+          : `Rekonsiliasi undangan gagal ${alert.consecutiveFailures} kali berturut-turut`
         : "Rekonsiliasi undangan telah pulih",
       ...alert,
     }),
@@ -85,16 +95,15 @@ const invitationReconciliation = schedulePendingInvitationReconciliation({
   revokeClerkInvitation: clerkClient.invitations.revokeInvitation.bind(
     clerkClient.invitations,
   ),
-  alerting: alertWebhookUrl
-    ? {
-        failureThreshold: alertFailureThreshold,
-        notify: sendInvitationReconciliationAlert,
-        onNotificationError: (err, alert) => {
-          logger.error({ err, alertType: alert.type },
-            "Invitation reconciliation alert delivery failed; it will be retried");
-        },
-      }
-    : undefined,
+  alerting: {
+    failureThreshold: alertFailureThreshold,
+    completionStaleAfterMs,
+    notify: sendInvitationReconciliationAlert,
+    onNotificationError: (err, alert) => {
+      logger.error({ err, alertType: alert.type },
+        "Invitation reconciliation alert delivery failed; it will be retried");
+    },
+  },
   onError: (err, invitation) => {
     logger.warn({
       err,

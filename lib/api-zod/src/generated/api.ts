@@ -14,6 +14,7 @@ import * as zod from 'zod';
  */
 export const healthCheckResponseInvitationReconciliationConsecutiveFailuresMin = 0;
 
+
 export const healthCheckResponseInvitationReconciliationLastRunFourCheckedMin = 0;
 
 export const healthCheckResponseInvitationReconciliationLastRunFourUpdatedMin = 0;
@@ -29,6 +30,9 @@ export const HealthCheckResponse = zod.object({
   "consecutiveFailures": zod.number().int().min(healthCheckResponseInvitationReconciliationConsecutiveFailuresMin),
   "lastFailureAt": zod.coerce.date().nullable(),
   "lastSuccessAt": zod.coerce.date().nullable(),
+  "lastCompletedAt": zod.coerce.date().nullable(),
+  "completionOverdue": zod.boolean(),
+  "completionStaleAfterMs": zod.number().int().min(1).nullable(),
   "lastRun": zod.union([zod.object({
   "outcome": zod.enum(['NEVER_RUN']),
   "occurredAt": zod.null()

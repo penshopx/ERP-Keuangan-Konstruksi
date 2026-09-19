@@ -49,6 +49,9 @@ export type InvitationReconciliationHealth = {
   consecutiveFailures: number;
   lastFailureAt: string | null;
   lastSuccessAt: string | null;
+  lastCompletedAt: string | null;
+  completionOverdue: boolean;
+  completionStaleAfterMs: number | null;
   lastRun: InvitationReconciliationRunEvent;
 };
 
@@ -80,14 +83,17 @@ export type InvitationReconciliationRunEvent =
 
 export type InvitationReconciliationAlert = {
   type: "DEGRADED" | "RECOVERED";
+  reason: "CONSECUTIVE_FAILURES" | "NO_RECENT_COMPLETION";
   occurredAt: string;
   consecutiveFailures: number;
   lastFailureAt: string | null;
   lastSuccessAt: string | null;
+  lastCompletedAt: string | null;
 };
 
 export type InvitationReconciliationAlerting = {
   failureThreshold: number;
+  completionStaleAfterMs: number;
   notify: (alert: InvitationReconciliationAlert) => Promise<void>;
   onNotificationError?: (
     error: unknown,
@@ -100,11 +106,15 @@ let reconciliationHealth: InvitationReconciliationHealth = {
   consecutiveFailures: 0,
   lastFailureAt: null,
   lastSuccessAt: null,
+  lastCompletedAt: null,
+  completionOverdue: false,
+  completionStaleAfterMs: null,
   lastRun: {
     outcome: "NEVER_RUN",
     occurredAt: null,
   },
 };
+const reconciliationMonitoringStartedAt = Date.now();
 
 export const clerkInvitationVerificationStateKey =
   "clerk-invitation-verification";
@@ -121,14 +131,42 @@ function recordReconciliationFailure() {
 function recordReconciliationSuccess() {
   reconciliationHealth = {
     ...reconciliationHealth,
-    status: "HEALTHY",
+    status: reconciliationHealth.completionOverdue ? "DEGRADED" : "HEALTHY",
     consecutiveFailures: 0,
     lastSuccessAt: new Date().toISOString(),
   };
 }
 
+function recordReconciliationCompletion(occurredAt: string) {
+  reconciliationHealth = {
+    ...reconciliationHealth,
+    status: reconciliationHealth.consecutiveFailures > 0 ? "DEGRADED" : "HEALTHY",
+    lastCompletedAt: occurredAt,
+    completionOverdue: false,
+  };
+}
+
+function evaluateReconciliationCompletionFreshness(
+  completionStaleAfterMs: number,
+  now = Date.now(),
+) {
+  const baseline = reconciliationHealth.lastCompletedAt
+    ? Date.parse(reconciliationHealth.lastCompletedAt)
+    : reconciliationMonitoringStartedAt;
+  const completionOverdue = now - baseline >= completionStaleAfterMs;
+  reconciliationHealth = {
+    ...reconciliationHealth,
+    status: completionOverdue || reconciliationHealth.consecutiveFailures > 0
+      ? "DEGRADED"
+      : "HEALTHY",
+    completionOverdue,
+    completionStaleAfterMs,
+  };
+}
+
 type AlertIncidentState = {
   active: boolean;
+  activeReason: InvitationReconciliationAlert["reason"] | null;
   pendingDegraded: InvitationReconciliationAlert | null;
 };
 
@@ -143,6 +181,7 @@ export async function updateInvitationReconciliationAlert(
 
   const state = alertIncidentStates.get(alerting) ?? {
     active: false,
+    activeReason: null,
     pendingDegraded: null,
   };
   alertIncidentStates.set(alerting, state);
@@ -150,14 +189,21 @@ export async function updateInvitationReconciliationAlert(
   if (
     !state.active
     && !state.pendingDegraded
-    && health.consecutiveFailures >= alerting.failureThreshold
+    && (
+      health.consecutiveFailures >= alerting.failureThreshold
+      || health.completionOverdue
+    )
   ) {
     state.pendingDegraded = {
       type: "DEGRADED",
+      reason: health.completionOverdue
+        ? "NO_RECENT_COMPLETION"
+        : "CONSECUTIVE_FAILURES",
       occurredAt: new Date().toISOString(),
       consecutiveFailures: health.consecutiveFailures,
       lastFailureAt: health.lastFailureAt,
       lastSuccessAt: health.lastSuccessAt,
+      lastCompletedAt: health.lastCompletedAt,
     };
   }
 
@@ -167,6 +213,7 @@ export async function updateInvitationReconciliationAlert(
       await alerting.notify(pending);
       state.pendingDegraded = null;
       state.active = true;
+      state.activeReason = pending.reason;
     } catch (error) {
       alerting.onNotificationError?.(error, pending);
       return;
@@ -177,14 +224,17 @@ export async function updateInvitationReconciliationAlert(
 
   const recovered: InvitationReconciliationAlert = {
     type: "RECOVERED",
+    reason: state.activeReason ?? "CONSECUTIVE_FAILURES",
     occurredAt: new Date().toISOString(),
     consecutiveFailures: health.consecutiveFailures,
     lastFailureAt: health.lastFailureAt,
     lastSuccessAt: health.lastSuccessAt,
+    lastCompletedAt: health.lastCompletedAt,
   };
   try {
     await alerting.notify(recovered);
     state.active = false;
+    state.activeReason = null;
   } catch (error) {
     alerting.onNotificationError?.(error, recovered);
   }
@@ -393,6 +443,15 @@ export async function runScheduledInvitationReconciliation(
     };
     reconciliationHealth = { ...reconciliationHealth, lastRun: skippedEvent };
     dependencies.onRunEvent?.(skippedEvent);
+    if (dependencies.alerting) {
+      evaluateReconciliationCompletionFreshness(
+        dependencies.alerting.completionStaleAfterMs,
+      );
+      await updateInvitationReconciliationAlert(
+        dependencies.alerting,
+        reconciliationHealth,
+      );
+    }
     return { skipped: true as const };
   }
   const completedEvent: InvitationReconciliationRunEvent = {
@@ -401,6 +460,12 @@ export async function runScheduledInvitationReconciliation(
     ...result.value,
   };
   reconciliationHealth = { ...reconciliationHealth, lastRun: completedEvent };
+  recordReconciliationCompletion(completedEvent.occurredAt);
+  if (dependencies.alerting) {
+    evaluateReconciliationCompletionFreshness(
+      dependencies.alerting.completionStaleAfterMs,
+    );
+  }
   dependencies.onRunEvent?.(completedEvent);
   await updateInvitationReconciliationAlert(
     dependencies.alerting,
@@ -415,9 +480,27 @@ export function schedulePendingInvitationReconciliation(
 ) {
   const intervalMs = options.intervalMs ?? 5 * 60_000;
   let running = false;
+  let alertUpdate = Promise.resolve();
+
+  const checkCompletionFreshness = () => {
+    if (!dependencies.alerting) return alertUpdate;
+    alertUpdate = alertUpdate.then(async () => {
+      evaluateReconciliationCompletionFreshness(
+        dependencies.alerting!.completionStaleAfterMs,
+      );
+      await updateInvitationReconciliationAlert(
+        dependencies.alerting,
+        reconciliationHealth,
+      );
+    });
+    return alertUpdate;
+  };
 
   const run = async () => {
-    if (running) return;
+    if (running) {
+      await checkCompletionFreshness();
+      return;
+    }
     running = true;
     try {
       await runScheduledInvitationReconciliation(dependencies);

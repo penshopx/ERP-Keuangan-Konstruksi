@@ -480,6 +480,14 @@ components:
             lastSuccessAt:
               type: [string, "null"]
               format: date-time
+            lastCompletedAt:
+              type: [string, "null"]
+              format: date-time
+            completionOverdue:
+              type: boolean
+            completionStaleAfterMs:
+              type: [integer, "null"]
+              minimum: 1
             lastRun:
               oneOf:
                 - type: object
@@ -534,6 +542,9 @@ components:
             - consecutiveFailures
             - lastFailureAt
             - lastSuccessAt
+            - lastCompletedAt
+            - completionOverdue
+            - completionStaleAfterMs
             - lastRun
       required:
         - status

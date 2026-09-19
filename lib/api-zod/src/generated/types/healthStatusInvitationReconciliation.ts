@@ -16,5 +16,13 @@ export type HealthStatusInvitationReconciliation = {
   lastFailureAt: Date | null;
   /** @nullable */
   lastSuccessAt: Date | null;
+  /** @nullable */
+  lastCompletedAt: Date | null;
+  completionOverdue: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  completionStaleAfterMs: number | null;
   lastRun: HealthStatusInvitationReconciliationLastRun;
 };

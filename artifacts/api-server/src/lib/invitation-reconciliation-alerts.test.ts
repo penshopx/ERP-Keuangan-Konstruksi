@@ -18,6 +18,7 @@ test("alerts once after the failure threshold and once after recovery", async ()
   const alerts: InvitationReconciliationAlert[] = [];
   const alerting = {
     failureThreshold: 2,
+    completionStaleAfterMs: 60_000,
     notify: async (alert: InvitationReconciliationAlert) => {
       alerts.push(alert);
     },
@@ -30,6 +31,9 @@ test("alerts once after the failure threshold and once after recovery", async ()
     consecutiveFailures,
     lastFailureAt: status === "DEGRADED" ? new Date().toISOString() : null,
     lastSuccessAt: status === "HEALTHY" ? new Date().toISOString() : null,
+    lastCompletedAt: completedRun.occurredAt,
+    completionOverdue: false,
+    completionStaleAfterMs: alerting.completionStaleAfterMs,
     lastRun: completedRun,
   });
 
@@ -53,6 +57,7 @@ test("retries a failed alert delivery instead of silently suppressing it", async
   let deliveryAttempts = 0;
   const alerting = {
     failureThreshold: 1,
+    completionStaleAfterMs: 60_000,
     notify: async () => {
       deliveryAttempts += 1;
       if (deliveryAttempts === 1) throw new Error("Webhook unavailable");
@@ -63,6 +68,9 @@ test("retries a failed alert delivery instead of silently suppressing it", async
     consecutiveFailures: 1,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
+    lastCompletedAt: null,
+    completionOverdue: false,
+    completionStaleAfterMs: alerting.completionStaleAfterMs,
     lastRun: completedRun,
   };
 
@@ -76,6 +84,7 @@ test("delivers a pending degradation before recovery when service recovers", asy
   let failFirstDelivery = true;
   const alerting = {
     failureThreshold: 1,
+    completionStaleAfterMs: 60_000,
     notify: async (alert: InvitationReconciliationAlert) => {
       if (failFirstDelivery) {
         failFirstDelivery = false;
@@ -90,6 +99,9 @@ test("delivers a pending degradation before recovery when service recovers", asy
     consecutiveFailures: 1,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
+    lastCompletedAt: null,
+    completionOverdue: false,
+    completionStaleAfterMs: alerting.completionStaleAfterMs,
     lastRun: completedRun,
   });
   await updateInvitationReconciliationAlert(alerting, {
@@ -97,8 +109,50 @@ test("delivers a pending degradation before recovery when service recovers", asy
     consecutiveFailures: 0,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: new Date().toISOString(),
+    lastCompletedAt: new Date().toISOString(),
+    completionOverdue: false,
+    completionStaleAfterMs: alerting.completionStaleAfterMs,
     lastRun: completedRun,
   });
 
   assert.deepEqual(delivered, ["DEGRADED", "RECOVERED"]);
+});
+
+test("alerts only after completion becomes overdue and recovers after completion", async () => {
+  const alerts: InvitationReconciliationAlert[] = [];
+  const alerting = {
+    failureThreshold: 3,
+    completionStaleAfterMs: 1,
+    notify: async (alert: InvitationReconciliationAlert) => {
+      alerts.push(alert);
+    },
+  };
+  const base: InvitationReconciliationHealth = {
+    status: "HEALTHY",
+    consecutiveFailures: 0,
+    lastFailureAt: null,
+    lastSuccessAt: null,
+    lastCompletedAt: null,
+    completionOverdue: false,
+    completionStaleAfterMs: alerting.completionStaleAfterMs,
+    lastRun: completedRun,
+  };
+
+  await updateInvitationReconciliationAlert(alerting, base);
+  assert.equal(alerts.length, 0);
+
+  await updateInvitationReconciliationAlert(alerting, {
+    ...base,
+    status: "DEGRADED",
+    completionOverdue: true,
+  });
+  assert.deepEqual(alerts.map(({ type, reason }) => [type, reason]), [
+    ["DEGRADED", "NO_RECENT_COMPLETION"],
+  ]);
+
+  await updateInvitationReconciliationAlert(alerting, {
+    ...base,
+    lastCompletedAt: new Date().toISOString(),
+  });
+  assert.deepEqual(alerts.map(({ type }) => type), ["DEGRADED", "RECOVERED"]);
 });
