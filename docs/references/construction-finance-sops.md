@@ -287,7 +287,7 @@ Sistem harus membedakan setidaknya PKWT, PKWTT, masa percobaan, dan surat keputu
 - nomor, versi, status, tanggal dibuat, tanggal ditandatangani, serta periode berlaku;
 - posisi, grade, departemen/section, atasan, proyek/lokasi, dan titik rekrutmen;
 - tanggal mulai kerja, akhir kontrak, dan tanggal efektif pengangkatan;
-- komponen upah, tunjangan, fasilitas, pajak, jaminan sosial, serta policy version;
+- komponen upah, tunjangan, fasilitas, perlakuan pajak, kepesertaan BPJS Ketenagakerjaan/BPJS Kesehatan bila berlaku, serta policy version;
 - pola hari/jam kerja dan referensi aturan lembur;
 - masa evaluasi, evaluator, kriteria, hasil, dan keputusan;
 - pihak penandatangan, kapasitas kewenangan, acknowledgement, dan bukti tanda tangan;
@@ -297,6 +297,7 @@ Sistem harus membedakan setidaknya PKWT, PKWTT, masa percobaan, dan surat keputu
 ### Kontrol
 
 - kontrak menggunakan template berversi dan field terstruktur, bukan salin-tempel dokumen lama;
+- template aktif menggunakan istilah dan nama program yang berlaku pada periode efektifnya;
 - HR menyiapkan, pejabat berwenang menyetujui, pekerja mengakui, dan perubahan status diaudit;
 - tanggal mulai, akhir, durasi, dan tanggal efektif harus konsisten secara otomatis;
 - aktivasi payroll dan benefit mengikuti tanggal efektif serta keputusan yang telah disetujui;
@@ -306,9 +307,25 @@ Sistem harus membedakan setidaknya PKWT, PKWTT, masa percobaan, dan surat keputu
 - akses dokumen mengikuti purpose, role, legal hold, retention policy, dan audit download;
 - tanda tangan, meterai, rangkap dokumen, dan penyelesaian perselisihan harus mengikuti aturan yang telah diverifikasi.
 
+### Normalisasi istilah dan klausul lama
+
+| Contoh lama | Representasi ERP yang digunakan |
+| --- | --- |
+| Jamsostek | Kepesertaan jaminan sosial dengan provider dan program berversi; default istilah saat ini adalah BPJS Ketenagakerjaan dan, bila relevan, BPJS Kesehatan. |
+| Klaim pengobatan setelah masa percobaan | Kepesertaan BPJS Kesehatan serta benefit kesehatan tambahan perusahaan dicatat terpisah, masing-masing dengan tanggal efektif dan policy version. |
+| “Calon karyawan” selama masa percobaan | Status hubungan kerja tetap dicatat berdasarkan dokumen yang sah; masa percobaan menjadi atribut/evaluasi PKWTT hanya bila diperbolehkan kebijakan dan hukum yang berlaku. |
+| PKWT dengan masa percobaan | Tidak dijadikan opsi template aktif. Sistem harus memblokir kombinasi ini kecuali konfigurasi legal yang terverifikasi secara eksplisit mengizinkannya. |
+| PHK atau kontrak batal otomatis tanpa kompensasi | Tidak dijadikan automation rule. Pengakhiran membutuhkan proses, alasan, approval, perhitungan hak, dan dokumen sesuai aturan yang berlaku. |
+| Peraturan tidak tertulis | Diganti dengan referensi dokumen kebijakan/PKB/peraturan perusahaan yang berversi dan telah diakui pekerja. |
+| Pajak “ditanggung perusahaan” | Disimpan sebagai tax-treatment policy yang berversi, bukan kalimat tetap atau asumsi perhitungan payroll. |
+| Jangka waktu/perpanjangan dari contoh lama | Dihitung dari aturan effective-dated dan diverifikasi HR/legal; sistem tidak memakai batas atau tenggat dari contoh sebagai konstanta. |
+| Surat pengangkatan otomatis setelah evaluasi | Evaluasi hanya menjadi input keputusan. Status berubah setelah keputusan disetujui, ditandatangani, dan mencapai tanggal efektif. |
+
+Istilah generik `jaminan_sosial` tetap dapat dipakai pada model data agar perubahan nama lembaga atau program di masa depan tidak memerlukan migrasi domain. Nama provider, program, nomor kepesertaan, tanggal efektif, dan policy version disimpan sebagai data terstruktur.
+
 ### Perlu verifikasi
 
-Contoh sumber berasal terutama dari 2005–2010 dan tidak boleh dipakai sebagai template legal tanpa review. Istilah Jamsostek, masa percobaan, kompensasi, pemutusan hubungan kerja, perpanjangan PKWT, pajak, jam kerja, lembur, penempatan, kerahasiaan, serta klausul pelanggaran harus diverifikasi terhadap regulasi, PKB/peraturan perusahaan, dan praktik organisasi yang berlaku.
+Contoh sumber berasal terutama dari 2005–2010 dan tidak boleh dipakai sebagai template legal tanpa review. Nama program BPJS, cakupan kepesertaan, masa percobaan, kompensasi, pemutusan hubungan kerja, perpanjangan PKWT, pajak, jam kerja, lembur, penempatan, kerahasiaan, serta klausul pelanggaran harus diverifikasi terhadap regulasi, PKB/peraturan perusahaan, dan praktik organisasi yang berlaku pada periode efektif.
 
 Salah satu contoh PKWT menyatakan masa dua tahun tetapi rentang tanggalnya melampaui dua tahun. Sistem perlu menolak ketidakkonsistenan semacam ini. Nama, perusahaan, alamat, nomor identitas, nominal, serta klausul pada contoh hanya data ilustratif dan tidak boleh dijadikan master data atau default produksi.
 
@@ -388,7 +405,7 @@ AI tidak boleh:
 - Pergantian stack aplikasi ke Next.js, Prisma, atau NextAuth.
 - Tarif pajak, UMR, retensi, threshold budget, approval, OTP, dan batas hari sebagai konstanta.
 - Nama, alamat, nomor identitas, nominal upah, dan identitas perusahaan dari contoh kontrak.
-- Klausul ketenagakerjaan lama, termasuk istilah jaminan sosial, masa percobaan, kompensasi, dan PHK, tanpa review HR/legal.
+- Klausul ketenagakerjaan lama, termasuk istilah Jamsostek, status “calon karyawan”, peraturan tidak tertulis, masa percobaan, kompensasi, dan PHK otomatis, tanpa review HR/legal.
 - Aktivasi, perpanjangan, pengangkatan, atau pengakhiran hubungan kerja hanya berdasarkan kalender atau keputusan AI.
 - Klaim masa simpan sepuluh tahun tanpa verifikasi resmi.
 - GPS wajib untuk seluruh bukti petty cash.
