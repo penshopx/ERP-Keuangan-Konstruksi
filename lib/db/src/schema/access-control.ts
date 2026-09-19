@@ -26,6 +26,7 @@ export const staffInvitationsTable = pgTable("staff_invitations", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   acceptedUserId: text("accepted_user_id").references(() => userRolesTable.userId),
+  acceptedEmail: text("accepted_email"),
   invitedByUserId: text("invited_by_user_id").notNull().references(() => userRolesTable.userId),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -18,6 +18,7 @@ const requiredMigrations = [
   "0005_add_fixture_ownership.sql",
   "0006_add_shared_invitation_reconciliation_state.sql",
   "0007_index_pending_resend_compensation_audits.sql",
+  "0008_record_invitation_acceptance_email.sql",
 ];
 const expectedTables = [
   "app_migrations",

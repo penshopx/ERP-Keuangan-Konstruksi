@@ -738,6 +738,34 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
         eq(staffInvitationsTable.acceptedUserId, userId),
       ));
     assert.equal(acceptedInvitations.length, 1);
+    assert.equal(acceptedInvitations[0]?.acceptedEmail, invitedEmail);
+
+    const director = await startServer(
+      staticAccessMiddleware(),
+      {},
+      {
+        ...clerkDependencies,
+        getClerkInvitation: async () => ({ status: "accepted" }),
+      },
+    );
+    try {
+      const response = await fetch(`${director.baseUrl}/access/invitations`);
+      assert.equal(response.status, 200);
+      const body = await response.json() as {
+        invitations: Array<{
+          id: string;
+          status: string;
+          acceptedEmail: string | null;
+          acceptedAt: string | null;
+        }>;
+      };
+      const accepted = body.invitations.find(({ id }) => id === invitation.id);
+      assert.equal(accepted?.status, "ACCEPTED");
+      assert.equal(accepted?.acceptedEmail, invitedEmail);
+      assert.ok(accepted?.acceptedAt);
+    } finally {
+      await director.close();
+    }
   });
 
   await t.test("a verified mixed-case Clerk email claims the normalized invitation exactly once", async () => {
@@ -790,6 +818,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
         eq(staffInvitationsTable.acceptedUserId, userId),
       ));
     assert.equal(acceptedInvitations.length, 1);
+    assert.equal(acceptedInvitations[0]?.acceptedEmail, mixedCaseEmail);
   });
 
   await t.test("an expired invitation cannot be claimed by a verified Clerk email", async () => {

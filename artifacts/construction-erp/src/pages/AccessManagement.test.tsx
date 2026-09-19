@@ -15,11 +15,30 @@ const verifiedInvitation = {
   status: "PENDING",
   expiresAt: "2026-10-01T00:00:00.000Z",
   createdAt: "2026-09-01T00:00:00.000Z",
+  acceptedAt: null,
+  acceptedEmail: null,
+} as const;
+
+const acceptedInvitation = {
+  ...verifiedInvitation,
+  id: "inv_accepted",
+  status: "ACCEPTED",
+  acceptedAt: "2026-09-18T10:00:00.000Z",
+  acceptedEmail: "email.sekunder@example.com",
+} as const;
+
+const legacyAcceptedInvitation = {
+  ...acceptedInvitation,
+  acceptedEmail: null,
 } as const;
 
 let invitationQuery: {
   data?: {
-    invitations: (typeof verifiedInvitation)[];
+    invitations: Array<
+      typeof verifiedInvitation
+      | typeof acceptedInvitation
+      | typeof legacyAcceptedInvitation
+    >;
     verification: {
       status: "VERIFIED" | "DEGRADED";
       message: string;
@@ -125,5 +144,44 @@ describe("status verifikasi daftar undangan", () => {
     expect(within(alert).getByText(/Hanya undangan terverifikasi yang ditampilkan/)).toBeTruthy();
     expect(screen.getByText("Memuat pengguna...")).toBeTruthy();
     expect(screen.getByText("Staf Terverifikasi")).toBeTruthy();
+  });
+
+  test("menampilkan email terverifikasi yang digunakan untuk menerima undangan", () => {
+    userQuery = { data: [], isLoading: false };
+    invitationQuery = {
+      data: {
+        invitations: [acceptedInvitation],
+        verification: {
+          status: "VERIFIED",
+          message: "Semua status undangan telah diverifikasi.",
+          lastSuccessfulVerificationAt: "2026-09-18T10:00:00.000Z",
+        },
+      },
+      isError: false,
+    };
+
+    renderPage();
+
+    expect(screen.getByText("Diterima")).toBeTruthy();
+    expect(screen.getByText("Diterima menggunakan email.sekunder@example.com")).toBeTruthy();
+  });
+
+  test("menampilkan fallback untuk undangan lama tanpa email penerimaan", () => {
+    userQuery = { data: [], isLoading: false };
+    invitationQuery = {
+      data: {
+        invitations: [legacyAcceptedInvitation],
+        verification: {
+          status: "VERIFIED",
+          message: "Semua status undangan telah diverifikasi.",
+          lastSuccessfulVerificationAt: null,
+        },
+      },
+      isError: false,
+    };
+
+    renderPage();
+
+    expect(screen.getByText("Email penerimaan tidak tercatat pada data lama")).toBeTruthy();
   });
 });

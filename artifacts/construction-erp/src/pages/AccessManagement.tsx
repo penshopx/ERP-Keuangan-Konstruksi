@@ -66,16 +66,39 @@ function InvitationRow({ invite }: { invite: AccessInvitation }) {
   const client = useQueryClient();
   const [message, setMessage] = useState("");
   const refresh = () => client.invalidateQueries({ queryKey: getListAccessInvitationsQueryKey() });
-  const status = invite.status === "PENDING" ? "Tertunda" : invite.status === "EXPIRED" ? "Kedaluwarsa" : "Dibatalkan";
+  const status = invite.status === "PENDING"
+    ? "Tertunda"
+    : invite.status === "EXPIRED"
+      ? "Kedaluwarsa"
+      : invite.status === "ACCEPTED"
+        ? "Diterima"
+        : "Dibatalkan";
   const statusClass = invite.status === "PENDING"
     ? "text-amber-600"
+    : invite.status === "ACCEPTED"
+      ? "text-emerald-600"
     : invite.status === "EXPIRED"
       ? "text-red-600"
       : "text-muted-foreground";
   return <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-    <div><p className="font-medium">{invite.displayName}</p><p className="text-sm text-muted-foreground">{invite.email} · {invite.role.replaceAll("_", " ")}</p></div>
+    <div>
+      <p className="font-medium">{invite.displayName}</p>
+      <p className="text-sm text-muted-foreground">{invite.email} · {invite.role.replaceAll("_", " ")}</p>
+      {invite.status === "ACCEPTED" && <p className="mt-1 text-xs text-muted-foreground">
+        {invite.acceptedEmail
+          ? `Diterima menggunakan ${invite.acceptedEmail}`
+          : "Email penerimaan tidak tercatat pada data lama"}
+      </p>}
+    </div>
     <div className="flex flex-wrap items-center gap-3">
-      <div className="text-right"><span className={`text-sm font-medium ${statusClass}`}>{status}</span><p className="text-xs text-muted-foreground">berakhir {new Date(invite.expiresAt).toLocaleDateString("id-ID")}</p></div>
+      <div className="text-right">
+        <span className={`text-sm font-medium ${statusClass}`}>{status}</span>
+        <p className="text-xs text-muted-foreground">
+          {invite.status === "ACCEPTED" && invite.acceptedAt
+            ? `diterima ${new Date(invite.acceptedAt).toLocaleDateString("id-ID")}`
+            : `berakhir ${new Date(invite.expiresAt).toLocaleDateString("id-ID")}`}
+        </p>
+      </div>
       {invite.status === "PENDING" && <Button variant="outline" size="sm" disabled={revoke.isPending} onClick={() => {
         if (!window.confirm(`Batalkan undangan untuk ${invite.email}? Tautan undangan tidak dapat digunakan lagi.`)) return;
         setMessage("");

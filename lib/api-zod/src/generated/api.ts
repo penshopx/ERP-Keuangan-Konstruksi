@@ -612,9 +612,11 @@ export const ListAccessInvitationsResponse = zod.object({
   "displayName": zod.string(),
   "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
   "assignedProjectIds": zod.array(zod.string()),
-  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "acceptedEmail": zod.string().email().nullable()
 })),
   "verification": zod.object({
   "status": zod.enum(['VERIFIED', 'DEGRADED']),
@@ -643,9 +645,11 @@ export const CreateAccessInvitationResponse = zod.object({
   "displayName": zod.string(),
   "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
   "assignedProjectIds": zod.array(zod.string()),
-  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "acceptedEmail": zod.string().email().nullable()
 })
 
 
@@ -662,9 +666,11 @@ export const RevokeAccessInvitationResponse = zod.object({
   "displayName": zod.string(),
   "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
   "assignedProjectIds": zod.array(zod.string()),
-  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "acceptedEmail": zod.string().email().nullable()
 })
 
 
@@ -681,9 +687,11 @@ export const ResendAccessInvitationResponse = zod.object({
   "displayName": zod.string(),
   "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
   "assignedProjectIds": zod.array(zod.string()),
-  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED']),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "acceptedEmail": zod.string().email().nullable()
 })
 
 

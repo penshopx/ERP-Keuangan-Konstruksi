@@ -506,6 +506,7 @@ export const AccessInvitationStatus = {
   PENDING: 'PENDING',
   EXPIRED: 'EXPIRED',
   REVOKED: 'REVOKED',
+  ACCEPTED: 'ACCEPTED',
 } as const;
 
 export interface AccessInvitation {
@@ -517,6 +518,10 @@ export interface AccessInvitation {
   status: AccessInvitationStatus;
   expiresAt: string;
   createdAt: string;
+  /** @nullable */
+  acceptedAt: string | null;
+  /** @nullable */
+  acceptedEmail: string | null;
 }
 
 export type AccessInvitationVerificationStatus = typeof AccessInvitationVerificationStatus[keyof typeof AccessInvitationVerificationStatus];

@@ -58,9 +58,13 @@ export function createRequireAccess(
     const clerkDisplayName = `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim()
       || clerkUser.primaryEmailAddress?.emailAddress
       || displayNameFromClaims(auth.sessionClaims as Record<string, unknown>);
-    const verifiedEmails = clerkUser.emailAddresses
+    const verifiedEmailAddresses = clerkUser.emailAddresses
       .filter((item) => item.verification?.status === "verified")
-      .map((item) => item.emailAddress.toLowerCase());
+      .map((item) => ({
+        emailAddress: item.emailAddress,
+        normalizedEmail: item.emailAddress.toLowerCase(),
+      }));
+    const verifiedEmails = verifiedEmailAddresses.map((item) => item.normalizedEmail);
     [user] = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext('erp-access-provisioning'))`);
       const [existing] = await tx.select().from(userRolesTable).where(eq(userRolesTable.userId, userId)).limit(1);
@@ -81,8 +85,17 @@ export function createRequireAccess(
         displayName: invitation?.displayName ?? clerkDisplayName,
       }).returning();
       if (invitation) {
+        const acceptedEmail = verifiedEmailAddresses.find(
+          (item) => item.normalizedEmail === invitation.email,
+        )?.emailAddress;
+        if (!acceptedEmail) throw new Error("Email terverifikasi yang cocok tidak ditemukan");
         const [claimed] = await tx.update(staffInvitationsTable)
-          .set({ status: "ACCEPTED", acceptedAt: new Date(), acceptedUserId: userId })
+          .set({
+            status: "ACCEPTED",
+            acceptedAt: new Date(),
+            acceptedUserId: userId,
+            acceptedEmail,
+          })
           .where(and(
             eq(staffInvitationsTable.id, invitation.id),
             eq(staffInvitationsTable.status, "PENDING"),

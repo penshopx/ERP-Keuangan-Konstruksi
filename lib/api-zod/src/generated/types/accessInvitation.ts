@@ -17,4 +17,8 @@ export interface AccessInvitation {
   status: AccessInvitationStatus;
   expiresAt: Date;
   createdAt: Date;
+  /** @nullable */
+  acceptedAt: Date | null;
+  /** @nullable */
+  acceptedEmail: string | null;
 }

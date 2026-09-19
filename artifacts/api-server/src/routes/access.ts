@@ -70,11 +70,15 @@ const serializeInvitation = (
   assignedProjectIds,
   status: invitation.status === "REVOKED"
     ? "REVOKED"
+    : invitation.status === "ACCEPTED"
+      ? "ACCEPTED"
     : invitation.status === "EXPIRED" || invitation.expiresAt <= now
       ? "EXPIRED"
       : "PENDING",
   expiresAt: invitation.expiresAt.toISOString(),
   createdAt: invitation.createdAt.toISOString(),
+  acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
+  acceptedEmail: invitation.acceptedEmail,
 });
 
 export function createAccessRouter(
@@ -111,8 +115,7 @@ router.get("/access/invitations", async (req, res) => {
     res.status(403).json({ error: "Hanya Director yang dapat melihat undangan" });
     return;
   }
-  const storedInvitations = (await db.select().from(staffInvitationsTable))
-    .filter((invite) => invite.status !== "ACCEPTED");
+  const storedInvitations = await db.select().from(staffInvitationsTable);
   const actor = {
     userId: req.access!.userId,
     displayName: req.access!.displayName,
@@ -249,6 +252,7 @@ router.post("/access/invitations", async (req, res) => {
     id: result.id, email, displayName: body.data.displayName.trim(), role: body.data.role,
     assignedProjectIds: body.data.assignedProjectIds, status: "PENDING",
     expiresAt: result.expiresAt.toISOString(), createdAt: result.createdAt.toISOString(),
+    acceptedAt: null, acceptedEmail: null,
   }));
 });
 

@@ -13,4 +13,5 @@ export const AccessInvitationStatus = {
   PENDING: 'PENDING',
   EXPIRED: 'EXPIRED',
   REVOKED: 'REVOKED',
+  ACCEPTED: 'ACCEPTED',
 } as const;
