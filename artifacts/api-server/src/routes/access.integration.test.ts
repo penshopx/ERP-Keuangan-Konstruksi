@@ -34,7 +34,11 @@ import {
 } from "../lib/invitation-reconciliation";
 import {
   acquirePersistenceDatabaseSuiteLock,
+  defaultDatabaseSuiteStatementTimeoutMs,
+  describeDatabaseSuiteError,
   releasePersistenceDatabaseSuiteLock,
+  runDatabaseSuiteOperation,
+  setDatabaseSuitePoolStatementTimeout,
   type DatabaseSuiteLockClient,
 } from "../testing/database-suite-lock";
 
@@ -51,6 +55,10 @@ const revokedClerkIds: string[] = [];
 const clerkStatuses = new Map<string, string>();
 let clerkSequence = 0;
 let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
+const databaseSuiteName = "Access integration suite";
+const databaseStatementTimeoutMs = Number(
+  process.env.ACCESS_TEST_STATEMENT_TIMEOUT_MS ?? defaultDatabaseSuiteStatementTimeoutMs,
+);
 
 const directorAccess: AccessContext = {
   userId: directorId,
@@ -184,23 +192,39 @@ async function deleteTestAccessRows() {
 }
 
 before(async () => {
-  databaseSuiteLockClient = await acquirePersistenceDatabaseSuiteLock();
+  setDatabaseSuitePoolStatementTimeout(databaseSuiteName, databaseStatementTimeoutMs);
+  await runDatabaseSuiteOperation(async () => {
+    databaseSuiteLockClient = await acquirePersistenceDatabaseSuiteLock();
+  }, databaseSuiteName, databaseStatementTimeoutMs);
 });
 
 after(async () => {
+  const cleanupErrors: unknown[] = [];
   try {
-    await deleteTestAccessRows();
-    await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+    try {
+      await deleteTestAccessRows();
+      await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+    } catch (error) {
+      cleanupErrors.push(describeDatabaseSuiteError(error, databaseSuiteName, databaseStatementTimeoutMs));
+    }
   } finally {
     if (databaseSuiteLockClient) {
-      await releasePersistenceDatabaseSuiteLock(databaseSuiteLockClient);
+      try {
+        await releasePersistenceDatabaseSuiteLock(databaseSuiteLockClient);
+      } catch (error) {
+        cleanupErrors.push(describeDatabaseSuiteError(error, databaseSuiteName, databaseStatementTimeoutMs));
+      }
       databaseSuiteLockClient = undefined;
     }
     await pool.end();
   }
+  if (cleanupErrors.length > 0) {
+    throw new AggregateError(cleanupErrors, `${databaseSuiteName} cleanup or lock release failed`);
+  }
 });
 
 test("staff invitation concurrency and atomic provisioning", async (t) => {
+  await runDatabaseSuiteOperation(async () => {
   await db.insert(userRolesTable).values({
     userId: directorId,
     role: "DIRECTOR",
@@ -1498,4 +1522,5 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       await succeeding.close();
     }
   });
+  }, databaseSuiteName, databaseStatementTimeoutMs);
 });

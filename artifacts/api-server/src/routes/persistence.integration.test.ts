@@ -24,7 +24,11 @@ import type { InvoicePersistenceHooks } from "./invoices";
 import type { ProjectPersistenceHooks } from "./projects";
 import {
   acquirePersistenceDatabaseSuiteLock,
+  defaultDatabaseSuiteStatementTimeoutMs,
+  describeDatabaseSuiteError,
   releasePersistenceDatabaseSuiteLock,
+  runDatabaseSuiteOperation,
+  setDatabaseSuitePoolStatementTimeout,
   type DatabaseSuiteLockClient,
 } from "../testing/database-suite-lock";
 
@@ -38,6 +42,10 @@ const regressionTaxRuleVersionPattern = "^TEST-(SUCCESSOR|CONCURRENT)-[0-9a-f-]{
 const regressionDirectTaxRuleIdPattern = "^test-direct-(base|adjacent|overlap)-[0-9a-f-]{36}$";
 const regressionRabTemplateIdPattern = "^test-rab-import-[0-9a-f-]{36}$";
 const databaseSuiteLockTimeoutMs = Number(process.env.PERSISTENCE_TEST_LOCK_TIMEOUT_MS ?? 120_000);
+const databaseStatementTimeoutMs = Number(
+  process.env.PERSISTENCE_TEST_STATEMENT_TIMEOUT_MS ?? defaultDatabaseSuiteStatementTimeoutMs,
+);
+const databaseSuiteName = "Persistence integration suite";
 const preventOverlappingTaxRulesMigrationUrl = new URL(
   "../../../../lib/db/migrations/0001_prevent_overlapping_tax_rule_periods.sql",
   import.meta.url,
@@ -255,23 +263,41 @@ async function releaseDatabaseSuiteLock() {
 }
 
 before(async () => {
-  await acquireDatabaseSuiteLock();
-  await cleanupRegressionData();
+  setDatabaseSuitePoolStatementTimeout(databaseSuiteName, databaseStatementTimeoutMs);
+  await runDatabaseSuiteOperation(async () => {
+    await acquireDatabaseSuiteLock();
+    await cleanupRegressionData();
+  }, databaseSuiteName, databaseStatementTimeoutMs);
 });
 
 after(async () => {
+  const cleanupErrors: unknown[] = [];
   try {
-    if (databaseSuiteLockClient) await cleanupRegressionData();
+    if (databaseSuiteLockClient) {
+      try {
+        await cleanupRegressionData();
+      } catch (error) {
+        cleanupErrors.push(describeDatabaseSuiteError(error, databaseSuiteName, databaseStatementTimeoutMs));
+      }
+    }
   } finally {
     try {
-      await releaseDatabaseSuiteLock();
+      try {
+        await releaseDatabaseSuiteLock();
+      } catch (error) {
+        cleanupErrors.push(describeDatabaseSuiteError(error, databaseSuiteName, databaseStatementTimeoutMs));
+      }
     } finally {
       await pool.end();
     }
   }
+  if (cleanupErrors.length > 0) {
+    throw new AggregateError(cleanupErrors, `${databaseSuiteName} cleanup or lock release failed`);
+  }
 });
 
 test("API persistence and invoice atomicity survive regressions", async (t) => {
+  await runDatabaseSuiteOperation(async () => {
   let projectId = "";
 
   await t.test("project status migration rejects unknown legacy values without rewriting them", async () => {
@@ -2605,4 +2631,5 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     assert.equal(snapshot, undefined);
     assert.equal(audit, undefined);
   });
+  }, databaseSuiteName, databaseStatementTimeoutMs);
 });

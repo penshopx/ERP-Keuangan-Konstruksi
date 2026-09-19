@@ -10,7 +10,11 @@ import {
 } from "@workspace/db";
 import {
   acquirePersistenceDatabaseSuiteLock,
+  defaultDatabaseSuiteStatementTimeoutMs,
+  describeDatabaseSuiteError,
   releasePersistenceDatabaseSuiteLock,
+  runDatabaseSuiteOperation,
+  setDatabaseSuitePoolStatementTimeout,
   type DatabaseSuiteLockClient,
 } from "../testing/database-suite-lock";
 import { demoInvoices, seedDemoData } from "./demo-data";
@@ -23,28 +27,48 @@ const nonDemoSnapshotId = `test-demo-seed-snapshot-${runId}`;
 const collidingInvoiceId = demoInvoices[0].id;
 const collidingSnapshotId = `tax-${collidingInvoiceId}`;
 let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
+const databaseSuiteName = "Demo seeding suite";
+const databaseStatementTimeoutMs = Number(
+  process.env.DEMO_SEEDING_TEST_STATEMENT_TIMEOUT_MS ?? defaultDatabaseSuiteStatementTimeoutMs,
+);
 
 before(async () => {
-  databaseSuiteLockClient = await acquirePersistenceDatabaseSuiteLock();
+  setDatabaseSuitePoolStatementTimeout(databaseSuiteName, databaseStatementTimeoutMs);
+  await runDatabaseSuiteOperation(async () => {
+    databaseSuiteLockClient = await acquirePersistenceDatabaseSuiteLock();
+  }, databaseSuiteName, databaseStatementTimeoutMs);
 });
 
 after(async () => {
+  const cleanupErrors: unknown[] = [];
   try {
-    await db.delete(taxCalculationSnapshotsTable)
-      .where(eq(taxCalculationSnapshotsTable.id, nonDemoSnapshotId));
-    await db.delete(taxCalculationSnapshotsTable)
-      .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
-    await db.delete(invoicesTable).where(eq(invoicesTable.id, nonDemoInvoiceId));
-    await db.delete(invoicesTable).where(eq(invoicesTable.id, collidingInvoiceId));
-    await db.delete(projectsTable).where(eq(projectsTable.id, nonDemoProjectId));
+    try {
+      await db.delete(taxCalculationSnapshotsTable)
+        .where(eq(taxCalculationSnapshotsTable.id, nonDemoSnapshotId));
+      await db.delete(taxCalculationSnapshotsTable)
+        .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
+      await db.delete(invoicesTable).where(eq(invoicesTable.id, nonDemoInvoiceId));
+      await db.delete(invoicesTable).where(eq(invoicesTable.id, collidingInvoiceId));
+      await db.delete(projectsTable).where(eq(projectsTable.id, nonDemoProjectId));
+    } catch (error) {
+      cleanupErrors.push(describeDatabaseSuiteError(error, databaseSuiteName, databaseStatementTimeoutMs));
+    }
   } finally {
     if (databaseSuiteLockClient) {
-      await releasePersistenceDatabaseSuiteLock(databaseSuiteLockClient);
+      try {
+        await releasePersistenceDatabaseSuiteLock(databaseSuiteLockClient);
+      } catch (error) {
+        cleanupErrors.push(describeDatabaseSuiteError(error, databaseSuiteName, databaseStatementTimeoutMs));
+      }
     }
+  }
+  if (cleanupErrors.length > 0) {
+    throw new AggregateError(cleanupErrors, `${databaseSuiteName} cleanup or lock release failed`);
   }
 });
 
 test("demo seeding does not change non-demo rows that collide with fixture IDs", async () => {
+  await runDatabaseSuiteOperation(async () => {
   await seedDemoData();
   await db.delete(taxCalculationSnapshotsTable)
     .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
@@ -114,6 +138,7 @@ test("demo seeding does not change non-demo rows that collide with fixture IDs",
     .where(eq(taxCalculationSnapshotsTable.id, collidingSnapshotId));
   await db.delete(invoicesTable).where(eq(invoicesTable.id, collidingInvoiceId));
   await seedDemoData();
+  }, databaseSuiteName, databaseStatementTimeoutMs);
 });
 
 test("demo data seeding requires development mode and explicit opt-in", () => {
@@ -140,6 +165,7 @@ test("demo data seeding requires development mode and explicit opt-in", () => {
 });
 
 test("demo seeding is idempotent and leaves non-demo tax references unchanged", async () => {
+  await runDatabaseSuiteOperation(async () => {
   await seedDemoData();
 
   await db.insert(projectsTable).values({
@@ -229,4 +255,5 @@ test("demo seeding is idempotent and leaves non-demo tax references unchanged", 
     .where(eq(taxCalculationSnapshotsTable.id, nonDemoSnapshotId));
   assert.deepEqual(nonDemoInvoiceAfterSecondSeed, nonDemoInvoiceAfterFirstSeed);
   assert.deepEqual(nonDemoSnapshotAfterSecondSeed, nonDemoSnapshotAfterFirstSeed);
+  }, databaseSuiteName, databaseStatementTimeoutMs);
 });

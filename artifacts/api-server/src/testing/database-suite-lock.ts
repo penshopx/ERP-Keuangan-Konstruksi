@@ -38,6 +38,41 @@ export async function setDatabaseSuiteStatementTimeout(
   await client.query(`SET statement_timeout = ${timeoutMs}`);
 }
 
+export function setDatabaseSuitePoolStatementTimeout(
+  suiteName: string,
+  timeoutMs: number,
+) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isInteger(timeoutMs)) {
+    throw new Error(`${suiteName} database statement timeout must be a positive integer; received ${timeoutMs}`);
+  }
+  pool.options.statement_timeout = timeoutMs;
+}
+
+export function describeDatabaseSuiteError(
+  error: unknown,
+  suiteName: string,
+  timeoutMs: number,
+): unknown {
+  return isDatabaseStatementTimeout(error)
+    ? new Error(
+      `${suiteName} database query exceeded the ${timeoutMs}ms statement timeout`,
+      { cause: error },
+    )
+    : error;
+}
+
+export async function runDatabaseSuiteOperation<T>(
+  operation: () => Promise<T>,
+  suiteName: string,
+  timeoutMs: number,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    throw describeDatabaseSuiteError(error, suiteName, timeoutMs);
+  }
+}
+
 export async function acquireDatabaseSuiteLock({
   lockName,
   suiteName,
