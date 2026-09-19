@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatRupiah } from "@/lib/utils"
+import { getTaxPeriodOptions } from "@/lib/tax-periods"
 import { Download, FileCheck, CheckCircle2, AlertTriangle, FileText } from "lucide-react"
 
-const PERIODS = ["2024-03", "2024-02", "2024-01", "2023-12", "2023-11", "2023-10"]
-
 export default function TaxSummary() {
-  const [period, setPeriod] = useState(PERIODS[0])
+  const [periods] = useState(getTaxPeriodOptions)
+  const [period, setPeriod] = useState(periods[0])
   const { data: tax, isLoading } = useGetTaxSummary({ period })
 
   if (isLoading || !tax) {
@@ -33,12 +33,12 @@ export default function TaxSummary() {
         </div>
         <div className="flex items-center gap-4">
           <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px]" data-testid="select-tax-period">
               <SelectValue placeholder="Select Period" />
             </SelectTrigger>
             <SelectContent>
-              {PERIODS.map(p => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
+              {periods.map(p => (
+                <SelectItem key={p} value={p} data-testid={`option-tax-period-${p}`}>{p}</SelectItem>
               ))}
             </SelectContent>
           </Select>
