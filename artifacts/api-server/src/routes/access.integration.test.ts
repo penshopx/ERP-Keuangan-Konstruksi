@@ -896,6 +896,78 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     assert.equal(acceptedInvitations[0]?.acceptedEmail, mixedCaseEmail);
   });
 
+  await t.test("invitation history can be searched by either email and filtered by every status", async () => {
+    const server = await startServer(staticAccessMiddleware());
+    const records = [
+      { suffix: "pending", status: "PENDING", acceptedEmail: null },
+      { suffix: "accepted", status: "ACCEPTED", acceptedEmail: `${prefix}-recipient@example.test` },
+      { suffix: "expired", status: "EXPIRED", acceptedEmail: null },
+      { suffix: "revoked", status: "REVOKED", acceptedEmail: null },
+    ] as const;
+
+    try {
+      const created = await Promise.all(records.map(async ({ suffix }) => {
+        const response = await postInvite(server.baseUrl, `${prefix}-history-${suffix}@example.test`);
+        assert.equal(response.status, 201);
+        return response.json() as Promise<{ id: string }>;
+      }));
+
+      for (const [index, record] of records.entries()) {
+        await db.update(staffInvitationsTable)
+          .set({
+            status: record.status,
+            acceptedEmail: record.acceptedEmail,
+            acceptedAt: record.status === "ACCEPTED" ? new Date() : null,
+          })
+          .where(eq(staffInvitationsTable.id, created[index]!.id));
+      }
+
+      const invitedEmailResponse = await fetch(
+        `${server.baseUrl}/access/invitations?email=${encodeURIComponent("HISTORY-EXPIRED")}`,
+      );
+      assert.equal(invitedEmailResponse.status, 200);
+      const invitedEmailBody = await invitedEmailResponse.json() as {
+        invitations: Array<{ id: string }>;
+      };
+      assert.deepEqual(invitedEmailBody.invitations.map(({ id }) => id), [created[2]!.id]);
+
+      const acceptedEmailResponse = await fetch(
+        `${server.baseUrl}/access/invitations?email=${encodeURIComponent(`${prefix}-RECIPIENT`)}`,
+      );
+      assert.equal(acceptedEmailResponse.status, 200);
+      const acceptedEmailBody = await acceptedEmailResponse.json() as {
+        invitations: Array<{ id: string; acceptedEmail: string | null }>;
+      };
+      assert.deepEqual(
+        acceptedEmailBody.invitations.map(({ id }) => id),
+        [created[1]!.id],
+      );
+
+      for (const [index, record] of records.entries()) {
+        const response = await fetch(
+          `${server.baseUrl}/access/invitations?email=${encodeURIComponent(`${prefix}-history`)}&status=${record.status}`,
+        );
+        assert.equal(response.status, 200);
+        const body = await response.json() as {
+          invitations: Array<{ id: string; status: string }>;
+        };
+        assert.deepEqual(
+          body.invitations.map(({ id, status }) => ({ id, status })),
+          [{ id: created[index]!.id, status: record.status }],
+        );
+      }
+
+      const legacyNullResponse = await fetch(
+        `${server.baseUrl}/access/invitations?email=${encodeURIComponent("not-recorded@example.test")}&status=ACCEPTED`,
+      );
+      assert.equal(legacyNullResponse.status, 200);
+      const legacyNullBody = await legacyNullResponse.json() as { invitations: unknown[] };
+      assert.deepEqual(legacyNullBody.invitations, []);
+    } finally {
+      await server.close();
+    }
+  });
+
   await t.test("an expired invitation cannot be claimed by a verified Clerk email", async () => {
     const email = `${prefix}-expired@example.test`;
     const userId = `${prefix}-expired-user`;

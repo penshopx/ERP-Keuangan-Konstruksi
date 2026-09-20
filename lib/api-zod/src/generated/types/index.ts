@@ -68,6 +68,8 @@ export * from './invoice';
 export * from './invoiceInput';
 export * from './invoiceInputQualification';
 export * from './invoiceInputServiceType';
+export * from './listAccessInvitationsParams';
+export * from './listAccessInvitationsStatus';
 export * from './listAhsTemplatesParams';
 export * from './listInvoicesParams';
 export * from './listPettyCashRequestsParams';

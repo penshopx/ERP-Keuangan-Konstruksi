@@ -1727,8 +1727,17 @@ export const ListAccessUsersResponse = zod.array(ListAccessUsersResponseItem)
 
 
 /**
- * @summary List pending and expired staff invitations
+ * @summary List and filter staff invitation history
  */
+export const listAccessInvitationsQueryEmailMax = 320;
+
+
+
+export const ListAccessInvitationsQueryParams = zod.object({
+  "email": zod.coerce.string().max(listAccessInvitationsQueryEmailMax).optional().describe('Match the invited or accepting email address'),
+  "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']).optional().describe('Filter invitations by their current status')
+})
+
 export const ListAccessInvitationsResponse = zod.object({
   "invitations": zod.array(zod.object({
   "id": zod.string(),

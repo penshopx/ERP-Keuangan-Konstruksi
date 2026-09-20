@@ -1382,3 +1382,25 @@ export type GetTaxSummaryParams = {
 period?: string;
 };
 
+export type ListAccessInvitationsParams = {
+/**
+ * Match the invited or accepting email address
+ * @maxLength 320
+ */
+email?: string;
+/**
+ * Filter invitations by their current status
+ */
+status?: ListAccessInvitationsStatus;
+};
+
+export type ListAccessInvitationsStatus = typeof ListAccessInvitationsStatus[keyof typeof ListAccessInvitationsStatus];
+
+
+export const ListAccessInvitationsStatus = {
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+  REVOKED: 'REVOKED',
+  ACCEPTED: 'ACCEPTED',
+} as const;
+

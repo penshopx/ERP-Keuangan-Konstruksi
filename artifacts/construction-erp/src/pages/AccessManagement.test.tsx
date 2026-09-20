@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import AccessManagement from "./AccessManagement";
@@ -51,6 +51,7 @@ let userQuery: {
   data?: [];
   isLoading: boolean;
 };
+let invitationParams: unknown;
 
 vi.mock("@workspace/api-client-react", async (importOriginal) => {
   const original = await importOriginal<typeof import("@workspace/api-client-react")>();
@@ -58,7 +59,10 @@ vi.mock("@workspace/api-client-react", async (importOriginal) => {
   return {
     ...original,
     useListAccessUsers: () => userQuery,
-    useListAccessInvitations: () => invitationQuery,
+    useListAccessInvitations: (params: unknown) => {
+      invitationParams = params;
+      return invitationQuery;
+    },
     useListProjects: () => ({ data: [] }),
     useCreateAccessInvitation: idleMutation,
     useResendAccessInvitation: idleMutation,
@@ -85,6 +89,30 @@ afterEach(() => {
 });
 
 describe("status verifikasi daftar undangan", () => {
+  test("mengirim pencarian email ke API dan menyediakan filter status", () => {
+    userQuery = { data: [], isLoading: false };
+    invitationQuery = {
+      data: {
+        invitations: [],
+        verification: {
+          status: "VERIFIED",
+          message: "Semua status undangan telah diverifikasi.",
+          lastSuccessfulVerificationAt: null,
+        },
+      },
+      isError: false,
+    };
+
+    renderPage();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Cari email" }), {
+      target: { value: " penerima@example.com " },
+    });
+    expect(invitationParams).toEqual({ email: "penerima@example.com" });
+    expect(screen.getByRole("combobox", { name: "Status" }).textContent).toContain("Semua status");
+    expect(screen.getByText("Tidak ada undangan yang cocok dengan pencarian dan status ini.")).toBeTruthy();
+  });
+
   test("menampilkan peringatan gangguan Clerk dan undangan yang sudah terverifikasi", () => {
     userQuery = { data: [], isLoading: false };
     invitationQuery = {

@@ -10,6 +10,7 @@ import {
   GetCurrentUserResponse,
   CreateAccessInvitationBody,
   CreateAccessInvitationResponse,
+  ListAccessInvitationsQueryParams,
   ListAccessInvitationsResponse,
   ListAccessUsersResponse,
   ResendAccessInvitationParams,
@@ -115,6 +116,11 @@ router.get("/access/invitations", async (req, res) => {
     res.status(403).json({ error: "Hanya Director yang dapat melihat undangan" });
     return;
   }
+  const query = ListAccessInvitationsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
   const storedInvitations = await db.select().from(staffInvitationsTable);
   const actor = {
     userId: req.access!.userId,
@@ -166,12 +172,21 @@ router.get("/access/invitations", async (req, res) => {
   req.app.locals.invitationListVerificationDegraded = verificationFailed;
   const projects = await db.select().from(staffInvitationProjectsTable);
   const now = new Date();
-  res.json(ListAccessInvitationsResponse.parse({
-    invitations: verifiedInvitations.map((invite) => serializeInvitation(
+  const normalizedEmail = query.data.email?.trim().toLocaleLowerCase();
+  const invitations = verifiedInvitations
+    .map((invite) => serializeInvitation(
       invite,
       projects.filter((item) => item.invitationId === invite.id).map((item) => item.projectId),
       now,
-    )),
+    ))
+    .filter((invite) => (
+      (!query.data.status || invite.status === query.data.status)
+      && (!normalizedEmail
+        || invite.email.toLocaleLowerCase().includes(normalizedEmail)
+        || invite.acceptedEmail?.toLocaleLowerCase().includes(normalizedEmail) === true)
+    ));
+  res.json(ListAccessInvitationsResponse.parse({
+    invitations,
     verification: verificationFailed
       ? {
           status: "DEGRADED",

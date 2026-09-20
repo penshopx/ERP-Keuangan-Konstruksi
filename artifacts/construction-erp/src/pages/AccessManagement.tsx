@@ -24,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const roles = ["DIRECTOR", "PROJECT_MANAGER", "SITE_MANAGER", "FINANCE", "TAX_STAFF", "PROCUREMENT", "JURU_HITUNG", "ESTIMATOR", "QUANTITY_SURVEYOR"] as const;
+const invitationStatuses = ["PENDING", "ACCEPTED", "EXPIRED", "REVOKED"] as const;
+type InvitationStatusFilter = typeof invitationStatuses[number] | "ALL";
 
 const roleLabels: Record<typeof roles[number], string> = {
   DIRECTOR: "Direktur (Eksekutif)",
@@ -45,8 +47,15 @@ function formatVerificationTime(value: string) {
 }
 
 export default function AccessManagement() {
+  const [invitationEmail, setInvitationEmail] = useState("");
+  const [invitationStatus, setInvitationStatus] = useState<InvitationStatusFilter>("ALL");
   const { data: users, isLoading } = useListAccessUsers();
-  const { data: invitationList, isError: invitationListFailed } = useListAccessInvitations();
+  const normalizedInvitationEmail = invitationEmail.trim();
+  const invitationFilters = {
+    ...(normalizedInvitationEmail ? { email: normalizedInvitationEmail } : {}),
+    ...(invitationStatus !== "ALL" ? { status: invitationStatus } : {}),
+  };
+  const { data: invitationList, isError: invitationListFailed } = useListAccessInvitations(invitationFilters);
   const { data: projects } = useListProjects();
   const invitations = invitationList?.invitations;
   return <div className="space-y-6"><div><h1 className="text-3xl font-bold">Hak Akses</h1><p className="text-muted-foreground">Undang staf dan siapkan jabatan serta proyek sebelum mereka pertama kali masuk.</p></div>
@@ -63,9 +72,41 @@ export default function AccessManagement() {
     {invitationListFailed && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950">
       Daftar undangan tidak dapat dimuat. Coba lagi beberapa saat.
     </div>}
-    {invitations && invitations.length > 0 && <Card><CardHeader><CardTitle className="text-base">Undangan staf</CardTitle></CardHeader><CardContent className="grid gap-3">
-      {invitations.map((invite) => <InvitationRow key={invite.id} invite={invite} />)}
-    </CardContent></Card>}
+    {invitations && <Card>
+      <CardHeader><CardTitle className="text-base">Riwayat undangan staf</CardTitle></CardHeader>
+      <CardContent className="grid gap-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="grid gap-2">
+            <Label htmlFor="invitation-email-filter">Cari email</Label>
+            <Input
+              id="invitation-email-filter"
+              type="search"
+              value={invitationEmail}
+              onChange={(event) => setInvitationEmail(event.target.value)}
+              placeholder="Email undangan atau penerimaan"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="invitation-status-filter">Status</Label>
+            <Select value={invitationStatus} onValueChange={(value) => setInvitationStatus(value as InvitationStatusFilter)}>
+              <SelectTrigger id="invitation-status-filter"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua status</SelectItem>
+                <SelectItem value="PENDING">Tertunda</SelectItem>
+                <SelectItem value="ACCEPTED">Diterima</SelectItem>
+                <SelectItem value="EXPIRED">Kedaluwarsa</SelectItem>
+                <SelectItem value="REVOKED">Dibatalkan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {invitations.length > 0
+          ? <div className="grid gap-3">{invitations.map((invite) => <InvitationRow key={invite.id} invite={invite} />)}</div>
+          : <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Tidak ada undangan yang cocok dengan pencarian dan status ini.
+            </p>}
+      </CardContent>
+    </Card>}
     {isLoading
       ? <div>Memuat pengguna...</div>
       : <div className="grid gap-4">{users?.map((user) => <AccessCard key={user.userId} user={user} projects={projects ?? []} />)}</div>}

@@ -764,7 +764,20 @@ paths:
     get:
       operationId: listAccessInvitations
       tags: [access]
-      summary: List pending and expired staff invitations
+      summary: List and filter staff invitation history
+      parameters:
+        - name: email
+          in: query
+          description: Match the invited or accepting email address
+          schema:
+            type: string
+            maxLength: 320
+        - name: status
+          in: query
+          description: Filter invitations by their current status
+          schema:
+            type: string
+            enum: [PENDING, EXPIRED, REVOKED, ACCEPTED]
       responses:
         "200":
           description: Invitation list

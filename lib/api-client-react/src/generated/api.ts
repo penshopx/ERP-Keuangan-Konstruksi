@@ -44,6 +44,7 @@ import type {
   InventoryMovementInput,
   Invoice,
   InvoiceInput,
+  ListAccessInvitationsParams,
   ListAhsTemplatesParams,
   ListInvoicesParams,
   ListPettyCashRequestsParams,
@@ -3587,20 +3588,27 @@ export function useListAccessUsers<TData = Awaited<ReturnType<typeof listAccessU
 
 
 
-export const getListAccessInvitationsUrl = () => {
+export const getListAccessInvitationsUrl = (params?: ListAccessInvitationsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/access/invitations`
+  return stringifiedParams.length > 0 ? `/api/access/invitations?${stringifiedParams}` : `/api/access/invitations`
 }
 
 /**
- * @summary List pending and expired staff invitations
+ * @summary List and filter staff invitation history
  */
-export const listAccessInvitations = async ( options?: Parameters<typeof customFetch>[1]): Promise<AccessInvitationList> => {
+export const listAccessInvitations = async (params?: ListAccessInvitationsParams, options?: Parameters<typeof customFetch>[1]): Promise<AccessInvitationList> => {
 
-  return customFetch<AccessInvitationList>(getListAccessInvitationsUrl(),
+  return customFetch<AccessInvitationList>(getListAccessInvitationsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3613,23 +3621,23 @@ export const listAccessInvitations = async ( options?: Parameters<typeof customF
 
 
 
-export const getListAccessInvitationsQueryKey = () => {
+export const getListAccessInvitationsQueryKey = (params?: ListAccessInvitationsParams,) => {
     return [
-    `/api/access/invitations`
+    `/api/access/invitations`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListAccessInvitationsQueryOptions = <TData = Awaited<ReturnType<typeof listAccessInvitations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccessInvitations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAccessInvitationsQueryOptions = <TData = Awaited<ReturnType<typeof listAccessInvitations>>, TError = ErrorType<unknown>>(params?: ListAccessInvitationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccessInvitations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListAccessInvitationsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListAccessInvitationsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAccessInvitations>>> = ({ signal }) => listAccessInvitations({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAccessInvitations>>> = ({ signal }) => listAccessInvitations(params, { signal, ...requestOptions });
 
 
 
@@ -3643,15 +3651,15 @@ export type ListAccessInvitationsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List pending and expired staff invitations
+ * @summary List and filter staff invitation history
  */
 
 export function useListAccessInvitations<TData = Awaited<ReturnType<typeof listAccessInvitations>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccessInvitations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListAccessInvitationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccessInvitations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListAccessInvitationsQueryOptions(options)
+  const queryOptions = getListAccessInvitationsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
