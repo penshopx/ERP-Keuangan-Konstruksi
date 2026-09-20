@@ -124,4 +124,39 @@ const invitationReconciliation = schedulePendingInvitationReconciliation({
   },
 });
 
-server.on("close", () => invitationReconciliation.stop());
+const shutdownTimeoutMs = 10_000;
+let shuttingDown = false;
+
+async function shutdown(signal: NodeJS.Signals) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal, shutdownTimeoutMs }, "Graceful shutdown started");
+
+  const forcedExit = setTimeout(() => {
+    logger.error(
+      { signal, shutdownTimeoutMs },
+      "Graceful shutdown timed out; forcing process exit",
+    );
+    process.exit(1);
+  }, shutdownTimeoutMs);
+  forcedExit.unref();
+
+  server.close();
+  await invitationReconciliation.stop();
+  await new Promise<void>((resolve, reject) => {
+    if (!server.listening) return resolve();
+    server.once("close", resolve);
+    server.once("error", reject);
+  });
+  clearTimeout(forcedExit);
+  logger.info({ signal }, "Graceful shutdown completed");
+}
+
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    void shutdown(signal).catch((err) => {
+      logger.error({ err, signal }, "Graceful shutdown failed");
+      process.exitCode = 1;
+    });
+  });
+}

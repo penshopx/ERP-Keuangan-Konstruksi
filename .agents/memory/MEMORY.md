@@ -11,5 +11,6 @@
 - [Child-process test lifecycle](child-process-test-lifecycle.md) — close stdin readers, servers, and database pools explicitly so integration workers terminate reliably.
 - [Database suite timeouts](database-suite-timeouts.md) — configure statement limits on the shared pool before lock acquisition so every suite connection inherits them.
 - [Reconciliation liveness](reconciliation-liveness.md) — monitor completed-pass freshness independently from per-pass failures so normal coordination skips do not create false alarms.
+- [Graceful reconciliation shutdown](graceful-reconciliation-shutdown.md) — stop new reconciliation runs, await the active transaction, and retain a bounded forced-exit fallback.
 - [Commitment exposure accounting](commitment-exposure-accounting.md) — receipts track physical progress; only posted vendor invoices move financial exposure from commitment to actual.
 - [Competency versus authorization](competency-versus-authorization.md) — professional SKKNI/SKKK evidence never grants ERP permissions automatically; authorization remains explicit and project-scoped.

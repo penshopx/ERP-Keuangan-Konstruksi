@@ -37,7 +37,17 @@ if (mode === "hold") {
       await new Promise(() => {});
     },
   );
-} else if (mode === "reconcile-hold") {
+} else if (mode === "reconcile-hold" || mode === "reconcile-graceful") {
+  let releaseHold: (() => void) | undefined;
+  const hold = new Promise<void>((resolve) => {
+    releaseHold = resolve;
+  });
+  if (mode === "reconcile-graceful") {
+    process.once("SIGTERM", () => {
+      process.stdout.write("SIGTERM_RECEIVED\n");
+      releaseHold?.();
+    });
+  }
   try {
     await reconcileInvitationFromClerk(
       await loadInvitation(),
@@ -47,10 +57,14 @@ if (mode === "hold") {
       {
         afterStatusUpdate: async () => {
           process.stdout.write("STATUS_UPDATED\n");
-          await new Promise(() => {});
+          if (mode === "reconcile-hold") await new Promise(() => {});
+          else await hold;
         },
       },
     );
+    if (mode === "reconcile-graceful") {
+      process.stdout.write("RECONCILIATION_COMPLETED\n");
+    }
   } catch (error) {
     process.stderr.write(
       `${error instanceof Error ? error.message : String(error)}\n`,

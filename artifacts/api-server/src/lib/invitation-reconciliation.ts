@@ -588,6 +588,8 @@ export function schedulePendingInvitationReconciliation(
 ) {
   const intervalMs = options.intervalMs ?? 5 * 60_000;
   let running = false;
+  let stopping = false;
+  let activeRun: Promise<void> | null = null;
   let alertUpdate = Promise.resolve();
 
   const checkCompletionFreshness = () => {
@@ -605,30 +607,38 @@ export function schedulePendingInvitationReconciliation(
   };
 
   const run = async () => {
+    if (stopping) return;
     if (running) {
       await checkCompletionFreshness();
       return;
     }
     running = true;
+    activeRun = (async () => {
+      try {
+        await runScheduledInvitationReconciliation(dependencies);
+      } catch (error) {
+        recordReconciliationFailure();
+        const failedEvent: InvitationReconciliationRunEvent = {
+          outcome: "FAILED",
+          occurredAt: new Date().toISOString(),
+        };
+        reconciliationHealth = { ...reconciliationHealth, lastRun: failedEvent };
+        await persistSharedReconciliationFailure(new Date(failedEvent.occurredAt));
+        await persistSharedRunEvent(failedEvent);
+        dependencies.onRunEvent?.(failedEvent);
+        dependencies.onRunError?.(error);
+        await updateInvitationReconciliationAlert(
+          dependencies.alerting,
+          reconciliationHealth,
+        );
+      } finally {
+        running = false;
+      }
+    })();
     try {
-      await runScheduledInvitationReconciliation(dependencies);
-    } catch (error) {
-      recordReconciliationFailure();
-      const failedEvent: InvitationReconciliationRunEvent = {
-        outcome: "FAILED",
-        occurredAt: new Date().toISOString(),
-      };
-      reconciliationHealth = { ...reconciliationHealth, lastRun: failedEvent };
-      await persistSharedReconciliationFailure(new Date(failedEvent.occurredAt));
-      await persistSharedRunEvent(failedEvent);
-      dependencies.onRunEvent?.(failedEvent);
-      dependencies.onRunError?.(error);
-      await updateInvitationReconciliationAlert(
-        dependencies.alerting,
-        reconciliationHealth,
-      );
+      await activeRun;
     } finally {
-      running = false;
+      activeRun = null;
     }
   };
 
@@ -637,7 +647,12 @@ export function schedulePendingInvitationReconciliation(
   if (options.runImmediately ?? true) void run();
 
   return {
-    stop: () => clearInterval(timer),
+    stop: async () => {
+      stopping = true;
+      clearInterval(timer);
+      await activeRun;
+      await alertUpdate;
+    },
     run,
   };
 }

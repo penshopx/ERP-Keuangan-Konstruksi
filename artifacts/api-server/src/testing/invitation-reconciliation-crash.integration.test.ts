@@ -19,7 +19,12 @@ const workerUrl = new URL(
 type Worker = ReturnType<typeof startWorker>;
 
 function startWorker(
-  mode: "hold" | "run" | "reconcile-hold" | "reconcile",
+  mode:
+    | "hold"
+    | "run"
+    | "reconcile-hold"
+    | "reconcile-graceful"
+    | "reconcile",
   invitationId?: string,
 ) {
   const child = spawn(
@@ -189,6 +194,83 @@ test("crashing mid-reconciliation cannot split invitation status and audit", asy
     const finalAudits = await db.select().from(auditLogsTable)
       .where(auditWhere);
     assert.equal(finalInvitation?.status, "EXPIRED");
+    assert.equal(finalAudits.length, 1);
+    assert.equal(finalAudits[0]?.metadata?.outcome, "UPDATED");
+  } finally {
+    await Promise.all([
+      ...(interrupted ? [killWorker(interrupted)] : []),
+      ...successors.map(killWorker),
+    ]);
+    await db.delete(auditLogsTable).where(eq(auditLogsTable.entityId, invitationId));
+    await db.delete(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitationId));
+    await db.delete(userRolesTable).where(eq(userRolesTable.userId, userId));
+  }
+});
+
+test("SIGTERM lets an active reconciliation finish atomically and idempotently", async () => {
+  const runId = randomUUID();
+  const userId = `reconciliation-graceful-user-${runId}`;
+  const invitationId = `reconciliation-graceful-invitation-${runId}`;
+  const auditWhere = and(
+    eq(auditLogsTable.entityId, invitationId),
+    eq(auditLogsTable.action, "STATUS UNDANGAN DIREKONSILIASI"),
+  );
+  let interrupted: Worker | undefined;
+  const successors: Worker[] = [];
+
+  try {
+    await db.insert(userRolesTable).values({
+      userId,
+      role: "ADMIN",
+      displayName: "Reconciliation Graceful Shutdown Test",
+    });
+    await db.insert(staffInvitationsTable).values({
+      id: invitationId,
+      clerkInvitationId: `clerk-${runId}`,
+      email: `reconciliation-graceful-${runId}@example.test`,
+      displayName: "Reconciliation Graceful Shutdown Test",
+      role: "STAFF",
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60_000),
+      invitedByUserId: userId,
+    });
+
+    interrupted = startWorker("reconcile-graceful", invitationId);
+    await waitForOutput(
+      interrupted.child,
+      "STATUS_UPDATED",
+      interrupted.stdout,
+    );
+
+    const shutdownStartedAt = Date.now();
+    assert.equal(interrupted.child.kill("SIGTERM"), true);
+    const stopped = await interrupted.result;
+    const shutdownElapsedMs = Date.now() - shutdownStartedAt;
+    assert.equal(stopped.code, 0, interrupted.stderr());
+    assert.equal(stopped.signal, null);
+    assert.match(interrupted.stdout(), /SIGTERM_RECEIVED/);
+    assert.match(interrupted.stdout(), /RECONCILIATION_COMPLETED/);
+    assert.ok(
+      shutdownElapsedMs < 5_000,
+      `graceful shutdown took ${shutdownElapsedMs}ms`,
+    );
+
+    const [afterShutdown] = await db.select().from(staffInvitationsTable)
+      .where(eq(staffInvitationsTable.id, invitationId));
+    const auditsAfterShutdown = await db.select().from(auditLogsTable)
+      .where(auditWhere);
+    assert.equal(afterShutdown?.status, "EXPIRED");
+    assert.equal(auditsAfterShutdown.length, 1);
+
+    const successor = startWorker("reconcile", invitationId);
+    successors.push(successor);
+    const completed = await successor.result;
+    assert.equal(completed.code, 0, successor.stderr());
+    assert.equal(successor.stdout(), "RECONCILED EXPIRED EXPIRED\n");
+
+    const finalAudits = await db.select().from(auditLogsTable)
+      .where(auditWhere);
     assert.equal(finalAudits.length, 1);
     assert.equal(finalAudits[0]?.metadata?.outcome, "UPDATED");
   } finally {
