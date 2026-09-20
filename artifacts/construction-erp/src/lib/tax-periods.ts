@@ -2,6 +2,17 @@ import { getJakartaCalendarDate } from "@/lib/indonesia-date"
 
 export const TAX_PERIOD_OPTION_COUNT = 6
 
+const taxPeriodLabelFormatter = new Intl.DateTimeFormat("id-ID", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+})
+
+export function formatTaxPeriodLabel(period: string): string {
+  const [year, month] = period.split("-").map(Number)
+  return taxPeriodLabelFormatter.format(new Date(Date.UTC(year, month - 1, 1)))
+}
+
 export function getTaxPeriodOptions(
   now = new Date(),
   count = TAX_PERIOD_OPTION_COUNT,

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatRupiah } from "@/lib/utils"
-import { getTaxPeriodOptions } from "@/lib/tax-periods"
+import { formatTaxPeriodLabel, getTaxPeriodOptions } from "@/lib/tax-periods"
 import { Download, FileCheck, CheckCircle2, AlertTriangle, FileText } from "lucide-react"
 
 export default function TaxSummary() {
@@ -38,7 +38,9 @@ export default function TaxSummary() {
             </SelectTrigger>
             <SelectContent>
               {periods.map(p => (
-                <SelectItem key={p} value={p} data-testid={`option-tax-period-${p}`}>{p}</SelectItem>
+                <SelectItem key={p} value={p} data-testid={`option-tax-period-${p}`}>
+                  {formatTaxPeriodLabel(p)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

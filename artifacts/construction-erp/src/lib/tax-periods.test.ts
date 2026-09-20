@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { getTaxPeriodOptions } from "./tax-periods"
+import { formatTaxPeriodLabel, getTaxPeriodOptions } from "./tax-periods"
 
 describe("pilihan periode pajak", () => {
   test("dimulai dari bulan operasional Asia/Jakarta dan memakai format YYYY-MM", () => {
@@ -22,5 +22,12 @@ describe("pilihan periode pajak", () => {
       "2026-12",
       "2026-11",
     ])
+  })
+
+  test("menampilkan nama bulan Indonesia tanpa mengubah nilai periode", () => {
+    const period = "2026-09"
+
+    expect(formatTaxPeriodLabel(period)).toBe("September 2026")
+    expect(period).toBe("2026-09")
   })
 })
