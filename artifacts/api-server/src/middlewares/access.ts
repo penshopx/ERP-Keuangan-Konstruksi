@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { clerkClient, getAuth } from "@clerk/express";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { NextFunction, Request, Response } from "express";
-import { db, projectAssignmentsTable, staffInvitationProjectsTable, staffInvitationsTable, userRolesTable } from "@workspace/db";
+import { auditLogsTable, db, projectAssignmentsTable, staffInvitationProjectsTable, staffInvitationsTable, userRolesTable } from "@workspace/db";
 import { isRole, roleCanAccessProject, roleHasPermission, rolePermissions, roles, type Role } from "./access-policy";
 
 export { roles, roleHasPermission, type Role } from "./access-policy";
@@ -89,10 +90,11 @@ export function createRequireAccess(
           (item) => item.normalizedEmail === invitation.email,
         )?.emailAddress;
         if (!acceptedEmail) throw new Error("Email terverifikasi yang cocok tidak ditemukan");
+        const acceptedAt = new Date();
         const [claimed] = await tx.update(staffInvitationsTable)
           .set({
             status: "ACCEPTED",
-            acceptedAt: new Date(),
+            acceptedAt,
             acceptedUserId: userId,
             acceptedEmail,
           })
@@ -108,6 +110,25 @@ export function createRequireAccess(
           await hooks.beforeProjectAssignmentsInsert?.(userId);
           await tx.insert(projectAssignmentsTable).values(prepared.map(({ projectId }) => ({ userId, projectId })));
         }
+        await tx.insert(auditLogsTable).values({
+          id: randomUUID(),
+          action: "UNDANGAN STAF DITERIMA",
+          entity: "Undangan",
+          entityId: invitation.id,
+          detail: `${invitation.displayName} · ${acceptedEmail} · ${invitation.role}`,
+          user: created.displayName,
+          actorUserId: userId,
+          actorRole: invitation.role,
+          tone: "success",
+          timestamp: acceptedAt,
+          metadata: {
+            invitationId: invitation.id,
+            recipientUserId: userId,
+            acceptedEmail,
+            role: invitation.role,
+            acceptedAt: acceptedAt.toISOString(),
+          },
+        });
       }
       return [created];
     });

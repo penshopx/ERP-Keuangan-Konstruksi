@@ -718,6 +718,13 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
         .where(eq(staffInvitationsTable.email, email));
       assert.equal(invitation.status, "ACCEPTED");
       assert.ok([firstId, secondId].includes(invitation.acceptedUserId ?? ""));
+      const acceptanceAudits = await db.select().from(auditLogsTable)
+        .where(and(
+          eq(auditLogsTable.entityId, invitation.id),
+          eq(auditLogsTable.action, "UNDANGAN STAF DITERIMA"),
+        ));
+      assert.equal(acceptanceAudits.length, 1);
+      assert.equal(acceptanceAudits[0]?.actorUserId, invitation.acceptedUserId);
     } finally {
       await server.close();
     }
@@ -815,6 +822,24 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     assert.equal(acceptedInvitations.length, 1);
     assert.equal(acceptedInvitations[0]?.acceptedEmail, invitedEmail);
 
+    const acceptanceAudits = await db.select().from(auditLogsTable)
+      .where(and(
+        eq(auditLogsTable.entityId, invitation.id),
+        eq(auditLogsTable.action, "UNDANGAN STAF DITERIMA"),
+      ));
+    assert.equal(acceptanceAudits.length, 1);
+    assert.equal(acceptanceAudits[0]?.entity, "Undangan");
+    assert.equal(acceptanceAudits[0]?.actorUserId, userId);
+    assert.equal(acceptanceAudits[0]?.actorRole, "TAX_STAFF");
+    assert.equal(acceptanceAudits[0]?.timestamp.toISOString(), acceptedInvitations[0]?.acceptedAt?.toISOString());
+    assert.deepEqual(acceptanceAudits[0]?.metadata, {
+      invitationId: invitation.id,
+      recipientUserId: userId,
+      acceptedEmail: invitedEmail,
+      role: "TAX_STAFF",
+      acceptedAt: acceptedInvitations[0]?.acceptedAt?.toISOString(),
+    });
+
     const director = await startServer(
       staticAccessMiddleware(),
       {},
@@ -840,6 +865,50 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       assert.ok(accepted?.acceptedAt);
     } finally {
       await director.close();
+    }
+  });
+
+  await t.test("only a role with audit permission can read invitation acceptance activity", async () => {
+    const acceptanceAuditId = randomUUID();
+    await db.insert(auditLogsTable).values({
+      id: acceptanceAuditId,
+      action: "UNDANGAN STAF DITERIMA",
+      entity: "Undangan",
+      entityId: `${prefix}-activity-invitation`,
+      detail: "Staf Audit · audit@example.test · TAX_STAFF",
+      user: "Staf Audit",
+      actorUserId: `${prefix}-activity-user`,
+      actorRole: "TAX_STAFF",
+      tone: "success",
+    });
+
+    const authorizedServer = await startServer((req, _res, next) => {
+      req.access = {
+        ...directorAccess,
+        role: "TAX_STAFF",
+        permissions: ["audit:view"],
+      };
+      next();
+    });
+    const unauthorizedServer = await startServer((req, _res, next) => {
+      req.access = {
+        ...directorAccess,
+        role: "PROCUREMENT",
+        permissions: [],
+      };
+      next();
+    });
+    try {
+      const authorizedResponse = await fetch(`${authorizedServer.baseUrl}/activity`);
+      assert.equal(authorizedResponse.status, 200);
+      const activity = await authorizedResponse.json() as Array<{ id: string }>;
+      assert.equal(activity.some(({ id }) => id === acceptanceAuditId), true);
+
+      const unauthorizedResponse = await fetch(`${unauthorizedServer.baseUrl}/activity`);
+      assert.equal(unauthorizedResponse.status, 403);
+    } finally {
+      await Promise.all([authorizedServer.close(), unauthorizedServer.close()]);
+      await db.delete(auditLogsTable).where(eq(auditLogsTable.id, acceptanceAuditId));
     }
   });
 
