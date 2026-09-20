@@ -13,5 +13,6 @@
 - [Reconciliation liveness](reconciliation-liveness.md) — monitor completed-pass freshness independently from per-pass failures so normal coordination skips do not create false alarms.
 - [Graceful reconciliation shutdown](graceful-reconciliation-shutdown.md) — stop new reconciliation runs, await the active transaction, and retain a bounded forced-exit fallback.
 - [Shared reconciliation alert claims](shared-reconciliation-alert-claims.md) — persist incident delivery state and serialize each alert type independently across API instances.
+- [Reconciliation event ordering](reconciliation-event-ordering.md) — order shared run events by when a pass starts, so older work finishing late cannot hide newer coordination state.
 - [Commitment exposure accounting](commitment-exposure-accounting.md) — receipts track physical progress; only posted vendor invoices move financial exposure from commitment to actual.
 - [Competency versus authorization](competency-versus-authorization.md) — professional SKKNI/SKKK evidence never grants ERP permissions automatically; authorization remains explicit and project-scoped.

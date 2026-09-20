@@ -1597,6 +1597,7 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     assert.deepEqual(competingEvents, ["RUNNING", "SKIPPED"]);
     const healthAfterSkip = await getInvitationReconciliationHealth();
     assert.equal(healthAfterSkip.lastRun.outcome, "SKIPPED");
+    const skippedAt = healthAfterSkip.lastRun.occurredAt;
     assert.equal(healthAfterSkip.status, "DEGRADED");
     assert.equal(healthAfterSkip.completionOverdue, true);
     assert.equal(alerts[0]?.type, "DEGRADED");
@@ -1610,7 +1611,8 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     const completedFirstRun = await firstRun;
     assert.equal(completedFirstRun.skipped, false);
     const healthAfterCompletion = await getInvitationReconciliationHealth();
-    assert.equal(healthAfterCompletion.lastRun.outcome, "COMPLETED");
+    assert.equal(healthAfterCompletion.lastRun.outcome, "SKIPPED");
+    assert.equal(healthAfterCompletion.lastRun.occurredAt, skippedAt);
     assert.equal(healthAfterCompletion.consecutiveFailures, healthBeforeSkip.consecutiveFailures);
 
     const nextRun = await runScheduledInvitationReconciliation({

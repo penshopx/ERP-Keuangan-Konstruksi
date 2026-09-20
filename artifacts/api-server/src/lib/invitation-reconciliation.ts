@@ -312,13 +312,13 @@ async function persistSharedReconciliationSuccess(at: Date) {
 
 async function persistSharedReconciliationCompletion(
   event: Extract<InvitationReconciliationRunEvent, { outcome: "COMPLETED" }>,
+  completedAt: Date,
 ) {
-  const occurredAt = new Date(event.occurredAt);
   await ensureSharedReconciliationState();
   await db.update(invitationReconciliationStateTable).set({
     lastCompletedAt: sql`greatest(
       ${invitationReconciliationStateTable.lastCompletedAt},
-      ${occurredAt}
+      ${completedAt}
     )`,
     updatedAt: new Date(),
   }).where(eq(
@@ -577,16 +577,20 @@ export async function runScheduledInvitationReconciliation(
   }
   const completedEvent: InvitationReconciliationRunEvent = {
     outcome: "COMPLETED",
-    occurredAt: new Date().toISOString(),
+    occurredAt: runningEvent.occurredAt,
     ...result.value,
   };
+  const completedAt = new Date();
   reconciliationHealth = { ...reconciliationHealth, lastRun: completedEvent };
-  recordReconciliationCompletion(completedEvent.occurredAt);
-  await persistSharedReconciliationCompletion(completedEvent);
+  recordReconciliationCompletion(completedAt.toISOString());
+  await persistSharedReconciliationCompletion(completedEvent, completedAt);
   if (dependencies.alerting) {
-    evaluateReconciliationCompletionFreshness(
-      dependencies.alerting.completionStaleAfterMs,
-    );
+    reconciliationHealth = {
+      ...reconciliationHealth,
+      status: reconciliationHealth.consecutiveFailures > 0 ? "DEGRADED" : "HEALTHY",
+      completionOverdue: false,
+      completionStaleAfterMs: dependencies.alerting.completionStaleAfterMs,
+    };
   }
   dependencies.onRunEvent?.(completedEvent);
   await updateInvitationReconciliationAlert(
@@ -628,6 +632,7 @@ export function schedulePendingInvitationReconciliation(
       return;
     }
     running = true;
+    const runStartedAt = new Date().toISOString();
     activeRun = (async () => {
       try {
         await runScheduledInvitationReconciliation(dependencies);
@@ -635,7 +640,7 @@ export function schedulePendingInvitationReconciliation(
         recordReconciliationFailure();
         const failedEvent: InvitationReconciliationRunEvent = {
           outcome: "FAILED",
-          occurredAt: new Date().toISOString(),
+          occurredAt: runStartedAt,
         };
         reconciliationHealth = { ...reconciliationHealth, lastRun: failedEvent };
         await persistSharedReconciliationFailure(new Date(failedEvent.occurredAt));
