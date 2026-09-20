@@ -26,6 +26,7 @@ const requiredMigrations = [
   "0013_add_estimator_workbench.sql",
   "0014_neutralize_competency_reference_labels.sql",
   "0015_share_reconciliation_alert_incidents.sql",
+  "0016_record_operational_alert_delivery.sql",
 ];
 const expectedTables = [
   "actual_cost_allocations",
@@ -47,6 +48,7 @@ const expectedTables = [
   "material_variance_exceptions",
   "material_waste_tolerance_versions",
   "materials",
+  "operational_alert_delivery_status",
   "operational_state",
   "petty_cash_expenses",
   "petty_cash_policy_versions",

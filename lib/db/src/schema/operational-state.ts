@@ -13,6 +13,16 @@ export const operationalStateTable = pgTable("operational_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const operationalAlertDeliveryStatusTable = pgTable(
+  "operational_alert_delivery_status",
+  {
+    source: text("source").primaryKey(),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }).notNull(),
+    lastResult: text("last_result").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
 export const invitationReconciliationStateTable = pgTable(
   "invitation_reconciliation_state",
   {

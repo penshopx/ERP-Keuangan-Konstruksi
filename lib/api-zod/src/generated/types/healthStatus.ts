@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { HealthStatusInvitationReconciliation } from './healthStatusInvitationReconciliation';
+import type { HealthStatusOperationalAlertsItem } from './healthStatusOperationalAlertsItem';
 import type { HealthStatusStatus } from './healthStatusStatus';
 
 export interface HealthStatus {
   status: HealthStatusStatus;
   invitationReconciliation: HealthStatusInvitationReconciliation;
+  operationalAlerts: HealthStatusOperationalAlertsItem[];
 }

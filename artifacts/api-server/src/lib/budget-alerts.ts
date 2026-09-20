@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { sendOperationalAlert, resolveOperationalAlertConfig } from "@workspace/db/operational-alert";
 import { logger } from "./logger";
+import { recordOperationalAlertDeliveryStatus } from "./operational-alert-status";
 
 type Access = { role?: string; assignedProjectIds?: string[] };
 type AlertType = "PROJECTED_EXPOSURE" | "ESTIMATE_AT_COMPLETION";
@@ -41,6 +42,7 @@ async function notify(alert: { id: string; projectId: string; detail: string; se
       alert: { source: "budget-control", event: "BUDGET_ALERT", severity: alert.severity === "info" ? "info" : "error", message: alert.detail, projectId: alert.projectId, alertId: alert.id },
       config: resolveOperationalAlertConfig(),
       log: logger,
+      recordDeliveryStatus: recordOperationalAlertDeliveryStatus,
     });
     if (!result.delivered && result.reason !== "not_configured") await audit(alert.id, "ALERT_DELIVERY_GAGAL", `Pengiriman kanal operasional gagal: ${result.reason}`, alert.projectId);
   } catch (error) {

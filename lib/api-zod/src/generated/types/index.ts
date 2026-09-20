@@ -59,6 +59,8 @@ export * from './healthStatus';
 export * from './healthStatusInvitationReconciliation';
 export * from './healthStatusInvitationReconciliationLastRun';
 export * from './healthStatusInvitationReconciliationStatus';
+export * from './healthStatusOperationalAlertsItem';
+export * from './healthStatusOperationalAlertsItemLastResult';
 export * from './healthStatusStatus';
 export * from './inventoryMovement';
 export * from './inventoryMovementInput';

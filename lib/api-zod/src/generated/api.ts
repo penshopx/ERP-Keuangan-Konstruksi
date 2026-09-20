@@ -53,7 +53,12 @@ export const HealthCheckResponse = zod.object({
   "updated": zod.number().int().min(healthCheckResponseInvitationReconciliationLastRunFourUpdatedMin),
   "failed": zod.number().int().min(healthCheckResponseInvitationReconciliationLastRunFourFailedMin)
 })])
-})
+}),
+  "operationalAlerts": zod.array(zod.object({
+  "source": zod.string(),
+  "lastAttemptAt": zod.coerce.date(),
+  "lastResult": zod.enum(['DELIVERED', 'NOT_CONFIGURED', 'DELIVERY_FAILED'])
+}))
 })
 
 

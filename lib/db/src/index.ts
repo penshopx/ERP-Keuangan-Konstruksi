@@ -96,6 +96,7 @@ const REQUIRED_MIGRATIONS = [
   "0010_add_commitment_ledger.sql",
   "0011_add_budget_alerts.sql",
   "0015_share_reconciliation_alert_incidents.sql",
+  "0016_record_operational_alert_delivery.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -120,6 +121,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     pending_resend_compensation_index: boolean;
     commitment_ledger_shape: boolean;
     budget_alerts_shape: boolean;
+    operational_alert_delivery_status_shape: boolean;
   }>(`
     SELECT
       EXISTS (
@@ -215,7 +217,25 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
       (
         to_regclass('budget_alert_thresholds') IS NOT NULL
         AND to_regclass('budget_alerts') IS NOT NULL
-      ) AS budget_alerts_shape
+      ) AS budget_alerts_shape,
+      (
+        SELECT count(*) = 4
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'operational_alert_delivery_status'
+          AND (
+            (
+              column_name IN ('source', 'last_result')
+              AND data_type = 'text'
+              AND is_nullable = 'NO'
+            )
+            OR (
+              column_name IN ('last_attempt_at', 'updated_at')
+              AND data_type = 'timestamp with time zone'
+              AND is_nullable = 'NO'
+            )
+          )
+      ) AS operational_alert_delivery_status_shape
   `);
 
   const status = result.rows[0];
@@ -230,6 +250,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     !status.pending_resend_compensation_index
     || !status.commitment_ledger_shape
     || !status.budget_alerts_shape
+    || !status.operational_alert_delivery_status_shape
   ) {
     throw new Error(
       `Mandatory database migrations ${REQUIRED_MIGRATIONS.join(", ")} are not fully applied. ` +

@@ -15,6 +15,7 @@ import {
   sendOperationalAlert,
 } from "@workspace/db/operational-alert";
 import { logRabImportLockTimeout } from "./lib/rab-import-config";
+import { recordOperationalAlertDeliveryStatus } from "./lib/operational-alert-status";
 
 const rawPort = process.env["PORT"];
 
@@ -72,6 +73,7 @@ async function sendInvitationReconciliationAlert(
         : "Rekonsiliasi undangan telah pulih",
       ...alert,
     },
+    recordDeliveryStatus: recordOperationalAlertDeliveryStatus,
   });
   if (!result.delivered && result.reason === "delivery_failed") throw result.error;
 }

@@ -987,9 +987,27 @@ components:
             - completionOverdue
             - completionStaleAfterMs
             - lastRun
+        operationalAlerts:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              lastAttemptAt:
+                type: string
+                format: date-time
+              lastResult:
+                type: string
+                enum: [DELIVERED, NOT_CONFIGURED, DELIVERY_FAILED]
+            required:
+              - source
+              - lastAttemptAt
+              - lastResult
       required:
         - status
         - invitationReconciliation
+        - operationalAlerts
     DashboardSummary:
       type: object
       required: [activeProjects, portfolioValue, committedCost, cashPosition, budgetUtilization, alerts, cashflow]

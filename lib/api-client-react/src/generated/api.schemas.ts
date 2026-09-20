@@ -64,9 +64,25 @@ export type HealthStatusInvitationReconciliation = {
   lastRun: HealthStatusInvitationReconciliationLastRun;
 };
 
+export type HealthStatusOperationalAlertsItemLastResult = typeof HealthStatusOperationalAlertsItemLastResult[keyof typeof HealthStatusOperationalAlertsItemLastResult];
+
+
+export const HealthStatusOperationalAlertsItemLastResult = {
+  DELIVERED: 'DELIVERED',
+  NOT_CONFIGURED: 'NOT_CONFIGURED',
+  DELIVERY_FAILED: 'DELIVERY_FAILED',
+} as const;
+
+export type HealthStatusOperationalAlertsItem = {
+  source: string;
+  lastAttemptAt: string;
+  lastResult: HealthStatusOperationalAlertsItemLastResult;
+};
+
 export interface HealthStatus {
   status: HealthStatusStatus;
   invitationReconciliation: HealthStatusInvitationReconciliation;
+  operationalAlerts: HealthStatusOperationalAlertsItem[];
 }
 
 export interface Alert {
