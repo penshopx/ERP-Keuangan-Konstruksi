@@ -23,7 +23,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const roles = ["DIRECTOR", "PROJECT_MANAGER", "SITE_MANAGER", "FINANCE", "TAX_STAFF", "PROCUREMENT"] as const;
+const roles = ["DIRECTOR", "PROJECT_MANAGER", "SITE_MANAGER", "FINANCE", "TAX_STAFF", "PROCUREMENT", "JURU_HITUNG", "ESTIMATOR", "QUANTITY_SURVEYOR"] as const;
+
+const roleLabels: Record<typeof roles[number], string> = {
+  DIRECTOR: "Direktur (Eksekutif)",
+  PROJECT_MANAGER: "Manajer Proyek (PM)",
+  SITE_MANAGER: "Manajer Lapangan (SM)",
+  FINANCE: "Keuangan (Pusat)",
+  TAX_STAFF: "Staf Pajak",
+  PROCUREMENT: "Pengadaan (Procurement)",
+  JURU_HITUNG: "Juru Hitung (Field)",
+  ESTIMATOR: "Estimator (RAB/AHS)",
+  QUANTITY_SURVEYOR: "Quantity Surveyor (QS)",
+};
 
 function formatVerificationTime(value: string) {
   return new Intl.DateTimeFormat("id-ID", {
@@ -83,7 +95,7 @@ function InvitationRow({ invite }: { invite: AccessInvitation }) {
   return <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
     <div>
       <p className="font-medium">{invite.displayName}</p>
-      <p className="text-sm text-muted-foreground">{invite.email} · {invite.role.replaceAll("_", " ")}</p>
+      <p className="text-sm text-muted-foreground">{invite.email} · {roleLabels[invite.role as keyof typeof roleLabels]}</p>
       {invite.status === "ACCEPTED" && <p className="mt-1 text-xs text-muted-foreground">
         {invite.acceptedEmail
           ? `Diterima menggunakan ${invite.acceptedEmail}`
@@ -130,7 +142,7 @@ function InviteCard({ projects }: { projects: Project[] }) {
   const toggle = (id: string) => setAssigned((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   const submit = () => {
     setMessage("");
-    create.mutate({ data: { email, displayName, role, assignedProjectIds: role === "PROJECT_MANAGER" ? assigned : [] } }, {
+    create.mutate({ data: { email, displayName, role, assignedProjectIds: ["PROJECT_MANAGER", "JURU_HITUNG", "ESTIMATOR", "QUANTITY_SURVEYOR"].includes(role) ? assigned : [] } }, {
       onSuccess: () => {
         setEmail(""); setDisplayName(""); setAssigned([]);
         setMessage("Undangan berhasil dikirim.");
@@ -142,8 +154,8 @@ function InviteCard({ projects }: { projects: Project[] }) {
   return <Card><CardHeader><CardTitle className="text-base">Undang staf baru</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
     <div className="space-y-2"><Label>Nama staf</Label><Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Nama lengkap" /></div>
     <div className="space-y-2"><Label>Email kerja</Label><Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nama@perusahaan.com" /></div>
-    <div className="space-y-2"><Label>Jabatan</Label><Select value={role} onValueChange={(value) => setRole(value as typeof role)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((item) => <SelectItem key={item} value={item}>{item.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></div>
-    <div className="space-y-2"><Label>Proyek PM</Label><div className="flex min-h-10 flex-wrap items-center gap-3">{role === "PROJECT_MANAGER" ? projects.map((project) => <label key={project.id} className="flex items-center gap-2 text-sm"><Checkbox checked={assigned.includes(project.id)} onCheckedChange={() => toggle(project.id)} />{project.code}</label>) : <span className="text-sm text-muted-foreground">Hanya diperlukan untuk Project Manager</span>}</div></div>
+    <div className="space-y-2"><Label>Jabatan</Label><Select value={role} onValueChange={(value) => setRole(value as typeof role)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((item) => <SelectItem key={item} value={item}>{roleLabels[item as keyof typeof roleLabels]}</SelectItem>)}</SelectContent></Select></div>
+    <div className="space-y-2"><Label>Proyek penugasan</Label><div className="flex min-h-10 flex-wrap items-center gap-3">{["PROJECT_MANAGER", "JURU_HITUNG", "ESTIMATOR", "QUANTITY_SURVEYOR"].includes(role) ? projects.map((project) => <label key={project.id} className="flex items-center gap-2 text-sm"><Checkbox checked={assigned.includes(project.id)} onCheckedChange={() => toggle(project.id)} />{project.code}</label>) : <span className="text-sm text-muted-foreground">Tidak diperlukan untuk jabatan ini</span>}</div></div>
     <div className="flex items-center gap-3 md:col-span-2"><Button disabled={create.isPending || !displayName.trim() || !email.includes("@")} onClick={submit}>{create.isPending ? "Mengirim..." : "Kirim undangan"}</Button>{message && <p className="text-sm text-muted-foreground">{message}</p>}</div>
   </CardContent></Card>;
 }
@@ -157,8 +169,8 @@ function AccessCard({ user, projects }: { user: AccessUser, projects: Project[] 
   const toggle = (id: string) => setAssigned((current: string[]) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   return <Card><CardHeader><CardTitle className="text-base">{user.displayName}</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-[1fr_1fr_2fr_auto] md:items-end">
     <div className="space-y-2"><Label>Nama</Label><Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></div>
-    <div className="space-y-2"><Label>Jabatan</Label><Select value={role} onValueChange={(value) => setRole(value as typeof role)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((item) => <SelectItem key={item} value={item}>{item.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></div>
-    <div className="space-y-2"><Label>Proyek PM</Label><div className="flex flex-wrap gap-3">{projects.map((project) => <label key={project.id} className="flex items-center gap-2 text-sm"><Checkbox checked={assigned.includes(project.id)} onCheckedChange={() => toggle(project.id)} />{project.code}</label>)}</div></div>
-    <Button disabled={update.isPending || !displayName.trim()} onClick={() => update.mutate({ userId: user.userId, data: { displayName, role, assignedProjectIds: role === "PROJECT_MANAGER" ? assigned : [] } }, { onSuccess: () => client.invalidateQueries({ queryKey: getListAccessUsersQueryKey() }) })}>Simpan</Button>
+    <div className="space-y-2"><Label>Jabatan</Label><Select value={role} onValueChange={(value) => setRole(value as typeof role)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((item) => <SelectItem key={item} value={item}>{roleLabels[item as keyof typeof roleLabels]}</SelectItem>)}</SelectContent></Select></div>
+     <div className="space-y-2"><Label>Proyek penugasan</Label><div className="flex flex-wrap gap-3">{["PROJECT_MANAGER", "JURU_HITUNG", "ESTIMATOR", "QUANTITY_SURVEYOR"].includes(role) ? projects.map((project) => <label key={project.id} className="flex items-center gap-2 text-sm"><Checkbox checked={assigned.includes(project.id)} onCheckedChange={() => toggle(project.id)} />{project.code}</label>) : <span className="text-sm text-muted-foreground">Tidak diperlukan untuk jabatan ini</span>}</div></div>
+     <Button disabled={update.isPending || !displayName.trim()} onClick={() => update.mutate({ userId: user.userId, data: { displayName, role, assignedProjectIds: ["PROJECT_MANAGER", "JURU_HITUNG", "ESTIMATOR", "QUANTITY_SURVEYOR"].includes(role) ? assigned : [] } }, { onSuccess: () => client.invalidateQueries({ queryKey: getListAccessUsersQueryKey() }) })}>Simpan</Button>
   </CardContent></Card>;
 }

@@ -12,6 +12,7 @@ import aiControlPlaneRouter from "./ai-control-plane";
 import pettyCashRouter from "./petty-cash";
 import commitmentsRouter from "./commitments";
 import materialReconciliationRouter from "./material-reconciliation";
+import estimatorWorkbenchRouter from "./estimator-workbench";
 
 export function createApiRouter(
   accessMiddleware: RequestHandler = requireAccess,
@@ -31,6 +32,7 @@ export function createApiRouter(
   router.use(pettyCashRouter);
   router.use(commitmentsRouter);
   router.use(materialReconciliationRouter);
+  router.use(estimatorWorkbenchRouter);
   router.use(rabTemplatesRouter);
   router.use(taxRouter);
   router.use(aiControlPlaneRouter);

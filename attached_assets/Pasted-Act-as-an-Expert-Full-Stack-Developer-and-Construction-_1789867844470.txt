@@ -1,0 +1,42 @@
+Act as an Expert Full-Stack Developer and Construction ERP Architect. 
+
+**CONTEXT:**
+We are building a Construction ERP module that collaborates with professional Estimator/Quantity Surveyor (QS) workflows based on Indonesian SKKNI standards. The system must move away from static Excel calculations to a dynamic, relational, and auditable database system.
+
+**REFERENCE FILES PROVIDED:**
+1. `RAB Lengkap dengan Time Schedule.xls` / `Zfile_backup...xls`: Contains the ground truth for Dynamic AHS (Analisa Harga Satuan), Volume, Unit Prices, and Material Take-Off (MTO) aggregation.
+2. `MUSHOLA.pdf`: Architectural and structural drawings (e.g., Denah Pondasi, Detail Kolom 15x20, Sloof) that serve as the source of truth for volume calculations.
+
+**OBJECTIVE:**
+Implement the foundational "Dynamic RAB & Estimator Collaboration Engine" with the following core features:
+
+**1. Dynamic AHS Engine (No Hardcoded Prices):**
+- Create a relational structure where `RAB_Item_Price` is NOT a static number.
+- Formula: `Total Price = Volume * SUM(Material_Coefficient * Master_Material_Price + Labor_Coefficient * Master_Labor_Price)`.
+- Example: For "Pasangan Pondasi Batu Kali 1m3", it must pull coefficients (e.g., 1.1 m3 Batu Kali, 4.04 zak Semen) from an `AHS_Coefficients` table and multiply them by the current `Master_Price`.
+
+**2. Automated Material Take-Off (MTO) Aggregation:**
+- Implement a function/query that aggregates all materials required for a project, similar to the "Volume Kebutuhan Material Keseluruhan" sheet in the Excel file.
+- Include a configurable `waste_factor` (e.g., +3% for steel, +5% for ceramics) at the material category level.
+
+**3. Drawing-to-RAB Traceability (Audit Trail):**
+- Add a feature allowing an Estimator to link a specific RAB line item to a source document. 
+- Example: Link "Pekerjaan Pondasi Batu Kali" to `MUSHOLA.pdf` (Page/Section: Denah Rencana Pondasi).
+
+**4. SKKNI Role-Based Validation Workflow:**
+- Simulate basic RBAC (Role-Based Access Control) for the RAB creation process:
+  - `Juru Hitung (Level 4-5)`: Can input/edit `Volume` and select `AHS_Template`.
+  - `QS Madya (Level 5-6)`: Can validate/adjust `Coefficients` and approve the MTO.
+  - `Ahli QS (Level 7+)`: Final approval and locking of the RAB version.
+
+**TECHNICAL REQUIREMENTS:**
+- Use a relational database schema (e.g., Prisma ORM with PostgreSQL or standard SQL).
+- Ensure data types are precise (DECIMAL for currency and coefficients).
+- Write clean, modular code with comments explaining the construction logic.
+
+**EXPECTED OUTPUT (Step-by-Step):**
+1. **Database Schema**: Provide the Prisma schema (or SQL) for `MasterMaterial`, `MasterLabor`, `AHSTemplate`, `AHS_Coefficient`, `Project`, and `RAB_Item`.
+2. **Core Logic**: Write a TypeScript/JavaScript function that calculates the dynamic price of a single RAB item based on the formula above, including the waste factor.
+3. **Next Steps**: Ask me for clarification on any specific SKKNI validation rules or UI requirements before proceeding to the next module.
+
+Start by generating the Database Schema and the Dynamic Pricing Calculation function.

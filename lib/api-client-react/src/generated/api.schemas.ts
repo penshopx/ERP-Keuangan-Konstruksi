@@ -996,6 +996,202 @@ export interface Activity {
   tone: string;
 }
 
+export type CompetencyCatalogEntrySchemeType = typeof CompetencyCatalogEntrySchemeType[keyof typeof CompetencyCatalogEntrySchemeType];
+
+
+export const CompetencyCatalogEntrySchemeType = {
+  SKKNI: 'SKKNI',
+  SKKK: 'SKKK',
+  SKKI: 'SKKI',
+} as const;
+
+export type CompetencyCatalogEntryValidityStatus = typeof CompetencyCatalogEntryValidityStatus[keyof typeof CompetencyCatalogEntryValidityStatus];
+
+
+export const CompetencyCatalogEntryValidityStatus = {
+  REFERENCE_ONLY: 'REFERENCE_ONLY',
+  VERIFIED: 'VERIFIED',
+  EXPIRED: 'EXPIRED',
+  REVOKED: 'REVOKED',
+} as const;
+
+export interface CompetencyCatalogEntry {
+  id: string;
+  schemeCode: string;
+  schemeType: CompetencyCatalogEntrySchemeType;
+  occupation: string;
+  title: string;
+  /**
+     * @minimum 1
+     * @maximum 9
+     */
+  level: number;
+  sourceUrl: string;
+  validityStatus: CompetencyCatalogEntryValidityStatus;
+  /** @nullable */
+  effectiveFrom?: string | null;
+  /** @nullable */
+  effectiveTo?: string | null;
+}
+
+export type UserCompetencyProfileVerificationStatus = typeof UserCompetencyProfileVerificationStatus[keyof typeof UserCompetencyProfileVerificationStatus];
+
+
+export const UserCompetencyProfileVerificationStatus = {
+  UNVERIFIED: 'UNVERIFIED',
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface UserCompetencyProfile {
+  id: string;
+  userId: string;
+  catalogEntryId: string;
+  verificationStatus: UserCompetencyProfileVerificationStatus;
+  /** @nullable */
+  certificateReference: string | null;
+  /** @nullable */
+  effectiveFrom: string | null;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  verifiedBy: string | null;
+  /** @nullable */
+  verifiedAt: string | null;
+}
+
+export type UserCompetencyProfileInputVerificationStatus = typeof UserCompetencyProfileInputVerificationStatus[keyof typeof UserCompetencyProfileInputVerificationStatus];
+
+
+export const UserCompetencyProfileInputVerificationStatus = {
+  UNVERIFIED: 'UNVERIFIED',
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface UserCompetencyProfileInput {
+  catalogEntryId: string;
+  verificationStatus: UserCompetencyProfileInputVerificationStatus;
+  /** @nullable */
+  certificateReference?: string | null;
+  /** @nullable */
+  effectiveFrom?: string | null;
+  /** @nullable */
+  expiresAt?: string | null;
+}
+
+export type AhsComponentResourceKind = typeof AhsComponentResourceKind[keyof typeof AhsComponentResourceKind];
+
+
+export const AhsComponentResourceKind = {
+  MATERIAL: 'MATERIAL',
+  LABOR: 'LABOR',
+  EQUIPMENT: 'EQUIPMENT',
+} as const;
+
+export interface AhsComponent {
+  id: string;
+  resourceKind: AhsComponentResourceKind;
+  resourceCode: string;
+  resourceName: string;
+  unit: string;
+  /** @minimum 1 */
+  coefficientMicros: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  wasteBasisPoints: number;
+}
+
+export type AhsTemplateStatus = typeof AhsTemplateStatus[keyof typeof AhsTemplateStatus];
+
+
+export const AhsTemplateStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  RETIRED: 'RETIRED',
+} as const;
+
+export interface AhsTemplate {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  /** @minimum 1 */
+  version: number;
+  status: AhsTemplateStatus;
+  sourceNote: string;
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo: string | null;
+  components: AhsComponent[];
+}
+
+export interface EstimatePreviewInput {
+  templateId: string;
+  effectiveDate: string;
+  /** @minimum 1 */
+  volumeBasisPoints: number;
+}
+
+export type EstimatePreviewFormulaSnapshot = { [key: string]: unknown };
+
+export type EstimatePreviewStatus = typeof EstimatePreviewStatus[keyof typeof EstimatePreviewStatus];
+
+
+export const EstimatePreviewStatus = {
+  PREVIEW: 'PREVIEW',
+  APPROVED: 'APPROVED',
+  USED: 'USED',
+} as const;
+
+export interface EstimatePreview {
+  id: string;
+  projectId: string;
+  templateId: string;
+  effectiveDate: string;
+  /** @minimum 1 */
+  volumeBasisPoints: number;
+  /** @minimum 0 */
+  unitPriceRupiah: number;
+  /** @minimum 0 */
+  totalBudgetRupiah: number;
+  formulaSnapshot: EstimatePreviewFormulaSnapshot;
+  status: EstimatePreviewStatus;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface EstimateBaselineInput {
+  previewId: string;
+  /** @minimum 1 */
+  expectedLatestVersion: number;
+}
+
+export type RabTransitionInputDecision = typeof RabTransitionInputDecision[keyof typeof RabTransitionInputDecision];
+
+
+export const RabTransitionInputDecision = {
+  SUBMIT: 'SUBMIT',
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT',
+} as const;
+
+export interface RabTransitionInput {
+  baselineId: string;
+  decision: RabTransitionInputDecision;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  note?: string | null;
+}
+
 export type CurrentUserRole = typeof CurrentUserRole[keyof typeof CurrentUserRole];
 
 
@@ -1006,6 +1202,9 @@ export const CurrentUserRole = {
   FINANCE: 'FINANCE',
   TAX_STAFF: 'TAX_STAFF',
   PROCUREMENT: 'PROCUREMENT',
+  JURU_HITUNG: 'JURU_HITUNG',
+  ESTIMATOR: 'ESTIMATOR',
+  QUANTITY_SURVEYOR: 'QUANTITY_SURVEYOR',
 } as const;
 
 export interface CurrentUser {
@@ -1041,6 +1240,9 @@ export const AccessUserRole = {
   FINANCE: 'FINANCE',
   TAX_STAFF: 'TAX_STAFF',
   PROCUREMENT: 'PROCUREMENT',
+  JURU_HITUNG: 'JURU_HITUNG',
+  ESTIMATOR: 'ESTIMATOR',
+  QUANTITY_SURVEYOR: 'QUANTITY_SURVEYOR',
 } as const;
 
 export interface AccessUser {
@@ -1060,6 +1262,9 @@ export const AccessUserUpdateRole = {
   FINANCE: 'FINANCE',
   TAX_STAFF: 'TAX_STAFF',
   PROCUREMENT: 'PROCUREMENT',
+  JURU_HITUNG: 'JURU_HITUNG',
+  ESTIMATOR: 'ESTIMATOR',
+  QUANTITY_SURVEYOR: 'QUANTITY_SURVEYOR',
 } as const;
 
 export interface AccessUserUpdate {
@@ -1079,6 +1284,9 @@ export const AccessInvitationRole = {
   FINANCE: 'FINANCE',
   TAX_STAFF: 'TAX_STAFF',
   PROCUREMENT: 'PROCUREMENT',
+  JURU_HITUNG: 'JURU_HITUNG',
+  ESTIMATOR: 'ESTIMATOR',
+  QUANTITY_SURVEYOR: 'QUANTITY_SURVEYOR',
 } as const;
 
 export type AccessInvitationStatus = typeof AccessInvitationStatus[keyof typeof AccessInvitationStatus];
@@ -1136,6 +1344,9 @@ export const AccessInvitationInputRole = {
   FINANCE: 'FINANCE',
   TAX_STAFF: 'TAX_STAFF',
   PROCUREMENT: 'PROCUREMENT',
+  JURU_HITUNG: 'JURU_HITUNG',
+  ESTIMATOR: 'ESTIMATOR',
+  QUANTITY_SURVEYOR: 'QUANTITY_SURVEYOR',
 } as const;
 
 export interface AccessInvitationInput {
@@ -1149,6 +1360,10 @@ export interface AccessInvitationInput {
 export type ListProjectsParams = {
 status?: string;
 search?: string;
+};
+
+export type ListAhsTemplatesParams = {
+effectiveDate?: string;
 };
 
 export type ListInvoicesParams = {

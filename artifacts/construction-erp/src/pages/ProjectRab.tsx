@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImportTemplateSheet } from "@/components/rab/ImportTemplateSheet"
 import { ProjectCommitments } from "@/components/rab/ProjectCommitments"
 import { MaterialReconciliation } from "@/components/rab/MaterialReconciliation"
+import { EstimatorWorkbench } from "@/components/rab/EstimatorWorkbench"
 
 export default function ProjectRab() {
   const { id } = useParams()
@@ -346,6 +347,7 @@ export default function ProjectRab() {
        <Tabs defaultValue={highlightedCommitment ? "commitments" : "wbs"} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="wbs" data-testid="tab-wbs">Item RAB (WBS)</TabsTrigger>
+          <TabsTrigger value="estimator" data-testid="tab-estimator">Estimator & AHS</TabsTrigger>
           <TabsTrigger value="commitments" data-testid="tab-commitments">Komitmen (PO/SPK)</TabsTrigger>
           <TabsTrigger value="material" data-testid="tab-material">Rekonsiliasi Material</TabsTrigger>
         </TabsList>
@@ -419,6 +421,10 @@ export default function ProjectRab() {
 
         <TabsContent value="commitments" className="m-0">
           <ProjectCommitments projectId={projectId} rabVersion={selectedVersion} highlightedCommitmentId={highlightedCommitment} />
+        </TabsContent>
+
+        <TabsContent value="estimator" className="m-0">
+          <EstimatorWorkbench projectId={projectId} baselineId={rab.baselineId} rabVersion={rab.version} rabStatus={rab.status} isHistorical={isHistorical} />
         </TabsContent>
 
         <TabsContent value="material" className="m-0">

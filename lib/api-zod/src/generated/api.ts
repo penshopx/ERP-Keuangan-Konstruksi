@@ -451,6 +451,228 @@ export const ImportProjectRabTemplateResponse = zod.object({
 
 
 /**
+ * @summary List referenced competency scheme entries
+ */
+export const listCompetencyCatalogResponseLevelMax = 9;
+
+
+
+export const ListCompetencyCatalogResponseItem = zod.object({
+  "id": zod.string(),
+  "schemeCode": zod.string(),
+  "schemeType": zod.enum(['SKKNI', 'SKKK', 'SKKI']),
+  "occupation": zod.string(),
+  "title": zod.string(),
+  "level": zod.number().int().min(1).max(listCompetencyCatalogResponseLevelMax),
+  "sourceUrl": zod.string().url(),
+  "validityStatus": zod.enum(['REFERENCE_ONLY', 'VERIFIED', 'EXPIRED', 'REVOKED']),
+  "effectiveFrom": zod.coerce.date().nullish(),
+  "effectiveTo": zod.coerce.date().nullish()
+})
+export const ListCompetencyCatalogResponse = zod.array(ListCompetencyCatalogResponseItem)
+
+
+/**
+ * @summary Get a user's professional competency profile
+ */
+export const GetCompetencyProfileParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const GetCompetencyProfileResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "catalogEntryId": zod.string(),
+  "verificationStatus": zod.enum(['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED', 'EXPIRED']),
+  "certificateReference": zod.string().nullable(),
+  "effectiveFrom": zod.coerce.date().nullable(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "verifiedBy": zod.string().nullable(),
+  "verifiedAt": zod.coerce.date().nullable()
+})
+export const GetCompetencyProfileResponse = zod.array(GetCompetencyProfileResponseItem)
+
+
+/**
+ * @summary Add or update a user's competency profile
+ */
+export const UpdateCompetencyProfileParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const UpdateCompetencyProfileBody = zod.object({
+  "catalogEntryId": zod.string(),
+  "verificationStatus": zod.enum(['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED', 'EXPIRED']),
+  "certificateReference": zod.string().nullish(),
+  "effectiveFrom": zod.coerce.date().nullish(),
+  "expiresAt": zod.coerce.date().nullish()
+})
+
+export const UpdateCompetencyProfileResponse = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "catalogEntryId": zod.string(),
+  "verificationStatus": zod.enum(['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED', 'EXPIRED']),
+  "certificateReference": zod.string().nullable(),
+  "effectiveFrom": zod.coerce.date().nullable(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "verifiedBy": zod.string().nullable(),
+  "verifiedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary List versioned AHS templates effective on a date
+ */
+export const ListAhsTemplatesQueryParams = zod.object({
+  "effectiveDate": zod.date().optional()
+})
+
+
+
+export const listAhsTemplatesResponseComponentsItemWasteBasisPointsMin = 0;
+export const listAhsTemplatesResponseComponentsItemWasteBasisPointsMax = 10000;
+
+
+
+export const ListAhsTemplatesResponseItem = zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "unit": zod.string(),
+  "version": zod.number().int().min(1),
+  "status": zod.enum(['DRAFT', 'ACTIVE', 'RETIRED']),
+  "sourceNote": zod.string(),
+  "effectiveFrom": zod.coerce.date(),
+  "effectiveTo": zod.coerce.date().nullable(),
+  "components": zod.array(zod.object({
+  "id": zod.string(),
+  "resourceKind": zod.enum(['MATERIAL', 'LABOR', 'EQUIPMENT']),
+  "resourceCode": zod.string(),
+  "resourceName": zod.string(),
+  "unit": zod.string(),
+  "coefficientMicros": zod.number().int().min(1),
+  "wasteBasisPoints": zod.number().int().min(listAhsTemplatesResponseComponentsItemWasteBasisPointsMin).max(listAhsTemplatesResponseComponentsItemWasteBasisPointsMax)
+}))
+})
+export const ListAhsTemplatesResponse = zod.array(ListAhsTemplatesResponseItem)
+
+
+/**
+ * @summary Calculate a deterministic AHS estimate from effective resource prices
+ */
+export const PreviewRabEstimateParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+
+export const PreviewRabEstimateBody = zod.object({
+  "templateId": zod.string(),
+  "effectiveDate": zod.coerce.date(),
+  "volumeBasisPoints": zod.number().int().min(1)
+})
+
+
+export const previewRabEstimateResponseUnitPriceRupiahMin = 0;
+
+export const previewRabEstimateResponseTotalBudgetRupiahMin = 0;
+
+
+
+export const PreviewRabEstimateResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "templateId": zod.string(),
+  "effectiveDate": zod.coerce.date(),
+  "volumeBasisPoints": zod.number().int().min(1),
+  "unitPriceRupiah": zod.number().int().min(previewRabEstimateResponseUnitPriceRupiahMin),
+  "totalBudgetRupiah": zod.number().int().min(previewRabEstimateResponseTotalBudgetRupiahMin),
+  "formulaSnapshot": zod.record(zod.string(), zod.unknown()),
+  "status": zod.enum(['PREVIEW', 'APPROVED', 'USED']),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Create an existing RAB draft baseline from an approved preview
+ */
+export const CreateRabEstimateBaselineParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+
+export const CreateRabEstimateBaselineBody = zod.object({
+  "previewId": zod.string(),
+  "expectedLatestVersion": zod.number().int().min(1)
+})
+
+export const CreateRabEstimateBaselineResponse = zod.object({
+  "projectId": zod.string(),
+  "baselineId": zod.string(),
+  "version": zod.number().int(),
+  "status": zod.string(),
+  "totalBudget": zod.number(),
+  "committed": zod.number(),
+  "remainingCommitment": zod.number(),
+  "actual": zod.number(),
+  "availableBudget": zod.number(),
+  "remaining": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "parentCode": zod.string().nullish(),
+  "level": zod.number().int(),
+  "unit": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "materialCost": zod.number(),
+  "laborCost": zod.number(),
+  "equipmentCost": zod.number(),
+  "budget": zod.number(),
+  "committed": zod.number(),
+  "actual": zod.number(),
+  "remainingCommitment": zod.number().optional(),
+  "availableBudget": zod.number().optional(),
+  "variance": zod.number(),
+  "utilization": zod.number(),
+  "costCodeId": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Submit, approve, or reject an RAB baseline
+ */
+export const TransitionRabBaselineParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const transitionRabBaselineBodyNoteMax = 500;
+
+
+
+export const TransitionRabBaselineBody = zod.object({
+  "baselineId": zod.string(),
+  "decision": zod.enum(['SUBMIT', 'APPROVE', 'REJECT']),
+  "note": zod.string().max(transitionRabBaselineBodyNoteMax).nullish()
+})
+
+export const TransitionRabBaselineResponse = zod.object({
+  "version": zod.number().int(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Compare theoretical material requirements with recorded movements
  */
 export const GetProjectMaterialReconciliationParams = zod.object({
@@ -1483,7 +1705,7 @@ export const ListActivityResponse = zod.array(ListActivityResponseItem)
 export const GetCurrentUserResponse = zod.object({
   "userId": zod.string(),
   "displayName": zod.string(),
-  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string()),
   "permissions": zod.array(zod.string())
 })
@@ -1495,7 +1717,7 @@ export const GetCurrentUserResponse = zod.object({
 export const ListAccessUsersResponseItem = zod.object({
   "userId": zod.string(),
   "displayName": zod.string(),
-  "role": zod.enum(['UNASSIGNED', 'DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['UNASSIGNED', 'DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string())
 })
 export const ListAccessUsersResponse = zod.array(ListAccessUsersResponseItem)
@@ -1509,7 +1731,7 @@ export const ListAccessInvitationsResponse = zod.object({
   "id": zod.string(),
   "email": zod.string().email(),
   "displayName": zod.string(),
-  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string()),
   "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
@@ -1534,7 +1756,7 @@ export const ListAccessInvitationsResponse = zod.object({
 export const CreateAccessInvitationBody = zod.object({
   "email": zod.string().email(),
   "displayName": zod.string().min(1),
-  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string())
 })
 
@@ -1542,7 +1764,7 @@ export const CreateAccessInvitationResponse = zod.object({
   "id": zod.string(),
   "email": zod.string().email(),
   "displayName": zod.string(),
-  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string()),
   "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
@@ -1563,7 +1785,7 @@ export const RevokeAccessInvitationResponse = zod.object({
   "id": zod.string(),
   "email": zod.string().email(),
   "displayName": zod.string(),
-  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string()),
   "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
@@ -1584,7 +1806,7 @@ export const ResendAccessInvitationResponse = zod.object({
   "id": zod.string(),
   "email": zod.string().email(),
   "displayName": zod.string(),
-  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string()),
   "status": zod.enum(['PENDING', 'EXPIRED', 'REVOKED', 'ACCEPTED']),
   "expiresAt": zod.coerce.date(),
@@ -1606,14 +1828,14 @@ export const UpdateAccessUserParams = zod.object({
 
 export const UpdateAccessUserBody = zod.object({
   "displayName": zod.string().min(1),
-  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string())
 })
 
 export const UpdateAccessUserResponse = zod.object({
   "userId": zod.string(),
   "displayName": zod.string(),
-  "role": zod.enum(['UNASSIGNED', 'DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT']),
+  "role": zod.enum(['UNASSIGNED', 'DIRECTOR', 'PROJECT_MANAGER', 'SITE_MANAGER', 'FINANCE', 'TAX_STAFF', 'PROCUREMENT', 'JURU_HITUNG', 'ESTIMATOR', 'QUANTITY_SURVEYOR']),
   "assignedProjectIds": zod.array(zod.string())
 })
 

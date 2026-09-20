@@ -26,6 +26,8 @@ tags:
     description: Reusable construction budget templates
   - name: petty-cash
     description: Project petty cash requests, settlement, and reconciliation
+  - name: estimator
+    description: SKKNI-aligned estimator competency profiles and versioned AHS calculations
 paths:
   /healthz:
     get:
@@ -242,6 +244,128 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RabSummary"
+  /competencies/catalog:
+    get:
+      operationId: listCompetencyCatalog
+      tags: [estimator]
+      summary: List referenced competency scheme entries
+      responses:
+        "200":
+          description: Competency catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CompetencyCatalogEntry" }
+  /competencies/profiles/{userId}:
+    get:
+      operationId: getCompetencyProfile
+      tags: [estimator]
+      summary: Get a user's professional competency profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Competency profile
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserCompetencyProfile" }
+    put:
+      operationId: updateCompetencyProfile
+      tags: [estimator]
+      summary: Add or update a user's competency profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCompetencyProfileInput" }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserCompetencyProfile" }
+  /ahs/templates:
+    get:
+      operationId: listAhsTemplates
+      tags: [estimator]
+      summary: List versioned AHS templates effective on a date
+      parameters:
+        - name: effectiveDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: AHS templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AhsTemplate" }
+  /projects/{projectId}/estimates/preview:
+    post:
+      operationId: previewRabEstimate
+      tags: [estimator]
+      summary: Calculate a deterministic AHS estimate from effective resource prices
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstimatePreviewInput" }
+      responses:
+        "200":
+          description: Estimate preview with formula snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstimatePreview" }
+  /projects/{projectId}/estimates/baseline:
+    post:
+      operationId: createRabEstimateBaseline
+      tags: [estimator]
+      summary: Create an existing RAB draft baseline from an approved preview
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstimateBaselineInput" }
+      responses:
+        "201":
+          description: Created draft RAB baseline
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RabSummary" }
+  /projects/{projectId}/rab/transition:
+    post:
+      operationId: transitionRabBaseline
+      tags: [estimator]
+      summary: Submit, approve, or reject an RAB baseline
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RabTransitionInput" }
+      responses:
+        "200":
+          description: Updated RAB baseline
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RabVersion" }
   /projects/{projectId}/material-reconciliation:
     get:
       operationId: getProjectMaterialReconciliation
@@ -1485,6 +1609,104 @@ components:
         user: { type: string }
         timestamp: { type: string }
         tone: { type: string }
+    CompetencyCatalogEntry:
+      type: object
+      required: [id, schemeCode, schemeType, occupation, title, level, sourceUrl, validityStatus]
+      properties:
+        id: { type: string }
+        schemeCode: { type: string }
+        schemeType: { type: string, enum: [SKKNI, SKKK, SKKI] }
+        occupation: { type: string }
+        title: { type: string }
+        level: { type: integer, minimum: 1, maximum: 9 }
+        sourceUrl: { type: string, format: uri }
+        validityStatus: { type: string, enum: [REFERENCE_ONLY, VERIFIED, EXPIRED, REVOKED] }
+        effectiveFrom: { type: ["string", "null"], format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+    UserCompetencyProfile:
+      type: object
+      required: [id, userId, catalogEntryId, verificationStatus, certificateReference, effectiveFrom, expiresAt, verifiedBy, verifiedAt]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        catalogEntryId: { type: string }
+        verificationStatus: { type: string, enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED, EXPIRED] }
+        certificateReference: { type: ["string", "null"] }
+        effectiveFrom: { type: ["string", "null"], format: date }
+        expiresAt: { type: ["string", "null"], format: date }
+        verifiedBy: { type: ["string", "null"] }
+        verifiedAt: { type: ["string", "null"], format: date-time }
+    UserCompetencyProfileInput:
+      type: object
+      required: [catalogEntryId, verificationStatus]
+      properties:
+        catalogEntryId: { type: string }
+        verificationStatus: { type: string, enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED, EXPIRED] }
+        certificateReference: { type: ["string", "null"] }
+        effectiveFrom: { type: ["string", "null"], format: date }
+        expiresAt: { type: ["string", "null"], format: date }
+    AhsComponent:
+      type: object
+      required: [id, resourceKind, resourceCode, resourceName, unit, coefficientMicros, wasteBasisPoints]
+      properties:
+        id: { type: string }
+        resourceKind: { type: string, enum: [MATERIAL, LABOR, EQUIPMENT] }
+        resourceCode: { type: string }
+        resourceName: { type: string }
+        unit: { type: string }
+        coefficientMicros: { type: integer, minimum: 1 }
+        wasteBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+    AhsTemplate:
+      type: object
+      required: [id, code, name, unit, version, status, sourceNote, effectiveFrom, effectiveTo, components]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        unit: { type: string }
+        version: { type: integer, minimum: 1 }
+        status: { type: string, enum: [DRAFT, ACTIVE, RETIRED] }
+        sourceNote: { type: string }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+        components:
+          type: array
+          items: { $ref: "#/components/schemas/AhsComponent" }
+    EstimatePreviewInput:
+      type: object
+      required: [templateId, effectiveDate, volumeBasisPoints]
+      properties:
+        templateId: { type: string }
+        effectiveDate: { type: string, format: date }
+        volumeBasisPoints: { type: integer, minimum: 1 }
+    EstimatePreview:
+      type: object
+      required: [id, projectId, templateId, effectiveDate, volumeBasisPoints, unitPriceRupiah, totalBudgetRupiah, formulaSnapshot, status, createdBy, createdAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        templateId: { type: string }
+        effectiveDate: { type: string, format: date }
+        volumeBasisPoints: { type: integer, minimum: 1 }
+        unitPriceRupiah: { type: integer, minimum: 0 }
+        totalBudgetRupiah: { type: integer, minimum: 0 }
+        formulaSnapshot: { type: object, additionalProperties: true }
+        status: { type: string, enum: [PREVIEW, APPROVED, USED] }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+    EstimateBaselineInput:
+      type: object
+      required: [previewId, expectedLatestVersion]
+      properties:
+        previewId: { type: string }
+        expectedLatestVersion: { type: integer, minimum: 1 }
+    RabTransitionInput:
+      type: object
+      required: [baselineId, decision]
+      properties:
+        baselineId: { type: string }
+        decision: { type: string, enum: [SUBMIT, APPROVE, REJECT] }
+        note: { type: ["string", "null"], maxLength: 500 }
     CurrentUser:
       type: object
       required: [userId, displayName, role, assignedProjectIds, permissions]
@@ -1493,7 +1715,7 @@ components:
         displayName: { type: string }
         role:
           type: string
-          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT, JURU_HITUNG, ESTIMATOR, QUANTITY_SURVEYOR]
         assignedProjectIds:
           type: array
           items: { type: string }
@@ -1518,7 +1740,7 @@ components:
         displayName: { type: string }
         role:
           type: string
-          enum: [UNASSIGNED, DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+          enum: [UNASSIGNED, DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT, JURU_HITUNG, ESTIMATOR, QUANTITY_SURVEYOR]
         assignedProjectIds:
           type: array
           items: { type: string }
@@ -1529,7 +1751,7 @@ components:
         displayName: { type: string, minLength: 1 }
         role:
           type: string
-          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT, JURU_HITUNG, ESTIMATOR, QUANTITY_SURVEYOR]
         assignedProjectIds:
           type: array
           items: { type: string }
@@ -1542,7 +1764,7 @@ components:
         displayName: { type: string }
         role:
           type: string
-          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT, JURU_HITUNG, ESTIMATOR, QUANTITY_SURVEYOR]
         assignedProjectIds:
           type: array
           items: { type: string }
@@ -1587,7 +1809,7 @@ components:
         displayName: { type: string, minLength: 1 }
         role:
           type: string
-          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT]
+          enum: [DIRECTOR, PROJECT_MANAGER, SITE_MANAGER, FINANCE, TAX_STAFF, PROCUREMENT, JURU_HITUNG, ESTIMATOR, QUANTITY_SURVEYOR]
         assignedProjectIds:
           type: array
           items: { type: string }

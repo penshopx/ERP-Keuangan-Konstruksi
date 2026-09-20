@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import { db, projectAssignmentsTable, staffInvitationProjectsTable, staffInvitationsTable, userRolesTable } from "@workspace/db";
 import { isRole, roleCanAccessProject, roleHasPermission, rolePermissions, roles, type Role } from "./access-policy";
 
-export { roles, type Role } from "./access-policy";
+export { roles, roleHasPermission, type Role } from "./access-policy";
 
 export type AccessContext = {
   userId: string;

@@ -26,19 +26,25 @@ import type {
   AccessUser,
   AccessUserUpdate,
   Activity,
+  AhsTemplate,
   ApprovalDecisionInput,
   BudgetAlert,
   Commitment,
   CommitmentInput,
   CommitmentTransitionInput,
+  CompetencyCatalogEntry,
   CurrentUser,
   DashboardSummary,
+  EstimateBaselineInput,
+  EstimatePreview,
+  EstimatePreviewInput,
   GetTaxSummaryParams,
   HealthStatus,
   InventoryMovement,
   InventoryMovementInput,
   Invoice,
   InvoiceInput,
+  ListAhsTemplatesParams,
   ListInvoicesParams,
   ListPettyCashRequestsParams,
   ListProjectsParams,
@@ -60,10 +66,13 @@ import type {
   RabSummary,
   RabTemplate,
   RabTemplateImportInput,
+  RabTransitionInput,
   RabVersion,
   TaxRule,
   TaxRuleInput,
-  TaxSummary
+  TaxSummary,
+  UserCompetencyProfile,
+  UserCompetencyProfileInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1122,6 +1131,600 @@ export const useImportProjectRabTemplate = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getImportProjectRabTemplateMutationOptions(options));
+    }
+
+export const getListCompetencyCatalogUrl = () => {
+
+
+
+
+  return `/api/competencies/catalog`
+}
+
+/**
+ * @summary List referenced competency scheme entries
+ */
+export const listCompetencyCatalog = async ( options?: Parameters<typeof customFetch>[1]): Promise<CompetencyCatalogEntry[]> => {
+
+  return customFetch<CompetencyCatalogEntry[]>(getListCompetencyCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCompetencyCatalogQueryKey = () => {
+    return [
+    `/api/competencies/catalog`
+    ] as const;
+    }
+
+
+export const getListCompetencyCatalogQueryOptions = <TData = Awaited<ReturnType<typeof listCompetencyCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCompetencyCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCompetencyCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCompetencyCatalog>>> = ({ signal }) => listCompetencyCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCompetencyCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCompetencyCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof listCompetencyCatalog>>>
+export type ListCompetencyCatalogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List referenced competency scheme entries
+ */
+
+export function useListCompetencyCatalog<TData = Awaited<ReturnType<typeof listCompetencyCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCompetencyCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCompetencyCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCompetencyProfileUrl = (userId: string,) => {
+
+
+
+
+  return `/api/competencies/profiles/${userId}`
+}
+
+/**
+ * @summary Get a user's professional competency profile
+ */
+export const getCompetencyProfile = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<UserCompetencyProfile[]> => {
+
+  return customFetch<UserCompetencyProfile[]>(getGetCompetencyProfileUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompetencyProfileQueryKey = (userId: string,) => {
+    return [
+    `/api/competencies/profiles/${userId}`
+    ] as const;
+    }
+
+
+export const getGetCompetencyProfileQueryOptions = <TData = Awaited<ReturnType<typeof getCompetencyProfile>>, TError = ErrorType<unknown>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompetencyProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompetencyProfileQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompetencyProfile>>> = ({ signal }) => getCompetencyProfile(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompetencyProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCompetencyProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getCompetencyProfile>>>
+export type GetCompetencyProfileQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a user's professional competency profile
+ */
+
+export function useGetCompetencyProfile<TData = Awaited<ReturnType<typeof getCompetencyProfile>>, TError = ErrorType<unknown>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompetencyProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCompetencyProfileQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateCompetencyProfileUrl = (userId: string,) => {
+
+
+
+
+  return `/api/competencies/profiles/${userId}`
+}
+
+/**
+ * @summary Add or update a user's competency profile
+ */
+export const updateCompetencyProfile = async (userId: string,
+    userCompetencyProfileInput: UserCompetencyProfileInput, options?: Parameters<typeof customFetch>[1]): Promise<UserCompetencyProfile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<UserCompetencyProfile>(getUpdateCompetencyProfileUrl(userId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(userCompetencyProfileInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateCompetencyProfileMutationKey = () => ['updateCompetencyProfile'] as const;
+
+export const getUpdateCompetencyProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCompetencyProfile>>, TError,UpdateCompetencyProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCompetencyProfile>>, TError,UpdateCompetencyProfileMutationVariables, TContext> => {
+
+const mutationKey = getUpdateCompetencyProfileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCompetencyProfile>>, UpdateCompetencyProfileMutationVariables> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  updateCompetencyProfile(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCompetencyProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateCompetencyProfile>>>
+    export type UpdateCompetencyProfileMutationBody = BodyType<UserCompetencyProfileInput>
+    export type UpdateCompetencyProfileMutationError = ErrorType<unknown>
+    export type UpdateCompetencyProfileMutationVariables = {userId: string;data: BodyType<UserCompetencyProfileInput>}
+
+    /**
+ * @summary Add or update a user's competency profile
+ */
+export const useUpdateCompetencyProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCompetencyProfile>>, TError,UpdateCompetencyProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCompetencyProfile>>,
+        TError,
+        UpdateCompetencyProfileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateCompetencyProfileMutationOptions(options));
+    }
+
+export const getListAhsTemplatesUrl = (params?: ListAhsTemplatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/ahs/templates?${stringifiedParams}` : `/api/ahs/templates`
+}
+
+/**
+ * @summary List versioned AHS templates effective on a date
+ */
+export const listAhsTemplates = async (params?: ListAhsTemplatesParams, options?: Parameters<typeof customFetch>[1]): Promise<AhsTemplate[]> => {
+
+  return customFetch<AhsTemplate[]>(getListAhsTemplatesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAhsTemplatesQueryKey = (params?: ListAhsTemplatesParams,) => {
+    return [
+    `/api/ahs/templates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAhsTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listAhsTemplates>>, TError = ErrorType<unknown>>(params?: ListAhsTemplatesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhsTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAhsTemplatesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAhsTemplates>>> = ({ signal }) => listAhsTemplates(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAhsTemplates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAhsTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listAhsTemplates>>>
+export type ListAhsTemplatesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List versioned AHS templates effective on a date
+ */
+
+export function useListAhsTemplates<TData = Awaited<ReturnType<typeof listAhsTemplates>>, TError = ErrorType<unknown>>(
+ params?: ListAhsTemplatesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhsTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAhsTemplatesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewRabEstimateUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/estimates/preview`
+}
+
+/**
+ * @summary Calculate a deterministic AHS estimate from effective resource prices
+ */
+export const previewRabEstimate = async (projectId: string,
+    estimatePreviewInput: EstimatePreviewInput, options?: Parameters<typeof customFetch>[1]): Promise<EstimatePreview> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EstimatePreview>(getPreviewRabEstimateUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(estimatePreviewInput)
+  }
+);}
+
+
+
+
+
+export const getPreviewRabEstimateMutationKey = () => ['previewRabEstimate'] as const;
+
+export const getPreviewRabEstimateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewRabEstimate>>, TError,PreviewRabEstimateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewRabEstimate>>, TError,PreviewRabEstimateMutationVariables, TContext> => {
+
+const mutationKey = getPreviewRabEstimateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewRabEstimate>>, PreviewRabEstimateMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  previewRabEstimate(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewRabEstimateMutationResult = NonNullable<Awaited<ReturnType<typeof previewRabEstimate>>>
+    export type PreviewRabEstimateMutationBody = BodyType<EstimatePreviewInput>
+    export type PreviewRabEstimateMutationError = ErrorType<unknown>
+    export type PreviewRabEstimateMutationVariables = {projectId: string;data: BodyType<EstimatePreviewInput>}
+
+    /**
+ * @summary Calculate a deterministic AHS estimate from effective resource prices
+ */
+export const usePreviewRabEstimate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewRabEstimate>>, TError,PreviewRabEstimateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewRabEstimate>>,
+        TError,
+        PreviewRabEstimateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPreviewRabEstimateMutationOptions(options));
+    }
+
+export const getCreateRabEstimateBaselineUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/estimates/baseline`
+}
+
+/**
+ * @summary Create an existing RAB draft baseline from an approved preview
+ */
+export const createRabEstimateBaseline = async (projectId: string,
+    estimateBaselineInput: EstimateBaselineInput, options?: Parameters<typeof customFetch>[1]): Promise<RabSummary> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RabSummary>(getCreateRabEstimateBaselineUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(estimateBaselineInput)
+  }
+);}
+
+
+
+
+
+export const getCreateRabEstimateBaselineMutationKey = () => ['createRabEstimateBaseline'] as const;
+
+export const getCreateRabEstimateBaselineMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRabEstimateBaseline>>, TError,CreateRabEstimateBaselineMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRabEstimateBaseline>>, TError,CreateRabEstimateBaselineMutationVariables, TContext> => {
+
+const mutationKey = getCreateRabEstimateBaselineMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRabEstimateBaseline>>, CreateRabEstimateBaselineMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createRabEstimateBaseline(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRabEstimateBaselineMutationResult = NonNullable<Awaited<ReturnType<typeof createRabEstimateBaseline>>>
+    export type CreateRabEstimateBaselineMutationBody = BodyType<EstimateBaselineInput>
+    export type CreateRabEstimateBaselineMutationError = ErrorType<unknown>
+    export type CreateRabEstimateBaselineMutationVariables = {projectId: string;data: BodyType<EstimateBaselineInput>}
+
+    /**
+ * @summary Create an existing RAB draft baseline from an approved preview
+ */
+export const useCreateRabEstimateBaseline = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRabEstimateBaseline>>, TError,CreateRabEstimateBaselineMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRabEstimateBaseline>>,
+        TError,
+        CreateRabEstimateBaselineMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateRabEstimateBaselineMutationOptions(options));
+    }
+
+export const getTransitionRabBaselineUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/rab/transition`
+}
+
+/**
+ * @summary Submit, approve, or reject an RAB baseline
+ */
+export const transitionRabBaseline = async (projectId: string,
+    rabTransitionInput: RabTransitionInput, options?: Parameters<typeof customFetch>[1]): Promise<RabVersion> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RabVersion>(getTransitionRabBaselineUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rabTransitionInput)
+  }
+);}
+
+
+
+
+
+export const getTransitionRabBaselineMutationKey = () => ['transitionRabBaseline'] as const;
+
+export const getTransitionRabBaselineMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionRabBaseline>>, TError,TransitionRabBaselineMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transitionRabBaseline>>, TError,TransitionRabBaselineMutationVariables, TContext> => {
+
+const mutationKey = getTransitionRabBaselineMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transitionRabBaseline>>, TransitionRabBaselineMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  transitionRabBaseline(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransitionRabBaselineMutationResult = NonNullable<Awaited<ReturnType<typeof transitionRabBaseline>>>
+    export type TransitionRabBaselineMutationBody = BodyType<RabTransitionInput>
+    export type TransitionRabBaselineMutationError = ErrorType<unknown>
+    export type TransitionRabBaselineMutationVariables = {projectId: string;data: BodyType<RabTransitionInput>}
+
+    /**
+ * @summary Submit, approve, or reject an RAB baseline
+ */
+export const useTransitionRabBaseline = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionRabBaseline>>, TError,TransitionRabBaselineMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transitionRabBaseline>>,
+        TError,
+        TransitionRabBaselineMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransitionRabBaselineMutationOptions(options));
     }
 
 export const getGetProjectMaterialReconciliationUrl = (projectId: string,) => {
