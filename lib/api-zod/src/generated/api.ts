@@ -451,6 +451,246 @@ export const ImportProjectRabTemplateResponse = zod.object({
 
 
 /**
+ * @summary Compare theoretical material requirements with recorded movements
+ */
+export const GetProjectMaterialReconciliationParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const getProjectMaterialReconciliationResponseItemsItemEvidenceItemQuantityMin = 0;
+
+export const getProjectMaterialReconciliationResponseItemsItemEvidenceItemBaseQuantityMin = 0;
+
+
+
+export const GetProjectMaterialReconciliationResponse = zod.object({
+  "projectId": zod.string(),
+  "baselineId": zod.string(),
+  "asOf": zod.coerce.date(),
+  "openExceptionCount": zod.number().int(),
+  "items": zod.array(zod.object({
+  "rabItemId": zod.string(),
+  "costCodeId": zod.string(),
+  "workCode": zod.string(),
+  "workName": zod.string(),
+  "materialId": zod.string(),
+  "materialCode": zod.string(),
+  "materialName": zod.string(),
+  "unit": zod.string(),
+  "analysisVersion": zod.number().int(),
+  "coefficient": zod.number(),
+  "theoreticalQuantity": zod.number(),
+  "tolerancePercent": zod.number(),
+  "toleranceQuantity": zod.number(),
+  "allowedQuantity": zod.number(),
+  "procuredQuantity": zod.number(),
+  "receivedQuantity": zod.number(),
+  "issuedQuantity": zod.number(),
+  "returnedQuantity": zod.number(),
+  "installedQuantity": zod.number(),
+  "invoicedQuantity": zod.number(),
+  "actualCostQuantity": zod.number(),
+  "consumedQuantity": zod.number(),
+  "varianceQuantity": zod.number(),
+  "exceedsTolerance": zod.boolean(),
+  "exception": zod.union([zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['OPEN', 'UNDER_REVIEW', 'CLOSED']),
+  "classification": zod.union([zod.literal('WASTE'),zod.literal('DESIGN_CHANGE'),zod.literal('REWORK'),zod.literal('MISALLOCATION'),zod.literal('RECORDING_DELAY'),zod.literal('IN_TRANSIT'),zod.literal('UNIT_CONVERSION'),zod.literal('DAMAGE'),zod.literal('LOSS'),zod.literal(null)]).nullish(),
+  "disposition": zod.string().nullish(),
+  "theoreticalQuantity": zod.number(),
+  "consumedQuantity": zod.number(),
+  "varianceQuantity": zod.number(),
+  "toleranceQuantity": zod.number(),
+  "reviewedBy": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish(),
+  "closedBy": zod.string().nullish(),
+  "closedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "events": zod.array(zod.object({
+  "id": zod.string(),
+  "eventType": zod.string(),
+  "actorName": zod.string(),
+  "detail": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date()
+}))
+}),zod.null()]).optional(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string(),
+  "costCodeId": zod.string(),
+  "materialId": zod.string(),
+  "movementType": zod.enum(['PROCURED', 'RECEIVED', 'ISSUED', 'RETURNED', 'INSTALLED', 'INVOICED', 'ACTUAL_COST', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT']),
+  "quantity": zod.number().min(getProjectMaterialReconciliationResponseItemsItemEvidenceItemQuantityMin),
+  "unit": zod.string(),
+  "baseQuantity": zod.number().min(getProjectMaterialReconciliationResponseItemsItemEvidenceItemBaseQuantityMin),
+  "sourceDocumentType": zod.string(),
+  "sourceDocumentId": zod.string(),
+  "sourceDocumentNumber": zod.string(),
+  "occurredAt": zod.coerce.date(),
+  "notes": zod.string().nullish(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+}))
+})
+
+
+/**
+ * @summary Add a versioned material analysis requirement and effective waste tolerance
+ */
+export const CreateMaterialRequirementParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+
+
+export const createMaterialRequirementBodyCoefficientExclusiveMin = 0;
+
+export const createMaterialRequirementBodyTolerancePercentMin = 0;
+export const createMaterialRequirementBodyTolerancePercentMax = 100;
+
+
+
+
+export const CreateMaterialRequirementBody = zod.object({
+  "baselineId": zod.string(),
+  "rabItemId": zod.string(),
+  "materialCode": zod.string().min(1),
+  "materialName": zod.string().min(1),
+  "unit": zod.string().min(1),
+  "analysisVersion": zod.number().int().min(1),
+  "coefficient": zod.number().gt(createMaterialRequirementBodyCoefficientExclusiveMin),
+  "tolerancePercent": zod.number().min(createMaterialRequirementBodyTolerancePercentMin).max(createMaterialRequirementBodyTolerancePercentMax),
+  "effectiveFrom": zod.coerce.date(),
+  "effectiveTo": zod.coerce.date().nullish(),
+  "reason": zod.string().min(1)
+})
+
+export const CreateMaterialRequirementResponse = zod.object({
+  "id": zod.string(),
+  "baselineId": zod.string(),
+  "rabItemId": zod.string(),
+  "costCodeId": zod.string(),
+  "materialId": zod.string(),
+  "materialCode": zod.string(),
+  "materialName": zod.string(),
+  "unit": zod.string(),
+  "analysisVersion": zod.number().int(),
+  "coefficient": zod.number(),
+  "tolerancePercent": zod.number(),
+  "effectiveFrom": zod.coerce.date(),
+  "effectiveTo": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Record a project inventory movement with source evidence
+ */
+export const CreateInventoryMovementParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const createInventoryMovementBodyQuantityMin = 0;
+
+
+export const createInventoryMovementBodyBaseQuantityMin = 0;
+
+
+
+
+
+
+export const CreateInventoryMovementBody = zod.object({
+  "baselineId": zod.string(),
+  "costCodeId": zod.string(),
+  "materialId": zod.string(),
+  "movementType": zod.enum(['PROCURED', 'RECEIVED', 'ISSUED', 'RETURNED', 'INSTALLED', 'INVOICED', 'ACTUAL_COST', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT']),
+  "quantity": zod.number().min(createInventoryMovementBodyQuantityMin),
+  "unit": zod.string().min(1),
+  "baseQuantity": zod.number().min(createInventoryMovementBodyBaseQuantityMin),
+  "sourceDocumentType": zod.string().min(1),
+  "sourceDocumentId": zod.string().min(1),
+  "sourceDocumentNumber": zod.string().min(1),
+  "occurredAt": zod.coerce.date(),
+  "notes": zod.string().optional()
+})
+
+export const createInventoryMovementResponseQuantityMin = 0;
+
+export const createInventoryMovementResponseBaseQuantityMin = 0;
+
+
+
+export const CreateInventoryMovementResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string(),
+  "costCodeId": zod.string(),
+  "materialId": zod.string(),
+  "movementType": zod.enum(['PROCURED', 'RECEIVED', 'ISSUED', 'RETURNED', 'INSTALLED', 'INVOICED', 'ACTUAL_COST', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT']),
+  "quantity": zod.number().min(createInventoryMovementResponseQuantityMin),
+  "unit": zod.string(),
+  "baseQuantity": zod.number().min(createInventoryMovementResponseBaseQuantityMin),
+  "sourceDocumentType": zod.string(),
+  "sourceDocumentId": zod.string(),
+  "sourceDocumentNumber": zod.string(),
+  "occurredAt": zod.coerce.date(),
+  "notes": zod.string().nullish(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Classify, disposition, or close a material variance exception
+ */
+export const UpdateMaterialVarianceExceptionParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "exceptionId": zod.coerce.string()
+})
+
+
+
+
+export const UpdateMaterialVarianceExceptionBody = zod.object({
+  "status": zod.enum(['UNDER_REVIEW', 'CLOSED']),
+  "classification": zod.enum(['WASTE', 'DESIGN_CHANGE', 'REWORK', 'MISALLOCATION', 'RECORDING_DELAY', 'IN_TRANSIT', 'UNIT_CONVERSION', 'DAMAGE', 'LOSS']),
+  "disposition": zod.string().min(1)
+})
+
+export const UpdateMaterialVarianceExceptionResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['OPEN', 'UNDER_REVIEW', 'CLOSED']),
+  "classification": zod.union([zod.literal('WASTE'),zod.literal('DESIGN_CHANGE'),zod.literal('REWORK'),zod.literal('MISALLOCATION'),zod.literal('RECORDING_DELAY'),zod.literal('IN_TRANSIT'),zod.literal('UNIT_CONVERSION'),zod.literal('DAMAGE'),zod.literal('LOSS'),zod.literal(null)]).nullish(),
+  "disposition": zod.string().nullish(),
+  "theoreticalQuantity": zod.number(),
+  "consumedQuantity": zod.number(),
+  "varianceQuantity": zod.number(),
+  "toleranceQuantity": zod.number(),
+  "reviewedBy": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish(),
+  "closedBy": zod.string().nullish(),
+  "closedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "events": zod.array(zod.object({
+  "id": zod.string(),
+  "eventType": zod.string(),
+  "actorName": zod.string(),
+  "detail": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * @summary List project commitments
  */
 export const ListProjectCommitmentsParams = zod.object({

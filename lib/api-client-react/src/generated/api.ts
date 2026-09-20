@@ -35,11 +35,18 @@ import type {
   DashboardSummary,
   GetTaxSummaryParams,
   HealthStatus,
+  InventoryMovement,
+  InventoryMovementInput,
   Invoice,
   InvoiceInput,
   ListInvoicesParams,
   ListPettyCashRequestsParams,
   ListProjectsParams,
+  MaterialExceptionUpdate,
+  MaterialReconciliationSummary,
+  MaterialRequirement,
+  MaterialRequirementInput,
+  MaterialVarianceException,
   PettyCashDecisionInput,
   PettyCashDisbursementInput,
   PettyCashReconciliationInput,
@@ -1115,6 +1122,352 @@ export const useImportProjectRabTemplate = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getImportProjectRabTemplateMutationOptions(options));
+    }
+
+export const getGetProjectMaterialReconciliationUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/material-reconciliation`
+}
+
+/**
+ * @summary Compare theoretical material requirements with recorded movements
+ */
+export const getProjectMaterialReconciliation = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<MaterialReconciliationSummary> => {
+
+  return customFetch<MaterialReconciliationSummary>(getGetProjectMaterialReconciliationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectMaterialReconciliationQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/material-reconciliation`
+    ] as const;
+    }
+
+
+export const getGetProjectMaterialReconciliationQueryOptions = <TData = Awaited<ReturnType<typeof getProjectMaterialReconciliation>>, TError = ErrorType<unknown>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectMaterialReconciliation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectMaterialReconciliationQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectMaterialReconciliation>>> = ({ signal }) => getProjectMaterialReconciliation(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectMaterialReconciliation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectMaterialReconciliationQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectMaterialReconciliation>>>
+export type GetProjectMaterialReconciliationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Compare theoretical material requirements with recorded movements
+ */
+
+export function useGetProjectMaterialReconciliation<TData = Awaited<ReturnType<typeof getProjectMaterialReconciliation>>, TError = ErrorType<unknown>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectMaterialReconciliation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectMaterialReconciliationQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateMaterialRequirementUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/material-requirements`
+}
+
+/**
+ * @summary Add a versioned material analysis requirement and effective waste tolerance
+ */
+export const createMaterialRequirement = async (projectId: string,
+    materialRequirementInput: MaterialRequirementInput, options?: Parameters<typeof customFetch>[1]): Promise<MaterialRequirement> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MaterialRequirement>(getCreateMaterialRequirementUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(materialRequirementInput)
+  }
+);}
+
+
+
+
+
+export const getCreateMaterialRequirementMutationKey = () => ['createMaterialRequirement'] as const;
+
+export const getCreateMaterialRequirementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMaterialRequirement>>, TError,CreateMaterialRequirementMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMaterialRequirement>>, TError,CreateMaterialRequirementMutationVariables, TContext> => {
+
+const mutationKey = getCreateMaterialRequirementMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMaterialRequirement>>, CreateMaterialRequirementMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createMaterialRequirement(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMaterialRequirementMutationResult = NonNullable<Awaited<ReturnType<typeof createMaterialRequirement>>>
+    export type CreateMaterialRequirementMutationBody = BodyType<MaterialRequirementInput>
+    export type CreateMaterialRequirementMutationError = ErrorType<unknown>
+    export type CreateMaterialRequirementMutationVariables = {projectId: string;data: BodyType<MaterialRequirementInput>}
+
+    /**
+ * @summary Add a versioned material analysis requirement and effective waste tolerance
+ */
+export const useCreateMaterialRequirement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMaterialRequirement>>, TError,CreateMaterialRequirementMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMaterialRequirement>>,
+        TError,
+        CreateMaterialRequirementMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateMaterialRequirementMutationOptions(options));
+    }
+
+export const getCreateInventoryMovementUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/inventory-movements`
+}
+
+/**
+ * @summary Record a project inventory movement with source evidence
+ */
+export const createInventoryMovement = async (projectId: string,
+    inventoryMovementInput: InventoryMovementInput, options?: Parameters<typeof customFetch>[1]): Promise<InventoryMovement> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InventoryMovement>(getCreateInventoryMovementUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(inventoryMovementInput)
+  }
+);}
+
+
+
+
+
+export const getCreateInventoryMovementMutationKey = () => ['createInventoryMovement'] as const;
+
+export const getCreateInventoryMovementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInventoryMovement>>, TError,CreateInventoryMovementMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInventoryMovement>>, TError,CreateInventoryMovementMutationVariables, TContext> => {
+
+const mutationKey = getCreateInventoryMovementMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInventoryMovement>>, CreateInventoryMovementMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createInventoryMovement(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateInventoryMovementMutationResult = NonNullable<Awaited<ReturnType<typeof createInventoryMovement>>>
+    export type CreateInventoryMovementMutationBody = BodyType<InventoryMovementInput>
+    export type CreateInventoryMovementMutationError = ErrorType<unknown>
+    export type CreateInventoryMovementMutationVariables = {projectId: string;data: BodyType<InventoryMovementInput>}
+
+    /**
+ * @summary Record a project inventory movement with source evidence
+ */
+export const useCreateInventoryMovement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInventoryMovement>>, TError,CreateInventoryMovementMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createInventoryMovement>>,
+        TError,
+        CreateInventoryMovementMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateInventoryMovementMutationOptions(options));
+    }
+
+export const getUpdateMaterialVarianceExceptionUrl = (projectId: string,
+    exceptionId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/material-exceptions/${exceptionId}`
+}
+
+/**
+ * @summary Classify, disposition, or close a material variance exception
+ */
+export const updateMaterialVarianceException = async (projectId: string,
+    exceptionId: string,
+    materialExceptionUpdate: MaterialExceptionUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MaterialVarianceException> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MaterialVarianceException>(getUpdateMaterialVarianceExceptionUrl(projectId,exceptionId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(materialExceptionUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateMaterialVarianceExceptionMutationKey = () => ['updateMaterialVarianceException'] as const;
+
+export const getUpdateMaterialVarianceExceptionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMaterialVarianceException>>, TError,UpdateMaterialVarianceExceptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMaterialVarianceException>>, TError,UpdateMaterialVarianceExceptionMutationVariables, TContext> => {
+
+const mutationKey = getUpdateMaterialVarianceExceptionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMaterialVarianceException>>, UpdateMaterialVarianceExceptionMutationVariables> = (props) => {
+          const {projectId,exceptionId,data} = props ?? {};
+
+          return  updateMaterialVarianceException(projectId,exceptionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMaterialVarianceExceptionMutationResult = NonNullable<Awaited<ReturnType<typeof updateMaterialVarianceException>>>
+    export type UpdateMaterialVarianceExceptionMutationBody = BodyType<MaterialExceptionUpdate>
+    export type UpdateMaterialVarianceExceptionMutationError = ErrorType<unknown>
+    export type UpdateMaterialVarianceExceptionMutationVariables = {projectId: string;exceptionId: string;data: BodyType<MaterialExceptionUpdate>}
+
+    /**
+ * @summary Classify, disposition, or close a material variance exception
+ */
+export const useUpdateMaterialVarianceException = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMaterialVarianceException>>, TError,UpdateMaterialVarianceExceptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMaterialVarianceException>>,
+        TError,
+        UpdateMaterialVarianceExceptionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateMaterialVarianceExceptionMutationOptions(options));
     }
 
 export const getListProjectCommitmentsUrl = (projectId: string,) => {

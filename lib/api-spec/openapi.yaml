@@ -242,6 +242,84 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RabSummary"
+  /projects/{projectId}/material-reconciliation:
+    get:
+      operationId: getProjectMaterialReconciliation
+      tags: [projects, inventory]
+      summary: Compare theoretical material requirements with recorded movements
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Deterministic material reconciliation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialReconciliationSummary"
+  /projects/{projectId}/material-requirements:
+    post:
+      operationId: createMaterialRequirement
+      tags: [projects, inventory]
+      summary: Add a versioned material analysis requirement and effective waste tolerance
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialRequirementInput"
+      responses:
+        "201":
+          description: Created material requirement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialRequirement"
+  /projects/{projectId}/inventory-movements:
+    post:
+      operationId: createInventoryMovement
+      tags: [projects, inventory]
+      summary: Record a project inventory movement with source evidence
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InventoryMovementInput"
+      responses:
+        "201":
+          description: Recorded movement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryMovement"
+  /projects/{projectId}/material-exceptions/{exceptionId}:
+    patch:
+      operationId: updateMaterialVarianceException
+      tags: [projects, inventory]
+      summary: Classify, disposition, or close a material variance exception
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: exceptionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialExceptionUpdate"
+      responses:
+        "200":
+          description: Updated exception
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialVarianceException"
   /projects/{projectId}/commitments:
     get:
       operationId: listProjectCommitments
@@ -933,6 +1011,154 @@ components:
         variance: { type: number }
         utilization: { type: number }
         costCodeId: { type: ["string", "null"] }
+    MaterialReconciliationSummary:
+      type: object
+      required: [projectId, baselineId, asOf, openExceptionCount, items]
+      properties:
+        projectId: { type: string }
+        baselineId: { type: string }
+        asOf: { type: string, format: date-time }
+        openExceptionCount: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/MaterialReconciliationItem" }
+    MaterialRequirement:
+      type: object
+      required: [id, baselineId, rabItemId, costCodeId, materialId, materialCode, materialName, unit, analysisVersion, coefficient, tolerancePercent, effectiveFrom]
+      properties:
+        id: { type: string }
+        baselineId: { type: string }
+        rabItemId: { type: string }
+        costCodeId: { type: string }
+        materialId: { type: string }
+        materialCode: { type: string }
+        materialName: { type: string }
+        unit: { type: string }
+        analysisVersion: { type: integer }
+        coefficient: { type: number }
+        tolerancePercent: { type: number }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+    MaterialRequirementInput:
+      type: object
+      required: [baselineId, rabItemId, materialCode, materialName, unit, analysisVersion, coefficient, tolerancePercent, effectiveFrom, reason]
+      properties:
+        baselineId: { type: string }
+        rabItemId: { type: string }
+        materialCode: { type: string, minLength: 1 }
+        materialName: { type: string, minLength: 1 }
+        unit: { type: string, minLength: 1 }
+        analysisVersion: { type: integer, minimum: 1 }
+        coefficient: { type: number, exclusiveMinimum: 0 }
+        tolerancePercent: { type: number, minimum: 0, maximum: 100 }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+        reason: { type: string, minLength: 1 }
+    MaterialReconciliationItem:
+      type: object
+      required: [rabItemId, costCodeId, workCode, workName, materialId, materialCode, materialName, unit, analysisVersion, coefficient, theoreticalQuantity, tolerancePercent, toleranceQuantity, allowedQuantity, procuredQuantity, receivedQuantity, issuedQuantity, returnedQuantity, installedQuantity, invoicedQuantity, actualCostQuantity, consumedQuantity, varianceQuantity, exceedsTolerance, evidence]
+      properties:
+        rabItemId: { type: string }
+        costCodeId: { type: string }
+        workCode: { type: string }
+        workName: { type: string }
+        materialId: { type: string }
+        materialCode: { type: string }
+        materialName: { type: string }
+        unit: { type: string }
+        analysisVersion: { type: integer }
+        coefficient: { type: number }
+        theoreticalQuantity: { type: number }
+        tolerancePercent: { type: number }
+        toleranceQuantity: { type: number }
+        allowedQuantity: { type: number }
+        procuredQuantity: { type: number }
+        receivedQuantity: { type: number }
+        issuedQuantity: { type: number }
+        returnedQuantity: { type: number }
+        installedQuantity: { type: number }
+        invoicedQuantity: { type: number }
+        actualCostQuantity: { type: number }
+        consumedQuantity: { type: number }
+        varianceQuantity: { type: number }
+        exceedsTolerance: { type: boolean }
+        exception: { anyOf: [{ $ref: "#/components/schemas/MaterialVarianceException" }, { type: "null" }] }
+        evidence:
+          type: array
+          items: { $ref: "#/components/schemas/InventoryMovement" }
+    InventoryMovement:
+      type: object
+      required: [id, projectId, baselineId, costCodeId, materialId, movementType, quantity, unit, baseQuantity, sourceDocumentType, sourceDocumentId, sourceDocumentNumber, occurredAt, createdBy, createdAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        baselineId: { type: string }
+        costCodeId: { type: string }
+        materialId: { type: string }
+        movementType: { type: string, enum: [PROCURED, RECEIVED, ISSUED, RETURNED, INSTALLED, INVOICED, ACTUAL_COST, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT] }
+        quantity: { type: number, minimum: 0 }
+        unit: { type: string }
+        baseQuantity: { type: number, minimum: 0 }
+        sourceDocumentType: { type: string }
+        sourceDocumentId: { type: string }
+        sourceDocumentNumber: { type: string }
+        occurredAt: { type: string, format: date-time }
+        notes: { type: ["string", "null"] }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+    InventoryMovementInput:
+      type: object
+      required: [baselineId, costCodeId, materialId, movementType, quantity, unit, baseQuantity, sourceDocumentType, sourceDocumentId, sourceDocumentNumber, occurredAt]
+      properties:
+        baselineId: { type: string }
+        costCodeId: { type: string }
+        materialId: { type: string }
+        movementType: { type: string, enum: [PROCURED, RECEIVED, ISSUED, RETURNED, INSTALLED, INVOICED, ACTUAL_COST, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT] }
+        quantity: { type: number, minimum: 0 }
+        unit: { type: string, minLength: 1 }
+        baseQuantity: { type: number, minimum: 0 }
+        sourceDocumentType: { type: string, minLength: 1 }
+        sourceDocumentId: { type: string, minLength: 1 }
+        sourceDocumentNumber: { type: string, minLength: 1 }
+        occurredAt: { type: string, format: date-time }
+        notes: { type: string }
+    MaterialVarianceException:
+      type: object
+      required: [id, status, theoreticalQuantity, consumedQuantity, varianceQuantity, toleranceQuantity, events, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [OPEN, UNDER_REVIEW, CLOSED] }
+        classification: { type: ["string", "null"], enum: [WASTE, DESIGN_CHANGE, REWORK, MISALLOCATION, RECORDING_DELAY, IN_TRANSIT, UNIT_CONVERSION, DAMAGE, LOSS, null] }
+        disposition: { type: ["string", "null"] }
+        theoreticalQuantity: { type: number }
+        consumedQuantity: { type: number }
+        varianceQuantity: { type: number }
+        toleranceQuantity: { type: number }
+        reviewedBy: { type: ["string", "null"] }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+        closedBy: { type: ["string", "null"] }
+        closedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        events:
+          type: array
+          items:
+            type: object
+            required: [id, eventType, actorName, detail, metadata, createdAt]
+            properties:
+              id: { type: string }
+              eventType: { type: string }
+              actorName: { type: string }
+              detail: { type: string }
+              metadata: { type: object, additionalProperties: true }
+              createdAt: { type: string, format: date-time }
+    MaterialExceptionUpdate:
+      type: object
+      required: [status, classification, disposition]
+      properties:
+        status: { type: string, enum: [UNDER_REVIEW, CLOSED] }
+        classification: { type: string, enum: [WASTE, DESIGN_CHANGE, REWORK, MISALLOCATION, RECORDING_DELAY, IN_TRANSIT, UNIT_CONVERSION, DAMAGE, LOSS] }
+        disposition: { type: string, minLength: 1 }
     Commitment:
       type: object
       required: [id, projectId, baselineId, documentType, documentNumber, vendorName, status, version, totalAmount, createdBy, createdAt, updatedAt, lines]

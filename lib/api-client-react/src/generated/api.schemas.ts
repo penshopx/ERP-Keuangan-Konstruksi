@@ -262,6 +262,252 @@ export interface RabVersion {
   updatedAt: string;
 }
 
+export type MaterialVarianceExceptionStatus = typeof MaterialVarianceExceptionStatus[keyof typeof MaterialVarianceExceptionStatus];
+
+
+export const MaterialVarianceExceptionStatus = {
+  OPEN: 'OPEN',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  CLOSED: 'CLOSED',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MaterialVarianceExceptionClassification = typeof MaterialVarianceExceptionClassification[keyof typeof MaterialVarianceExceptionClassification] | null;
+
+
+export const MaterialVarianceExceptionClassification = {
+  WASTE: 'WASTE',
+  DESIGN_CHANGE: 'DESIGN_CHANGE',
+  REWORK: 'REWORK',
+  MISALLOCATION: 'MISALLOCATION',
+  RECORDING_DELAY: 'RECORDING_DELAY',
+  IN_TRANSIT: 'IN_TRANSIT',
+  UNIT_CONVERSION: 'UNIT_CONVERSION',
+  DAMAGE: 'DAMAGE',
+  LOSS: 'LOSS',
+} as const;
+
+export type MaterialVarianceExceptionEventsItemMetadata = { [key: string]: unknown };
+
+export type MaterialVarianceExceptionEventsItem = {
+  id: string;
+  eventType: string;
+  actorName: string;
+  detail: string;
+  metadata: MaterialVarianceExceptionEventsItemMetadata;
+  createdAt: string;
+};
+
+export interface MaterialVarianceException {
+  id: string;
+  status: MaterialVarianceExceptionStatus;
+  /** @nullable */
+  classification?: MaterialVarianceExceptionClassification;
+  /** @nullable */
+  disposition?: string | null;
+  theoreticalQuantity: number;
+  consumedQuantity: number;
+  varianceQuantity: number;
+  toleranceQuantity: number;
+  /** @nullable */
+  reviewedBy?: string | null;
+  /** @nullable */
+  reviewedAt?: string | null;
+  /** @nullable */
+  closedBy?: string | null;
+  /** @nullable */
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  events: MaterialVarianceExceptionEventsItem[];
+}
+
+export type InventoryMovementMovementType = typeof InventoryMovementMovementType[keyof typeof InventoryMovementMovementType];
+
+
+export const InventoryMovementMovementType = {
+  PROCURED: 'PROCURED',
+  RECEIVED: 'RECEIVED',
+  ISSUED: 'ISSUED',
+  RETURNED: 'RETURNED',
+  INSTALLED: 'INSTALLED',
+  INVOICED: 'INVOICED',
+  ACTUAL_COST: 'ACTUAL_COST',
+  TRANSFER_IN: 'TRANSFER_IN',
+  TRANSFER_OUT: 'TRANSFER_OUT',
+  ADJUSTMENT: 'ADJUSTMENT',
+} as const;
+
+export interface InventoryMovement {
+  id: string;
+  projectId: string;
+  baselineId: string;
+  costCodeId: string;
+  materialId: string;
+  movementType: InventoryMovementMovementType;
+  /** @minimum 0 */
+  quantity: number;
+  unit: string;
+  /** @minimum 0 */
+  baseQuantity: number;
+  sourceDocumentType: string;
+  sourceDocumentId: string;
+  sourceDocumentNumber: string;
+  occurredAt: string;
+  /** @nullable */
+  notes?: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface MaterialReconciliationItem {
+  rabItemId: string;
+  costCodeId: string;
+  workCode: string;
+  workName: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  unit: string;
+  analysisVersion: number;
+  coefficient: number;
+  theoreticalQuantity: number;
+  tolerancePercent: number;
+  toleranceQuantity: number;
+  allowedQuantity: number;
+  procuredQuantity: number;
+  receivedQuantity: number;
+  issuedQuantity: number;
+  returnedQuantity: number;
+  installedQuantity: number;
+  invoicedQuantity: number;
+  actualCostQuantity: number;
+  consumedQuantity: number;
+  varianceQuantity: number;
+  exceedsTolerance: boolean;
+  exception?: MaterialVarianceException | null;
+  evidence: InventoryMovement[];
+}
+
+export interface MaterialReconciliationSummary {
+  projectId: string;
+  baselineId: string;
+  asOf: string;
+  openExceptionCount: number;
+  items: MaterialReconciliationItem[];
+}
+
+export interface MaterialRequirement {
+  id: string;
+  baselineId: string;
+  rabItemId: string;
+  costCodeId: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  unit: string;
+  analysisVersion: number;
+  coefficient: number;
+  tolerancePercent: number;
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+}
+
+export interface MaterialRequirementInput {
+  baselineId: string;
+  rabItemId: string;
+  /** @minLength 1 */
+  materialCode: string;
+  /** @minLength 1 */
+  materialName: string;
+  /** @minLength 1 */
+  unit: string;
+  /** @minimum 1 */
+  analysisVersion: number;
+  /** @exclusiveMinimum 0 */
+  coefficient: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  tolerancePercent: number;
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+  /** @minLength 1 */
+  reason: string;
+}
+
+export type InventoryMovementInputMovementType = typeof InventoryMovementInputMovementType[keyof typeof InventoryMovementInputMovementType];
+
+
+export const InventoryMovementInputMovementType = {
+  PROCURED: 'PROCURED',
+  RECEIVED: 'RECEIVED',
+  ISSUED: 'ISSUED',
+  RETURNED: 'RETURNED',
+  INSTALLED: 'INSTALLED',
+  INVOICED: 'INVOICED',
+  ACTUAL_COST: 'ACTUAL_COST',
+  TRANSFER_IN: 'TRANSFER_IN',
+  TRANSFER_OUT: 'TRANSFER_OUT',
+  ADJUSTMENT: 'ADJUSTMENT',
+} as const;
+
+export interface InventoryMovementInput {
+  baselineId: string;
+  costCodeId: string;
+  materialId: string;
+  movementType: InventoryMovementInputMovementType;
+  /** @minimum 0 */
+  quantity: number;
+  /** @minLength 1 */
+  unit: string;
+  /** @minimum 0 */
+  baseQuantity: number;
+  /** @minLength 1 */
+  sourceDocumentType: string;
+  /** @minLength 1 */
+  sourceDocumentId: string;
+  /** @minLength 1 */
+  sourceDocumentNumber: string;
+  occurredAt: string;
+  notes?: string;
+}
+
+export type MaterialExceptionUpdateStatus = typeof MaterialExceptionUpdateStatus[keyof typeof MaterialExceptionUpdateStatus];
+
+
+export const MaterialExceptionUpdateStatus = {
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  CLOSED: 'CLOSED',
+} as const;
+
+export type MaterialExceptionUpdateClassification = typeof MaterialExceptionUpdateClassification[keyof typeof MaterialExceptionUpdateClassification];
+
+
+export const MaterialExceptionUpdateClassification = {
+  WASTE: 'WASTE',
+  DESIGN_CHANGE: 'DESIGN_CHANGE',
+  REWORK: 'REWORK',
+  MISALLOCATION: 'MISALLOCATION',
+  RECORDING_DELAY: 'RECORDING_DELAY',
+  IN_TRANSIT: 'IN_TRANSIT',
+  UNIT_CONVERSION: 'UNIT_CONVERSION',
+  DAMAGE: 'DAMAGE',
+  LOSS: 'LOSS',
+} as const;
+
+export interface MaterialExceptionUpdate {
+  status: MaterialExceptionUpdateStatus;
+  classification: MaterialExceptionUpdateClassification;
+  /** @minLength 1 */
+  disposition: string;
+}
+
 export type CommitmentDocumentType = typeof CommitmentDocumentType[keyof typeof CommitmentDocumentType];
 
 

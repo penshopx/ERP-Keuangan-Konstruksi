@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImportTemplateSheet } from "@/components/rab/ImportTemplateSheet"
 import { ProjectCommitments } from "@/components/rab/ProjectCommitments"
+import { MaterialReconciliation } from "@/components/rab/MaterialReconciliation"
 
 export default function ProjectRab() {
   const { id } = useParams()
@@ -346,6 +347,7 @@ export default function ProjectRab() {
         <TabsList className="mb-4">
           <TabsTrigger value="wbs" data-testid="tab-wbs">Item RAB (WBS)</TabsTrigger>
           <TabsTrigger value="commitments" data-testid="tab-commitments">Komitmen (PO/SPK)</TabsTrigger>
+          <TabsTrigger value="material" data-testid="tab-material">Rekonsiliasi Material</TabsTrigger>
         </TabsList>
 
         <TabsContent value="wbs" className="m-0">
@@ -417,6 +419,10 @@ export default function ProjectRab() {
 
         <TabsContent value="commitments" className="m-0">
           <ProjectCommitments projectId={projectId} rabVersion={selectedVersion} highlightedCommitmentId={highlightedCommitment} />
+        </TabsContent>
+
+        <TabsContent value="material" className="m-0">
+          <MaterialReconciliation projectId={projectId} />
         </TabsContent>
       </Tabs>
     </div>
