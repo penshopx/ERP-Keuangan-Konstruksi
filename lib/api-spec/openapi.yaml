@@ -898,6 +898,9 @@ components:
             consecutiveFailures:
               type: integer
               minimum: 0
+            pendingResendCompensations:
+              type: integer
+              minimum: 0
             lastFailureAt:
               type: [string, "null"]
               format: date-time
@@ -964,6 +967,7 @@ components:
           required:
             - status
             - consecutiveFailures
+            - pendingResendCompensations
             - lastFailureAt
             - lastSuccessAt
             - lastCompletedAt

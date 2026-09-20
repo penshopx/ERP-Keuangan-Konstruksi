@@ -38,6 +38,7 @@ test("alerts once after the failure threshold and once after recovery", async ()
   ): InvitationReconciliationHealth => ({
     status,
     consecutiveFailures,
+    pendingResendCompensations: 0,
     lastFailureAt: status === "DEGRADED" ? new Date().toISOString() : null,
     lastSuccessAt: status === "HEALTHY" ? new Date().toISOString() : null,
     lastCompletedAt: completedRun.occurredAt,
@@ -75,6 +76,7 @@ test("retries a failed alert delivery instead of silently suppressing it", async
   const degraded: InvitationReconciliationHealth = {
     status: "DEGRADED",
     consecutiveFailures: 1,
+    pendingResendCompensations: 0,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
     lastCompletedAt: null,
@@ -106,6 +108,7 @@ test("delivers a pending degradation before recovery when service recovers", asy
   await updateInvitationReconciliationAlert(alerting, {
     status: "DEGRADED",
     consecutiveFailures: 1,
+    pendingResendCompensations: 0,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
     lastCompletedAt: null,
@@ -116,6 +119,7 @@ test("delivers a pending degradation before recovery when service recovers", asy
   await updateInvitationReconciliationAlert(alerting, {
     status: "HEALTHY",
     consecutiveFailures: 0,
+    pendingResendCompensations: 0,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: new Date().toISOString(),
     lastCompletedAt: new Date().toISOString(),
@@ -139,6 +143,7 @@ test("alerts only after completion becomes overdue and recovers after completion
   const base: InvitationReconciliationHealth = {
     status: "HEALTHY",
     consecutiveFailures: 0,
+    pendingResendCompensations: 0,
     lastFailureAt: null,
     lastSuccessAt: null,
     lastCompletedAt: null,
@@ -179,6 +184,7 @@ test("claims one degradation and one recovery across concurrent evaluators", asy
   const degraded: InvitationReconciliationHealth = {
     status: "DEGRADED",
     consecutiveFailures: 1,
+    pendingResendCompensations: 0,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
     lastCompletedAt: null,
@@ -223,6 +229,7 @@ test("does not resend a successful degradation when recovery delivery fails", as
   const degraded: InvitationReconciliationHealth = {
     status: "DEGRADED",
     consecutiveFailures: 1,
+    pendingResendCompensations: 0,
     lastFailureAt: new Date().toISOString(),
     lastSuccessAt: null,
     lastCompletedAt: null,

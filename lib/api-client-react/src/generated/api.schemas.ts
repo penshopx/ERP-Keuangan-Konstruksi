@@ -47,6 +47,8 @@ export type HealthStatusInvitationReconciliation = {
   status: HealthStatusInvitationReconciliationStatus;
   /** @minimum 0 */
   consecutiveFailures: number;
+  /** @minimum 0 */
+  pendingResendCompensations: number;
   /** @nullable */
   lastFailureAt: string | null;
   /** @nullable */

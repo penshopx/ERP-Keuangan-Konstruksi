@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -48,6 +48,7 @@ export type InvitationReconciliationScheduleOptions = {
 export type InvitationReconciliationHealth = {
   status: "HEALTHY" | "DEGRADED";
   consecutiveFailures: number;
+  pendingResendCompensations: number;
   lastFailureAt: string | null;
   lastSuccessAt: string | null;
   lastCompletedAt: string | null;
@@ -105,6 +106,7 @@ export type InvitationReconciliationAlerting = {
 let reconciliationHealth: InvitationReconciliationHealth = {
   status: "HEALTHY",
   consecutiveFailures: 0,
+  pendingResendCompensations: 0,
   lastFailureAt: null,
   lastSuccessAt: null,
   lastCompletedAt: null,
@@ -330,12 +332,15 @@ async function persistSharedReconciliationCompletion(
 
 export async function getInvitationReconciliationHealth(): Promise<InvitationReconciliationHealth> {
   await ensureSharedReconciliationState();
-  const [shared] = await db.select().from(invitationReconciliationStateTable)
-    .where(eq(
-      invitationReconciliationStateTable.key,
-      invitationReconciliationStateKey,
-    ))
-    .limit(1);
+  const [[shared], pendingResendCompensations] = await Promise.all([
+    db.select().from(invitationReconciliationStateTable)
+      .where(eq(
+        invitationReconciliationStateTable.key,
+        invitationReconciliationStateKey,
+      ))
+      .limit(1),
+    countPendingResendCompensations(),
+  ]);
   if (!shared) throw new Error("Status rekonsiliasi bersama tidak tersedia");
 
   const completionStaleAfterMs = reconciliationHealth.completionStaleAfterMs;
@@ -343,10 +348,13 @@ export async function getInvitationReconciliationHealth(): Promise<InvitationRec
   const completionOverdue = completionStaleAfterMs !== null
     && Date.now() - baseline.getTime() >= completionStaleAfterMs;
   return {
-    status: completionOverdue || shared.consecutiveFailures > 0
+    status: completionOverdue
+        || shared.consecutiveFailures > 0
+        || pendingResendCompensations > 0
       ? "DEGRADED"
       : "HEALTHY",
     consecutiveFailures: shared.consecutiveFailures,
+    pendingResendCompensations,
     lastFailureAt: shared.lastFailureAt?.toISOString() ?? null,
     lastSuccessAt: shared.lastSuccessAt?.toISOString() ?? null,
     lastCompletedAt: shared.lastCompletedAt?.toISOString() ?? null,
@@ -399,8 +407,18 @@ const scheduledActor: ReconciliationActor = {
 const inactiveClerkStatuses = new Set(["revoked", "expired"]);
 const replacementRevokeFailureAction =
   "KEGAGALAN PARSIAL KOMPENSASI KIRIM ULANG UNDANGAN";
+const pendingResendCompensationPredicate = and(
+  eq(auditLogsTable.action, replacementRevokeFailureAction),
+  sql`${auditLogsTable.metadata}->>'reconciliationRequired' = 'true'`,
+);
 export const scheduledReconciliationLockName =
   "api-server:scheduled-invitation-reconciliation";
+
+async function countPendingResendCompensations() {
+  const [result] = await db.select({ value: count() }).from(auditLogsTable)
+    .where(pendingResendCompensationPredicate);
+  return result?.value ?? 0;
+}
 
 export async function reconcileInvitationFromClerk(
   invitation: typeof staffInvitationsTable.$inferSelect,
@@ -482,10 +500,7 @@ export async function reconcilePendingInvitations(
 
   if (dependencies.revokeClerkInvitation) {
     const partialFailures = await db.select().from(auditLogsTable)
-      .where(and(
-        eq(auditLogsTable.action, replacementRevokeFailureAction),
-        sql`${auditLogsTable.metadata}->>'reconciliationRequired' = 'true'`,
-      ));
+      .where(pendingResendCompensationPredicate);
     for (const partialFailure of partialFailures) {
       const metadata = partialFailure.metadata;
       if (

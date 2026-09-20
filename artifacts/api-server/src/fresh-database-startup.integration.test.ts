@@ -156,11 +156,13 @@ async function waitForHealth(
         invitationReconciliation: {
           status: string;
           consecutiveFailures: number;
+          pendingResendCompensations: number;
         };
       };
       assert.equal(health.status, "ok");
       assert.equal(health.invitationReconciliation.status, "HEALTHY");
       assert.equal(health.invitationReconciliation.consecutiveFailures, 0);
+      assert.equal(health.invitationReconciliation.pendingResendCompensations, 0);
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));

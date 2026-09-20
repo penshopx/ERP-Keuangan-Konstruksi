@@ -14,6 +14,8 @@ import * as zod from 'zod';
  */
 export const healthCheckResponseInvitationReconciliationConsecutiveFailuresMin = 0;
 
+export const healthCheckResponseInvitationReconciliationPendingResendCompensationsMin = 0;
+
 
 export const healthCheckResponseInvitationReconciliationLastRunFourCheckedMin = 0;
 
@@ -28,6 +30,7 @@ export const HealthCheckResponse = zod.object({
   "invitationReconciliation": zod.object({
   "status": zod.enum(['HEALTHY', 'DEGRADED']),
   "consecutiveFailures": zod.number().int().min(healthCheckResponseInvitationReconciliationConsecutiveFailuresMin),
+  "pendingResendCompensations": zod.number().int().min(healthCheckResponseInvitationReconciliationPendingResendCompensationsMin),
   "lastFailureAt": zod.coerce.date().nullable(),
   "lastSuccessAt": zod.coerce.date().nullable(),
   "lastCompletedAt": zod.coerce.date().nullable(),

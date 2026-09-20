@@ -1102,6 +1102,9 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     assert.equal(partialFailure.metadata?.reconciliationRequired, true);
     assert.equal(auditsBeforeReconciliation.some(({ action }) =>
       action === "UNDANGAN STAF DIKIRIM ULANG"), false);
+    const healthWithBacklog = await getInvitationReconciliationHealth();
+    assert.equal(healthWithBacklog.pendingResendCompensations, 1);
+    assert.equal(healthWithBacklog.status, "DEGRADED");
 
     const reconciliation = await reconcilePendingInvitations({
       getClerkInvitation: clerkDependencies.getClerkInvitation,
@@ -1113,6 +1116,9 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       .where(eq(auditLogsTable.id, partialFailure.id));
     assert.equal(resolvedFailure.metadata?.reconciliationRequired, false);
     assert.equal(resolvedFailure.metadata?.reconciliationOutcome, "REVOKED");
+    const healthWithoutBacklog = await getInvitationReconciliationHealth();
+    assert.equal(healthWithoutBacklog.pendingResendCompensations, 0);
+    assert.equal(healthWithoutBacklog.status, "HEALTHY");
 
     const reconciliationLookups: string[] = [];
     const idempotentReconciliation = await reconcilePendingInvitations({
