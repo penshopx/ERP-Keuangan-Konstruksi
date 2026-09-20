@@ -524,6 +524,99 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
     }
   });
 
+  await t.test("operational roles retain their permitted read access", async () => {
+    const users = {
+      [siteManagerId]: {
+        email: `${siteManagerId}@example.test`,
+        name: "Integration Site Manager",
+      },
+      [financeId]: {
+        email: `${financeId}@example.test`,
+        name: "Integration Finance",
+      },
+      [procurementId]: {
+        email: `${procurementId}@example.test`,
+        name: "Integration Procurement",
+      },
+    };
+    const server = await startServer(clerkAccessMiddleware(users));
+    const invoicePeriod = `${prefix}-operational-read`;
+    const headers = (userId: string) => ({
+      "content-type": "application/json",
+      "x-test-user-id": userId,
+    });
+
+    try {
+      const createdInvoice = await fetch(`${server.baseUrl}/invoices`, {
+        method: "POST",
+        headers: headers(financeId),
+        body: JSON.stringify({
+          projectId,
+          period: invoicePeriod,
+          issuedAt: "2099-02-15",
+          dpp: 10_000,
+          retentionPercent: 0,
+          integrated: false,
+          serviceType: "JASA_LAIN",
+          qualification: "TIDAK_BERLAKU",
+          hasSbu: false,
+          supplierPkp: false,
+          governmentCollector: false,
+        }),
+      });
+      assert.equal(createdInvoice.status, 201);
+      const invoice = await createdInvoice.json() as { id: string };
+
+      const siteManagerProjects = await fetch(`${server.baseUrl}/projects`, {
+        headers: headers(siteManagerId),
+      });
+      assert.equal(siteManagerProjects.status, 200);
+      assert.ok(
+        (await siteManagerProjects.json() as Array<{ id: string }>).some(({ id }) => id === projectId),
+      );
+
+      const siteManagerInvoices = await fetch(
+        `${server.baseUrl}/invoices?projectId=${encodeURIComponent(projectId)}`,
+        { headers: headers(siteManagerId) },
+      );
+      assert.equal(siteManagerInvoices.status, 200);
+      assert.ok(
+        (await siteManagerInvoices.json() as Array<{ id: string }>).some(({ id }) => id === invoice.id),
+      );
+
+      const procurementProjects = await fetch(`${server.baseUrl}/projects`, {
+        headers: headers(procurementId),
+      });
+      assert.equal(procurementProjects.status, 200);
+      assert.ok(
+        (await procurementProjects.json() as Array<{ id: string }>).some(({ id }) => id === projectId),
+      );
+
+      for (const [userId, endpoint] of [
+        [siteManagerId, "/activity"],
+        [procurementId, "/invoices"],
+        [procurementId, "/activity"],
+      ] as const) {
+        const response = await fetch(`${server.baseUrl}${endpoint}`, {
+          headers: headers(userId),
+        });
+        assert.equal(response.status, 403);
+        assert.deepEqual(await response.json(), {
+          error: "Jabatan Anda tidak memiliki hak untuk tindakan ini",
+        });
+      }
+    } finally {
+      const invoices = await db.select({ id: invoicesTable.id }).from(invoicesTable)
+        .where(eq(invoicesTable.period, invoicePeriod));
+      if (invoices.length) {
+        await db.delete(taxCalculationSnapshotsTable)
+          .where(inArray(taxCalculationSnapshotsTable.invoiceId, invoices.map(({ id }) => id)));
+        await db.delete(invoicesTable).where(inArray(invoicesTable.id, invoices.map(({ id }) => id)));
+      }
+      await server.close();
+    }
+  });
+
   await t.test("an unassigned user cannot read protected data endpoints", async () => {
     const server = await startServer(clerkAccessMiddleware({
       [unassignedId]: {
