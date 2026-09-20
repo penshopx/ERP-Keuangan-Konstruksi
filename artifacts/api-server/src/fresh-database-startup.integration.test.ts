@@ -198,13 +198,13 @@ async function waitForFailedStartup(
       const response = await fetch(healthUrl);
       healthWasReachable = healthWasReachable || response.ok;
     } catch {
-      // Expected: migration validation must fail before the port opens.
+      // Expected: startup validation must fail before the port opens.
     }
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
 
   if (child.exitCode === null && child.signalCode === null) {
-    throw new Error(`API did not exit after migration failure\n${readOutput()}`);
+    throw new Error(`API did not exit after startup failure\n${readOutput()}`);
   }
 
   assert.equal(
@@ -233,6 +233,7 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
   const freshEnv = {
     ...process.env,
     DATABASE_URL: freshDatabaseUrl,
+    INVITATION_RECONCILIATION_ALERT_STALE_AFTER_MS: "60000",
     NODE_ENV: "production",
     SEED_DEMO_DATA: "true",
   };
@@ -321,6 +322,70 @@ test("setup prepares an empty PostgreSQL database before API startup", async (t)
     "tax_rule_versions_no_overlapping_periods",
     "tax_rule_versions_valid_period",
   ]);
+});
+
+test("API rejects invalid invitation reconciliation stale alert thresholds before opening its port", async (t) => {
+  const invalidValues = [
+    { name: "empty", value: "" },
+    { name: "zero", value: "0" },
+    { name: "negative", value: "-1" },
+    { name: "fractional", value: "1.5" },
+    { name: "non-numeric", value: "not-a-number" },
+  ];
+  const children = new Set<ChildProcess>();
+
+  t.after(async () => {
+    await Promise.all([...children].map((child) => stopProcess(child)));
+  });
+
+  await runCommand(
+    "pnpm",
+    ["--filter", "@workspace/api-server", "run", "build"],
+    process.env,
+  );
+
+  for (const invalid of invalidValues) {
+    await t.test(invalid.name, async () => {
+      const port = await reservePort();
+      let apiOutput = "";
+      const api = spawn(
+        "pnpm",
+        ["--filter", "@workspace/api-server", "run", "start"],
+        {
+          cwd: workspaceRoot,
+          env: {
+            ...process.env,
+            PORT: String(port),
+            INVITATION_RECONCILIATION_ALERT_STALE_AFTER_MS: invalid.value,
+          },
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
+      children.add(api);
+      api.stdout?.on("data", (chunk) => {
+        apiOutput += chunk;
+      });
+      api.stderr?.on("data", (chunk) => {
+        apiOutput += chunk;
+      });
+
+      const healthUrl = `http://127.0.0.1:${port}/api/healthz`;
+      const exit = await waitForFailedStartup(api, healthUrl, () => apiOutput);
+
+      assert.notEqual(
+        exit.code,
+        0,
+        `API unexpectedly accepted ${invalid.name} threshold\n${apiOutput}`,
+      );
+      assert.equal(exit.signal, null);
+      assert.match(
+        apiOutput,
+        /INVITATION_RECONCILIATION_ALERT_STALE_AFTER_MS/,
+      );
+      await assert.rejects(fetch(healthUrl), /fetch failed/);
+      children.delete(api);
+    });
+  }
 });
 
 test("API exits before opening its port when mandatory migrations are missing", async (t) => {
