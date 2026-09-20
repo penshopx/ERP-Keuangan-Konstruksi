@@ -25,6 +25,7 @@ const requiredMigrations = [
   "0012_add_material_reconciliation.sql",
   "0013_add_estimator_workbench.sql",
   "0014_neutralize_competency_reference_labels.sql",
+  "0015_share_reconciliation_alert_incidents.sql",
 ];
 const expectedTables = [
   "actual_cost_allocations",

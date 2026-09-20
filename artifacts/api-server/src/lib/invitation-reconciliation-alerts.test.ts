@@ -1,10 +1,19 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { beforeEach } from "node:test";
+import { db, invitationReconciliationStateTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   type InvitationReconciliationAlert,
   type InvitationReconciliationHealth,
   updateInvitationReconciliationAlert,
 } from "./invitation-reconciliation";
+
+beforeEach(async () => {
+  await db.delete(invitationReconciliationStateTable).where(eq(
+    invitationReconciliationStateTable.key,
+    "scheduled-invitation-reconciliation",
+  ));
+});
 
 const completedRun: InvitationReconciliationHealth["lastRun"] = {
   outcome: "COMPLETED",
@@ -155,4 +164,83 @@ test("alerts only after completion becomes overdue and recovers after completion
     lastCompletedAt: new Date().toISOString(),
   });
   assert.deepEqual(alerts.map(({ type }) => type), ["DEGRADED", "RECOVERED"]);
+});
+
+test("claims one degradation and one recovery across concurrent evaluators", async () => {
+  const delivered: InvitationReconciliationAlert["type"][] = [];
+  const alerting = {
+    failureThreshold: 1,
+    completionStaleAfterMs: 60_000,
+    notify: async (alert: InvitationReconciliationAlert) => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      delivered.push(alert.type);
+    },
+  };
+  const degraded: InvitationReconciliationHealth = {
+    status: "DEGRADED",
+    consecutiveFailures: 1,
+    lastFailureAt: new Date().toISOString(),
+    lastSuccessAt: null,
+    lastCompletedAt: null,
+    completionOverdue: false,
+    completionStaleAfterMs: alerting.completionStaleAfterMs,
+    lastRun: completedRun,
+  };
+
+  await Promise.all([
+    updateInvitationReconciliationAlert(alerting, degraded),
+    updateInvitationReconciliationAlert(alerting, degraded),
+  ]);
+  assert.deepEqual(delivered, ["DEGRADED"]);
+
+  const healthy: InvitationReconciliationHealth = {
+    ...degraded,
+    status: "HEALTHY",
+    consecutiveFailures: 0,
+    lastSuccessAt: new Date().toISOString(),
+    lastCompletedAt: new Date().toISOString(),
+  };
+  await Promise.all([
+    updateInvitationReconciliationAlert(alerting, healthy),
+    updateInvitationReconciliationAlert(alerting, healthy),
+  ]);
+  assert.deepEqual(delivered, ["DEGRADED", "RECOVERED"]);
+});
+
+test("does not resend a successful degradation when recovery delivery fails", async () => {
+  const attempts: InvitationReconciliationAlert["type"][] = [];
+  let recoveryFailures = 1;
+  const alerting = {
+    failureThreshold: 1,
+    completionStaleAfterMs: 60_000,
+    notify: async (alert: InvitationReconciliationAlert) => {
+      attempts.push(alert.type);
+      if (alert.type === "RECOVERED" && recoveryFailures-- > 0) {
+        throw new Error("Webhook unavailable");
+      }
+    },
+  };
+  const degraded: InvitationReconciliationHealth = {
+    status: "DEGRADED",
+    consecutiveFailures: 1,
+    lastFailureAt: new Date().toISOString(),
+    lastSuccessAt: null,
+    lastCompletedAt: null,
+    completionOverdue: false,
+    completionStaleAfterMs: alerting.completionStaleAfterMs,
+    lastRun: completedRun,
+  };
+  const healthy: InvitationReconciliationHealth = {
+    ...degraded,
+    status: "HEALTHY",
+    consecutiveFailures: 0,
+    lastSuccessAt: new Date().toISOString(),
+    lastCompletedAt: new Date().toISOString(),
+  };
+
+  await updateInvitationReconciliationAlert(alerting, degraded);
+  await updateInvitationReconciliationAlert(alerting, healthy);
+  await updateInvitationReconciliationAlert(alerting, healthy);
+
+  assert.deepEqual(attempts, ["DEGRADED", "RECOVERED", "RECOVERED"]);
 });

@@ -7,6 +7,7 @@ import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
+  invitationReconciliationStateTable,
   invoicesTable,
   operationalStateTable,
   pool,
@@ -1549,6 +1550,11 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
   });
 
   await t.test("scheduled reconciliation allows only one active pass across instances", async () => {
+    await db.update(invitationReconciliationStateTable).set({
+      alertIncidentActive: false,
+      alertIncidentReason: null,
+      degradedAlertSent: false,
+    });
     let releaseFirstLookup!: () => void;
     const firstLookupStarted = new Promise<void>((resolve) => {
       releaseFirstLookup = resolve;
@@ -1614,6 +1620,11 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
   });
 
   await t.test("a hung scheduled pass alerts once and recovers after it completes", async () => {
+    await db.update(invitationReconciliationStateTable).set({
+      alertIncidentActive: false,
+      alertIncidentReason: null,
+      degradedAlertSent: false,
+    });
     let releaseLookup!: () => void;
     const lookupBlocked = new Promise<void>((resolve) => {
       releaseLookup = resolve;
@@ -1651,8 +1662,9 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
       [["DEGRADED", "NO_RECENT_COMPLETION"]],
     );
 
-    scheduler.stop();
+    const stopped = scheduler.stop();
     releaseLookup();
+    await stopped;
     const recoveryDeadline = Date.now() + 1_000;
     while (alerts.length < 2 && Date.now() < recoveryDeadline) {
       await new Promise((resolve) => setTimeout(resolve, 5));

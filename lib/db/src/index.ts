@@ -95,6 +95,7 @@ const REQUIRED_MIGRATIONS = [
   "0007_index_pending_resend_compensation_audits.sql",
   "0010_add_commitment_ledger.sql",
   "0011_add_budget_alerts.sql",
+  "0015_share_reconciliation_alert_incidents.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -151,7 +152,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
           )
       ) AS operational_state_shape,
       (
-        SELECT count(*) = 9
+        SELECT count(*) = 12
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'invitation_reconciliation_state'
@@ -179,6 +180,16 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
             OR (
               column_name = 'last_run'
               AND data_type = 'jsonb'
+              AND is_nullable = 'YES'
+            )
+            OR (
+              column_name IN ('alert_incident_active', 'degraded_alert_sent')
+              AND data_type = 'boolean'
+              AND is_nullable = 'NO'
+            )
+            OR (
+              column_name = 'alert_incident_reason'
+              AND data_type = 'text'
               AND is_nullable = 'YES'
             )
             OR (

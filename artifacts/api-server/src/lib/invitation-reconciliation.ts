@@ -166,80 +166,94 @@ function evaluateReconciliationCompletionFreshness(
   };
 }
 
-type AlertIncidentState = {
-  active: boolean;
-  activeReason: InvitationReconciliationAlert["reason"] | null;
-  pendingDegraded: InvitationReconciliationAlert | null;
-};
-
-const alertIncidentStates =
-  new WeakMap<InvitationReconciliationAlerting, AlertIncidentState>();
-
 export async function updateInvitationReconciliationAlert(
   alerting: InvitationReconciliationAlerting | undefined,
   health: InvitationReconciliationHealth,
 ) {
   if (!alerting) return;
 
-  const state = alertIncidentStates.get(alerting) ?? {
-    active: false,
-    activeReason: null,
-    pendingDegraded: null,
-  };
-  alertIncidentStates.set(alerting, state);
-
-  if (
-    !state.active
-    && !state.pendingDegraded
-    && (
-      health.consecutiveFailures >= alerting.failureThreshold
-      || health.completionOverdue
-    )
-  ) {
-    state.pendingDegraded = {
-      type: "DEGRADED",
-      reason: health.completionOverdue
+  await ensureSharedReconciliationState();
+  const degraded = health.consecutiveFailures >= alerting.failureThreshold
+    || health.completionOverdue;
+  if (degraded) {
+    await db.update(invitationReconciliationStateTable).set({
+      alertIncidentActive: true,
+      alertIncidentReason: health.completionOverdue
         ? "NO_RECENT_COMPLETION"
         : "CONSECUTIVE_FAILURES",
-      occurredAt: new Date().toISOString(),
-      consecutiveFailures: health.consecutiveFailures,
-      lastFailureAt: health.lastFailureAt,
-      lastSuccessAt: health.lastSuccessAt,
-      lastCompletedAt: health.lastCompletedAt,
-    };
+      degradedAlertSent: false,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(invitationReconciliationStateTable.key, invitationReconciliationStateKey),
+      eq(invitationReconciliationStateTable.alertIncidentActive, false),
+    ));
   }
 
-  if (state.pendingDegraded) {
-    const pending = state.pendingDegraded;
+  const deliver = async (type: InvitationReconciliationAlert["type"]) => {
+    let attempted: InvitationReconciliationAlert | null = null;
     try {
-      await alerting.notify(pending);
-      state.pendingDegraded = null;
-      state.active = true;
-      state.activeReason = pending.reason;
+      await db.transaction(async (tx) => {
+      await tx.execute(sql`
+        select 1
+        from ${invitationReconciliationStateTable}
+        where ${invitationReconciliationStateTable.key} = ${invitationReconciliationStateKey}
+        for update
+      `);
+      const [state] = await tx.select().from(invitationReconciliationStateTable)
+        .where(eq(
+          invitationReconciliationStateTable.key,
+          invitationReconciliationStateKey,
+        ))
+        .limit(1);
+      if (!state?.alertIncidentActive) return;
+      if (type === "DEGRADED" && state.degradedAlertSent) return;
+      if (type === "RECOVERED" && !state.degradedAlertSent) return;
+
+      const reason = (
+        state.alertIncidentReason === "NO_RECENT_COMPLETION"
+          ? state.alertIncidentReason
+          : "CONSECUTIVE_FAILURES"
+      );
+      attempted = {
+        type,
+        reason,
+        occurredAt: new Date().toISOString(),
+        consecutiveFailures: health.consecutiveFailures,
+        lastFailureAt: health.lastFailureAt,
+        lastSuccessAt: health.lastSuccessAt,
+        lastCompletedAt: health.lastCompletedAt,
+      };
+      await alerting.notify(attempted);
+      if (type === "DEGRADED") {
+        await tx.update(invitationReconciliationStateTable).set({
+          degradedAlertSent: true,
+          updatedAt: new Date(),
+        }).where(eq(
+          invitationReconciliationStateTable.key,
+          invitationReconciliationStateKey,
+        ));
+      } else {
+        await tx.update(invitationReconciliationStateTable).set({
+          alertIncidentActive: false,
+          alertIncidentReason: null,
+          degradedAlertSent: false,
+          updatedAt: new Date(),
+        }).where(eq(
+          invitationReconciliationStateTable.key,
+          invitationReconciliationStateKey,
+        ));
+      }
+      });
+      return true;
     } catch (error) {
-      alerting.onNotificationError?.(error, pending);
-      return;
+      if (attempted) alerting.onNotificationError?.(error, attempted);
+      return false;
     }
-  }
-
-  if (!state.active || health.status !== "HEALTHY") return;
-
-  const recovered: InvitationReconciliationAlert = {
-    type: "RECOVERED",
-    reason: state.activeReason ?? "CONSECUTIVE_FAILURES",
-    occurredAt: new Date().toISOString(),
-    consecutiveFailures: health.consecutiveFailures,
-    lastFailureAt: health.lastFailureAt,
-    lastSuccessAt: health.lastSuccessAt,
-    lastCompletedAt: health.lastCompletedAt,
   };
-  try {
-    await alerting.notify(recovered);
-    state.active = false;
-    state.activeReason = null;
-  } catch (error) {
-    alerting.onNotificationError?.(error, recovered);
-  }
+
+  const degradedDelivered = await deliver("DEGRADED");
+  if (!degradedDelivered || health.status !== "HEALTHY") return;
+  await deliver("RECOVERED");
 }
 
 async function ensureSharedReconciliationState() {
@@ -595,6 +609,7 @@ export function schedulePendingInvitationReconciliation(
   const checkCompletionFreshness = () => {
     if (!dependencies.alerting) return alertUpdate;
     alertUpdate = alertUpdate.then(async () => {
+      if (stopping) return;
       evaluateReconciliationCompletionFreshness(
         dependencies.alerting!.completionStaleAfterMs,
       );

@@ -1,4 +1,11 @@
-import { integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 export const operationalStateTable = pgTable("operational_state", {
   key: text("key").primaryKey(),
@@ -16,6 +23,9 @@ export const invitationReconciliationStateTable = pgTable(
     lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
     lastRunAt: timestamp("last_run_at", { withTimezone: true }),
     lastRun: jsonb("last_run").$type<Record<string, unknown>>(),
+    alertIncidentActive: boolean("alert_incident_active").notNull().default(false),
+    alertIncidentReason: text("alert_incident_reason"),
+    degradedAlertSent: boolean("degraded_alert_sent").notNull().default(false),
     monitoringStartedAt: timestamp("monitoring_started_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
