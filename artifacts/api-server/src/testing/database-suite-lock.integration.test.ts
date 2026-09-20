@@ -6,14 +6,21 @@ import { after, test } from "node:test";
 import { createDatabasePool, pool } from "@workspace/db";
 import {
   acquireDatabaseSuiteLock,
+  acquirePersistenceDatabaseSuiteLock,
   describeDatabaseSuiteError,
   isDatabaseClientTimeout,
   isDatabaseStatementTimeout,
   releaseDatabaseSuiteLock,
+  releasePersistenceDatabaseSuiteLock,
   runDatabaseSuiteOperation,
   setDatabaseSuitePoolStatementTimeout,
   setDatabaseSuiteStatementTimeout,
 } from "./database-suite-lock";
+import {
+  getAccessDatabaseSuiteConfig,
+  getDemoSeedingDatabaseSuiteConfig,
+  getPersistenceDatabaseSuiteConfig,
+} from "./database-suite-config";
 
 const workerUrl = new URL("./database-suite-lock.worker.ts", import.meta.url);
 
@@ -277,3 +284,65 @@ test("statement timeout still cleans fixtures and releases the database suite lo
   const reacquiredClient = await acquireDatabaseSuiteLock({ ...lockOptions, timeoutMs: 1_000 });
   await releaseDatabaseSuiteLock(reacquiredClient, lockOptions);
 });
+
+for (const [timeoutEnvironmentName, expectedSuiteName, getConfig] of [
+  [
+    "PERSISTENCE_TEST_STATEMENT_TIMEOUT_MS",
+    "Persistence integration suite",
+    getPersistenceDatabaseSuiteConfig,
+  ],
+  [
+    "ACCESS_TEST_STATEMENT_TIMEOUT_MS",
+    "Access integration suite",
+    getAccessDatabaseSuiteConfig,
+  ],
+  [
+    "DEMO_SEEDING_TEST_STATEMENT_TIMEOUT_MS",
+    "Demo seeding suite",
+    getDemoSeedingDatabaseSuiteConfig,
+  ],
+] as const) {
+  test(`${timeoutEnvironmentName} reports its suite name and timeout while leaving the shared lock reusable`, async () => {
+    const statementTimeoutMs = 50;
+    const config = getConfig({ [timeoutEnvironmentName]: String(statementTimeoutMs) });
+    assert.equal(config.suiteName, expectedSuiteName);
+    const fixtureName = `timeout-cleanup-${randomUUID()}`;
+    let client = await acquirePersistenceDatabaseSuiteLock(5_000);
+
+    try {
+      await setDatabaseSuiteStatementTimeout(client, config.suiteName, config.statementTimeoutMs);
+      await client.query(
+        "CREATE TEMP TABLE IF NOT EXISTS shared_suite_timeout_cleanup (name text PRIMARY KEY)",
+      );
+      await client.query("INSERT INTO shared_suite_timeout_cleanup (name) VALUES ($1)", [fixtureName]);
+
+      await assert.rejects(
+        runDatabaseSuiteOperation(
+          () => client.query("SELECT pg_sleep(1)"),
+          config.suiteName,
+          config.statementTimeoutMs,
+        ),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal(
+            error.message,
+            `${expectedSuiteName} database query exceeded the ${statementTimeoutMs}ms statement timeout`,
+          );
+          return true;
+        },
+      );
+
+      await client.query("DELETE FROM shared_suite_timeout_cleanup WHERE name = $1", [fixtureName]);
+      const remaining = await client.query<{ count: string }>(
+        "SELECT COUNT(*)::text AS count FROM shared_suite_timeout_cleanup WHERE name = $1",
+        [fixtureName],
+      );
+      assert.equal(remaining.rows[0]?.count, "0");
+    } finally {
+      await releasePersistenceDatabaseSuiteLock(client);
+    }
+
+    client = await acquirePersistenceDatabaseSuiteLock(1_000);
+    await releasePersistenceDatabaseSuiteLock(client);
+  });
+}

@@ -10,13 +10,13 @@ import {
 } from "@workspace/db";
 import {
   acquirePersistenceDatabaseSuiteLock,
-  defaultDatabaseSuiteStatementTimeoutMs,
   describeDatabaseSuiteError,
   releasePersistenceDatabaseSuiteLock,
   runDatabaseSuiteOperation,
   setDatabaseSuitePoolStatementTimeout,
   type DatabaseSuiteLockClient,
 } from "../testing/database-suite-lock";
+import { getDemoSeedingDatabaseSuiteConfig } from "../testing/database-suite-config";
 import { demoInvoices, seedDemoData } from "./demo-data";
 import { shouldSeedDemoData } from "./demo-seeding";
 
@@ -27,10 +27,10 @@ const nonDemoSnapshotId = `test-demo-seed-snapshot-${runId}`;
 const collidingInvoiceId = demoInvoices[0].id;
 const collidingSnapshotId = `tax-${collidingInvoiceId}`;
 let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
-const databaseSuiteName = "Demo seeding suite";
-const databaseStatementTimeoutMs = Number(
-  process.env.DEMO_SEEDING_TEST_STATEMENT_TIMEOUT_MS ?? defaultDatabaseSuiteStatementTimeoutMs,
-);
+const {
+  suiteName: databaseSuiteName,
+  statementTimeoutMs: databaseStatementTimeoutMs,
+} = getDemoSeedingDatabaseSuiteConfig();
 
 before(async () => {
   setDatabaseSuitePoolStatementTimeout(databaseSuiteName, databaseStatementTimeoutMs);

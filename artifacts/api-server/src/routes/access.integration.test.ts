@@ -36,13 +36,13 @@ import {
 } from "../lib/invitation-reconciliation";
 import {
   acquirePersistenceDatabaseSuiteLock,
-  defaultDatabaseSuiteStatementTimeoutMs,
   describeDatabaseSuiteError,
   releasePersistenceDatabaseSuiteLock,
   runDatabaseSuiteOperation,
   setDatabaseSuitePoolStatementTimeout,
   type DatabaseSuiteLockClient,
 } from "../testing/database-suite-lock";
+import { getAccessDatabaseSuiteConfig } from "../testing/database-suite-config";
 
 const runId = randomUUID();
 const prefix = `access-test-${runId}`;
@@ -60,10 +60,10 @@ const revokedClerkIds: string[] = [];
 const clerkStatuses = new Map<string, string>();
 let clerkSequence = 0;
 let databaseSuiteLockClient: DatabaseSuiteLockClient | undefined;
-const databaseSuiteName = "Access integration suite";
-const databaseStatementTimeoutMs = Number(
-  process.env.ACCESS_TEST_STATEMENT_TIMEOUT_MS ?? defaultDatabaseSuiteStatementTimeoutMs,
-);
+const {
+  suiteName: databaseSuiteName,
+  statementTimeoutMs: databaseStatementTimeoutMs,
+} = getAccessDatabaseSuiteConfig();
 
 const directorAccess: AccessContext = {
   userId: directorId,

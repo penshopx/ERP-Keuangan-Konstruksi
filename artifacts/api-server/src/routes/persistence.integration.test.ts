@@ -24,13 +24,13 @@ import type { InvoicePersistenceHooks } from "./invoices";
 import type { ProjectPersistenceHooks } from "./projects";
 import {
   acquirePersistenceDatabaseSuiteLock,
-  defaultDatabaseSuiteStatementTimeoutMs,
   describeDatabaseSuiteError,
   releasePersistenceDatabaseSuiteLock,
   runDatabaseSuiteOperation,
   setDatabaseSuitePoolStatementTimeout,
   type DatabaseSuiteLockClient,
 } from "../testing/database-suite-lock";
+import { getPersistenceDatabaseSuiteConfig } from "../testing/database-suite-config";
 
 const runId = randomUUID();
 const projectCode = `TST-${runId.slice(0, 8)}`;
@@ -42,10 +42,10 @@ const regressionTaxRuleVersionPattern = "^TEST-(SUCCESSOR|CONCURRENT)-[0-9a-f-]{
 const regressionDirectTaxRuleIdPattern = "^test-direct-(base|adjacent|overlap)-[0-9a-f-]{36}$";
 const regressionRabTemplateIdPattern = "^test-rab-import-[0-9a-f-]{36}$";
 const databaseSuiteLockTimeoutMs = Number(process.env.PERSISTENCE_TEST_LOCK_TIMEOUT_MS ?? 120_000);
-const databaseStatementTimeoutMs = Number(
-  process.env.PERSISTENCE_TEST_STATEMENT_TIMEOUT_MS ?? defaultDatabaseSuiteStatementTimeoutMs,
-);
-const databaseSuiteName = "Persistence integration suite";
+const {
+  suiteName: databaseSuiteName,
+  statementTimeoutMs: databaseStatementTimeoutMs,
+} = getPersistenceDatabaseSuiteConfig();
 const preventOverlappingTaxRulesMigrationUrl = new URL(
   "../../../../lib/db/migrations/0001_prevent_overlapping_tax_rule_periods.sql",
   import.meta.url,
