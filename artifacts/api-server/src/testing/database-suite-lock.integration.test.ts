@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { createServer, type Socket } from "node:net";
 import { after, test } from "node:test";
-import { pool } from "@workspace/db";
+import { createDatabasePool, pool } from "@workspace/db";
 import {
   acquireDatabaseSuiteLock,
+  describeDatabaseSuiteError,
+  isDatabaseClientTimeout,
   isDatabaseStatementTimeout,
   releaseDatabaseSuiteLock,
+  runDatabaseSuiteOperation,
+  setDatabaseSuitePoolStatementTimeout,
   setDatabaseSuiteStatementTimeout,
 } from "./database-suite-lock";
 
@@ -84,6 +89,106 @@ function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string, 
     onData();
   });
 }
+
+test("database suite pool applies configurable client-side timeouts", () => {
+  setDatabaseSuitePoolStatementTimeout("client-timeout regression", 1_234);
+
+  assert.equal(pool.options.statement_timeout, 1_234);
+  assert.equal(pool.options.query_timeout, 1_234);
+  assert.equal(pool.options.connectionTimeoutMillis, 1_234);
+});
+
+test("client timeout errors identify the suite and configured limit", async () => {
+  const driverError = new Error("Query read timeout");
+  const wrappedError = new Error("Failed while acquiring the database lock", {
+    cause: driverError,
+  });
+
+  await assert.rejects(
+    runDatabaseSuiteOperation(
+      async () => {
+        throw wrappedError;
+      },
+      "Disconnected database regression",
+      321,
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(
+        error.message,
+        /Disconnected database regression database operation exceeded the 321ms client timeout/,
+      );
+      assert.equal(isDatabaseClientTimeout(error), true);
+      assert.equal(error.cause, wrappedError);
+      return true;
+    },
+  );
+
+  assert.equal(
+    describeDatabaseSuiteError(wrappedError, "Disconnected database regression", 321) instanceof Error,
+    true,
+  );
+});
+
+test("a non-responsive database connection times out and its pool closes", async () => {
+  const timeoutMs = 100;
+  const suiteName = "Non-responsive database regression";
+  const serverSockets = new Set<Socket>();
+  const stalledServer = createServer((socket) => {
+    // Accept the TCP connection without completing the PostgreSQL handshake.
+    serverSockets.add(socket);
+    socket.once("close", () => serverSockets.delete(socket));
+  });
+  await new Promise<void>((resolve, reject) => {
+    stalledServer.once("error", reject);
+    stalledServer.listen(0, "127.0.0.1", resolve);
+  });
+  const address = stalledServer.address();
+  assert.ok(address && typeof address === "object");
+  const stalledPool = createDatabasePool({
+    host: "127.0.0.1",
+    port: address.port,
+    user: "validation",
+    password: "validation",
+    database: "validation",
+    connectionTimeoutMillis: timeoutMs,
+    query_timeout: timeoutMs,
+  });
+  const startedAt = Date.now();
+
+  try {
+    await assert.rejects(
+      runDatabaseSuiteOperation(
+        () => stalledPool.query("SELECT 1"),
+        suiteName,
+        timeoutMs,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(
+          error.message,
+          /Non-responsive database regression database operation exceeded the 100ms client timeout/,
+        );
+        return true;
+      },
+    );
+    assert.ok(Date.now() - startedAt < 2_000, "stalled connection did not terminate promptly");
+  } finally {
+    try {
+      await Promise.race([
+        stalledPool.end(),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Timed out closing the stalled database pool")), 2_000);
+        }),
+      ]);
+    } finally {
+      for (const socket of serverSockets) socket.destroy();
+      await new Promise<void>((resolve, reject) => {
+        stalledServer.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  }
+});
 
 test("database suite advisory lock serializes separate validation processes", async () => {
   const first = startWorker("signal", 5_000);

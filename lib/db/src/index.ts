@@ -3,6 +3,7 @@ import pg from "pg";
 import * as schema from "./schema";
 
 const { Pool } = pg;
+const defaultDatabaseClientTimeoutMs = 60_000;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -10,8 +11,49 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+function readPositiveTimeout(name: string, fallback: number): number {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(value) || value <= 0 || !Number.isInteger(value)) {
+    throw new Error(`${name} must be a positive integer; received ${process.env[name]}`);
+  }
+  return value;
+}
+
+const databaseQueryTimeoutMs = readPositiveTimeout(
+  "DATABASE_QUERY_TIMEOUT_MS",
+  defaultDatabaseClientTimeoutMs,
+);
+const databaseConnectionTimeoutMs = readPositiveTimeout(
+  "DATABASE_CONNECTION_TIMEOUT_MS",
+  defaultDatabaseClientTimeoutMs,
+);
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  query_timeout: databaseQueryTimeoutMs,
+  connectionTimeoutMillis: databaseConnectionTimeoutMs,
+});
 export const db = drizzle(pool, { schema });
+
+export function createDatabasePool(config: pg.PoolConfig): pg.Pool {
+  return new Pool(config);
+}
+
+export type DatabasePoolTimeouts = {
+  statementTimeoutMs: number;
+  queryTimeoutMs: number;
+  connectionTimeoutMs: number;
+};
+
+export function configureDatabasePoolTimeouts({
+  statementTimeoutMs,
+  queryTimeoutMs,
+  connectionTimeoutMs,
+}: DatabasePoolTimeouts): void {
+  pool.options.statement_timeout = statementTimeoutMs;
+  pool.options.query_timeout = queryTimeoutMs;
+  pool.options.connectionTimeoutMillis = connectionTimeoutMs;
+}
 
 export type TryWithDatabaseAdvisoryLockResult<T> =
   | { acquired: true; value: T }

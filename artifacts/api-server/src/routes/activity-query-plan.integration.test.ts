@@ -6,9 +6,10 @@ import {
   acquireDatabaseSuiteLock,
   defaultDatabaseSuiteStatementTimeoutMs,
   defaultPersistenceDatabaseSuiteLockTimeoutMs,
-  isDatabaseStatementTimeout,
+  describeDatabaseSuiteError,
   persistenceDatabaseSuiteLockName,
   releaseDatabaseSuiteLock,
+  setDatabaseSuitePoolStatementTimeout,
   setDatabaseSuiteStatementTimeout,
 } from "../testing/database-suite-lock";
 
@@ -29,6 +30,10 @@ const databaseSuiteLockOptions = {
   lockName: persistenceDatabaseSuiteLockName,
   suiteName: "activity query-plan validation",
 };
+setDatabaseSuitePoolStatementTimeout(
+  databaseSuiteLockOptions.suiteName,
+  databaseStatementTimeoutMs,
+);
 const regressionUserIdPattern = "^test-user-[0-9a-f-]{36}$";
 const runId = randomUUID();
 const actorUserId = `test-user-${runId}`;
@@ -105,12 +110,11 @@ test("activity timeline uses its timestamp index at representative volume", asyn
       `Activity timeline regressed to a sequential scan: ${JSON.stringify(plan)}`,
     );
   } catch (error) {
-    testError = isDatabaseStatementTimeout(error)
-      ? new Error(
-        `Activity query-plan database query exceeded the ${databaseStatementTimeoutMs}ms statement timeout`,
-        { cause: error },
-      )
-      : error;
+    testError = describeDatabaseSuiteError(
+      error,
+      databaseSuiteLockOptions.suiteName,
+      databaseStatementTimeoutMs,
+    );
   } finally {
     const cleanupErrors: unknown[] = [];
     try {

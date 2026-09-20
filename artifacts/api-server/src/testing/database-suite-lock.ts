@@ -1,4 +1,4 @@
-import { pool } from "@workspace/db";
+import { configureDatabasePoolTimeouts, pool } from "@workspace/db";
 
 export const persistenceDatabaseSuiteLockName = "api-server:persistence-integration-shared-fixtures";
 export const defaultPersistenceDatabaseSuiteLockTimeoutMs = 120_000;
@@ -27,6 +27,27 @@ export function isDatabaseStatementTimeout(error: unknown): boolean {
   return false;
 }
 
+export function isDatabaseClientTimeout(error: unknown): boolean {
+  let current = error;
+  const visited = new Set<unknown>();
+  while (current && typeof current === "object" && !visited.has(current)) {
+    visited.add(current);
+    if (
+      "message" in current
+      && typeof current.message === "string"
+      && (
+        current.message === "Query read timeout"
+        || current.message.includes("timeout exceeded when trying to connect")
+        || current.message.includes("Connection terminated due to connection timeout")
+      )
+    ) {
+      return true;
+    }
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return false;
+}
+
 export async function setDatabaseSuiteStatementTimeout(
   client: DatabaseSuiteLockClient,
   suiteName: string,
@@ -45,7 +66,11 @@ export function setDatabaseSuitePoolStatementTimeout(
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isInteger(timeoutMs)) {
     throw new Error(`${suiteName} database statement timeout must be a positive integer; received ${timeoutMs}`);
   }
-  pool.options.statement_timeout = timeoutMs;
+  configureDatabasePoolTimeouts({
+    statementTimeoutMs: timeoutMs,
+    queryTimeoutMs: timeoutMs,
+    connectionTimeoutMs: timeoutMs,
+  });
 }
 
 export function describeDatabaseSuiteError(
@@ -53,12 +78,19 @@ export function describeDatabaseSuiteError(
   suiteName: string,
   timeoutMs: number,
 ): unknown {
-  return isDatabaseStatementTimeout(error)
-    ? new Error(
+  if (isDatabaseStatementTimeout(error)) {
+    return new Error(
       `${suiteName} database query exceeded the ${timeoutMs}ms statement timeout`,
       { cause: error },
-    )
-    : error;
+    );
+  }
+  if (isDatabaseClientTimeout(error)) {
+    return new Error(
+      `${suiteName} database operation exceeded the ${timeoutMs}ms client timeout`,
+      { cause: error },
+    );
+  }
+  return error;
 }
 
 export async function runDatabaseSuiteOperation<T>(

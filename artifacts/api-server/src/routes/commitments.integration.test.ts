@@ -9,7 +9,15 @@ import {
 } from "@workspace/db";
 import { createApiRouter } from "./index";
 import type { AccessContext } from "../middlewares/access";
+import {
+  defaultDatabaseSuiteStatementTimeoutMs,
+  runDatabaseSuiteOperation,
+  setDatabaseSuitePoolStatementTimeout,
+} from "../testing/database-suite-lock";
 
+const suiteName = "Commitment integration";
+const databaseTimeoutMs = defaultDatabaseSuiteStatementTimeoutMs;
+setDatabaseSuitePoolStatementTimeout(suiteName, databaseTimeoutMs);
 const runId = randomUUID();
 const access: AccessContext = {
   userId: `commitment-test-${runId}`,
@@ -52,9 +60,9 @@ let line2 = "";
 let commitmentId = "";
 
 before(async () => {
-  lockClient = await pool.connect();
-  await lockClient.query("SET statement_timeout = '10000'");
-  await lockClient.query("SELECT pg_advisory_lock(hashtext('commitment-integration-suite'))");
+  await runDatabaseSuiteOperation(async () => {
+    lockClient = await pool.connect();
+    await lockClient.query("SELECT pg_advisory_lock(hashtext('commitment-integration-suite'))");
   projectId = `commitment-project-${runId}`;
   baselineId = `commitment-baseline-${runId}`;
   code1 = `commitment-code-1-${runId}`;
@@ -81,14 +89,16 @@ before(async () => {
   await db.insert(projectCostCodesTable).values({
     id: foreignCode, projectId: foreignProjectId, code: "FOREIGN", name: "Foreign cost code",
   });
-  await db.insert(rabItemsTable).values([
+    await db.insert(rabItemsTable).values([
     { id: item1, baselineId, costCodeId: code1, code: "01", name: "Pekerjaan 01", category: "MATERIAL", parentCode: null, level: 1, unit: "ls", quantityBasisPoints: 100, unitPrice: 150_000, materialCost: 150_000, laborCost: 0, equipmentCost: 0, budget: 150_000, committed: 0, actual: 0 },
     { id: item2, baselineId, costCodeId: code2, code: "02", name: "Pekerjaan 02", category: "MATERIAL", parentCode: null, level: 1, unit: "ls", quantityBasisPoints: 100, unitPrice: 150_000, materialCost: 150_000, laborCost: 0, equipmentCost: 0, budget: 150_000, committed: 0, actual: 0 },
-  ]);
+    ]);
+  }, suiteName, databaseTimeoutMs);
 });
 
 after(async () => {
-  try {
+  await runDatabaseSuiteOperation(async () => {
+    try {
     await db.delete(auditLogsTable).where(eq(auditLogsTable.actorUserId, access.userId));
     const commitments = await db.select({ id: commitmentTable.id }).from(commitmentTable).where(eq(commitmentTable.projectId, projectId));
     if (commitments.length) {
@@ -98,13 +108,19 @@ after(async () => {
     }
     await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
     await db.delete(projectsTable).where(eq(projectsTable.id, foreignProjectId));
-  } finally {
-    await lockClient?.query("SELECT pg_advisory_unlock(hashtext('commitment-integration-suite'))");
-    lockClient?.release();
-  }
+    } finally {
+      try {
+        await lockClient?.query("SELECT pg_advisory_unlock(hashtext('commitment-integration-suite'))");
+      } finally {
+        lockClient?.release();
+        await pool.end();
+      }
+    }
+  }, suiteName, databaseTimeoutMs);
 });
 
 test("commitment ledger persists, scopes, versions, and reconciles without double count", async () => {
+  await runDatabaseSuiteOperation(async () => {
   const server = appFor().listen(0);
   await new Promise<void>((resolve) => server.once("listening", () => resolve()));
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api`;
@@ -267,4 +283,5 @@ test("commitment ledger persists, scopes, versions, and reconciles without doubl
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+  }, suiteName, databaseTimeoutMs);
 });

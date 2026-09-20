@@ -20,7 +20,15 @@ import {
 } from "@workspace/db";
 import { createApiRouter } from "./index";
 import type { AccessContext } from "../middlewares/access";
+import {
+  defaultDatabaseSuiteStatementTimeoutMs,
+  runDatabaseSuiteOperation,
+  setDatabaseSuitePoolStatementTimeout,
+} from "../testing/database-suite-lock";
 
+const suiteName = "Material reconciliation integration";
+const databaseTimeoutMs = defaultDatabaseSuiteStatementTimeoutMs;
+setDatabaseSuitePoolStatementTimeout(suiteName, databaseTimeoutMs);
 const runId = randomUUID();
 const projectId = `material-project-${runId}`;
 const foreignProjectId = `material-foreign-project-${runId}`;
@@ -57,9 +65,9 @@ async function json(base: string, path: string, init?: RequestInit) {
 }
 
 before(async () => {
-  lockClient = await pool.connect();
-  await lockClient.query("SET statement_timeout = '10000'");
-  await lockClient.query("SELECT pg_advisory_lock(hashtext('material-reconciliation-integration-suite'))");
+  await runDatabaseSuiteOperation(async () => {
+    lockClient = await pool.connect();
+    await lockClient.query("SELECT pg_advisory_lock(hashtext('material-reconciliation-integration-suite'))");
   await db.insert(projectsTable).values([
     {
       id: projectId, code: projectId, name: "Material reconciliation", owner: "Test",
@@ -77,7 +85,7 @@ before(async () => {
     { id: costCodeId, projectId, code: "MAT-01", name: "Pekerjaan material" },
     { id: foreignCostCodeId, projectId: foreignProjectId, code: "FOREIGN", name: "Foreign cost code" },
   ]);
-  await db.insert(rabItemsTable).values({
+    await db.insert(rabItemsTable).values({
     id: rabItemId,
     baselineId,
     costCodeId,
@@ -95,11 +103,13 @@ before(async () => {
     budget: 100_000,
     committed: 0,
     actual: 0,
-  });
+    });
+  }, suiteName, databaseTimeoutMs);
 });
 
 after(async () => {
-  try {
+  await runDatabaseSuiteOperation(async () => {
+    try {
     const exceptions = await db.select({ id: materialVarianceExceptionsTable.id }).from(materialVarianceExceptionsTable)
       .where(eq(materialVarianceExceptionsTable.projectId, projectId));
     if (exceptions.length) {
@@ -116,13 +126,19 @@ after(async () => {
     if (requirements.length) {
       await db.delete(materialsTable).where(inArray(materialsTable.id, requirements.map((row) => row.materialId)));
     }
-  } finally {
-    await lockClient?.query("SELECT pg_advisory_unlock(hashtext('material-reconciliation-integration-suite'))");
-    lockClient?.release();
-  }
+    } finally {
+      try {
+        await lockClient?.query("SELECT pg_advisory_unlock(hashtext('material-reconciliation-integration-suite'))");
+      } finally {
+        lockClient?.release();
+        await pool.end();
+      }
+    }
+  }, suiteName, databaseTimeoutMs);
 });
 
 test("material setup reconciles deterministically, rejects foreign cost codes, and reopens recurrence", async () => {
+  await runDatabaseSuiteOperation(async () => {
   const server = appFor().listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api`;
@@ -227,4 +243,5 @@ test("material setup reconciles deterministically, rejects foreign cost codes, a
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+  }, suiteName, databaseTimeoutMs);
 });
