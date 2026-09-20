@@ -17,9 +17,10 @@ import { TransitionCommitmentDialog } from "./TransitionCommitmentDialog"
 interface ProjectCommitmentsProps {
   projectId: string
   rabVersion: number | null
+  highlightedCommitmentId?: string | null
 }
 
-export function ProjectCommitments({ projectId, rabVersion }: ProjectCommitmentsProps) {
+export function ProjectCommitments({ projectId, rabVersion, highlightedCommitmentId }: ProjectCommitmentsProps) {
   const { data: commitments, isLoading, isError } = useListProjectCommitments(projectId, {
     query: {
       enabled: Boolean(projectId),
@@ -86,6 +87,7 @@ export function ProjectCommitments({ projectId, rabVersion }: ProjectCommitments
               key={commitment.id} 
               commitment={commitment} 
               isHistorical={isHistorical}
+               highlighted={highlightedCommitmentId === commitment.id}
               onTransition={(action) => setTransitioningCommitment({ commitment, action })}
             />
           ))}
@@ -116,10 +118,12 @@ export function ProjectCommitments({ projectId, rabVersion }: ProjectCommitments
 function CommitmentCard({ 
   commitment, 
   isHistorical,
+  highlighted,
   onTransition
 }: { 
   commitment: Commitment
   isHistorical: boolean
+  highlighted?: boolean
   onTransition: (action: CommitmentTransitionInputAction) => void
 }) {
   const isDraft = commitment.status === "DRAFT"
@@ -140,7 +144,7 @@ function CommitmentCard({
   }[commitment.status] as any
 
   return (
-    <Card>
+    <Card className={highlighted ? "ring-2 ring-amber-500 bg-amber-500/10" : undefined}>
       <div className="p-5 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center border-b bg-muted/20">
         <div>
           <div className="flex items-center gap-2 mb-1">

@@ -25,6 +25,10 @@ import { ProjectCommitments } from "@/components/rab/ProjectCommitments"
 export default function ProjectRab() {
   const { id } = useParams()
   const projectId = id || ""
+  const drilldown = new URLSearchParams(window.location.search)
+  const highlightedWbs = drilldown.get("wbs")
+  const highlightedCostCode = drilldown.get("costCode")
+  const highlightedCommitment = drilldown.get("commitmentId")
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
   const [comparisonVersions, setComparisonVersions] = useState<{ from: number; to: number } | null>(null)
   const latestQuery = useGetProjectRab(projectId)
@@ -301,7 +305,17 @@ export default function ProjectRab() {
         </Alert>
       )}
 
-      <div className="grid gap-4 md:grid-cols-4">
+       {(highlightedWbs || highlightedCostCode || highlightedCommitment) && (
+         <Alert className="border-amber-500/40 bg-amber-500/5" data-testid="alert-budget-drilldown">
+           <AlertTriangle className="h-4 w-4 text-amber-600" />
+           <AlertTitle>Penyebab peringatan anggaran</AlertTitle>
+           <AlertDescription>
+             {highlightedWbs ? `WBS ${highlightedWbs}` : highlightedCostCode ? `Cost code ${highlightedCostCode}` : `Komitmen ${highlightedCommitment}`} ditandai sebagai sumber selisih. Periksa transaksi dan komitmen terkait sebelum mengambil tindakan.
+           </AlertDescription>
+         </Alert>
+       )}
+
+       <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-muted/30">
           <CardContent className="p-6">
             <div className="text-sm font-medium text-muted-foreground mb-2">Total Budget</div>
@@ -328,7 +342,7 @@ export default function ProjectRab() {
         </Card>
       </div>
 
-      <Tabs defaultValue="wbs" className="w-full">
+       <Tabs defaultValue={highlightedCommitment ? "commitments" : "wbs"} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="wbs" data-testid="tab-wbs">Item RAB (WBS)</TabsTrigger>
           <TabsTrigger value="commitments" data-testid="tab-commitments">Komitmen (PO/SPK)</TabsTrigger>
@@ -352,7 +366,7 @@ export default function ProjectRab() {
                 {rab.items.map((item) => {
                   const isOverbudget = item.variance < 0
                   return (
-                    <TableRow key={item.id} className={item.level === 0 ? "bg-muted/10" : ""}>
+                    <TableRow key={item.id} className={`${item.level === 0 ? "bg-muted/10" : ""} ${highlightedWbs === item.code || highlightedCostCode === item.costCodeId ? "bg-amber-500/15 ring-1 ring-amber-500" : ""}`}>
                       <TableCell className="font-mono text-xs whitespace-nowrap">{item.code}</TableCell>
                       <TableCell>
                         <div className="font-medium" style={{ paddingLeft: `${item.level * 1.5}rem` }}>
@@ -402,7 +416,7 @@ export default function ProjectRab() {
         </TabsContent>
 
         <TabsContent value="commitments" className="m-0">
-          <ProjectCommitments projectId={projectId} rabVersion={selectedVersion} />
+          <ProjectCommitments projectId={projectId} rabVersion={selectedVersion} highlightedCommitmentId={highlightedCommitment} />
         </TabsContent>
       </Tabs>
     </div>

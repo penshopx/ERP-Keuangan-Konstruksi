@@ -92,6 +92,66 @@ export interface DashboardSummary {
   cashflow: CashflowPoint[];
 }
 
+export type BudgetAlertAlertType = typeof BudgetAlertAlertType[keyof typeof BudgetAlertAlertType];
+
+
+export const BudgetAlertAlertType = {
+  PROJECTED_EXPOSURE: 'PROJECTED_EXPOSURE',
+  ESTIMATE_AT_COMPLETION: 'ESTIMATE_AT_COMPLETION',
+} as const;
+
+export type BudgetAlertSeverity = typeof BudgetAlertSeverity[keyof typeof BudgetAlertSeverity];
+
+
+export const BudgetAlertSeverity = {
+  info: 'info',
+  warning: 'warning',
+  critical: 'critical',
+} as const;
+
+export type BudgetAlertStatus = typeof BudgetAlertStatus[keyof typeof BudgetAlertStatus];
+
+
+export const BudgetAlertStatus = {
+  OPEN: 'OPEN',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  RESOLVED: 'RESOLVED',
+} as const;
+
+export type BudgetAlertEvidence = { [key: string]: unknown };
+
+export interface BudgetAlertAudit {
+  action: string;
+  detail: string;
+  user: string;
+  timestamp: string;
+}
+
+export interface BudgetAlert {
+  id: string;
+  projectId: string;
+  /** @nullable */
+  baselineId?: string | null;
+  alertType: BudgetAlertAlertType;
+  severity: BudgetAlertSeverity;
+  owner: string;
+  status: BudgetAlertStatus;
+  title: string;
+  detail: string;
+  evidence: BudgetAlertEvidence;
+  auditHistory: BudgetAlertAudit[];
+  /** @nullable */
+  acknowledgedAt?: string | null;
+  /** @nullable */
+  acknowledgedBy?: string | null;
+  /** @nullable */
+  resolvedAt?: string | null;
+  /** @nullable */
+  resolvedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ProjectStatus = typeof ProjectStatus[keyof typeof ProjectStatus];
 
 

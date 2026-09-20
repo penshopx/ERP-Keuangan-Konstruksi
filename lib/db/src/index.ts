@@ -52,6 +52,7 @@ const REQUIRED_MIGRATIONS = [
   "0006_add_shared_invitation_reconciliation_state.sql",
   "0007_index_pending_resend_compensation_audits.sql",
   "0010_add_commitment_ledger.sql",
+  "0011_add_budget_alerts.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -75,6 +76,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     invitation_reconciliation_state_shape: boolean;
     pending_resend_compensation_index: boolean;
     commitment_ledger_shape: boolean;
+    budget_alerts_shape: boolean;
   }>(`
     SELECT
       EXISTS (
@@ -156,7 +158,11 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
         AND to_regclass('commitment_lines') IS NOT NULL
         AND to_regclass('project_cost_codes') IS NOT NULL
         AND to_regclass('actual_cost_allocations') IS NOT NULL
-      ) AS commitment_ledger_shape
+      ) AS commitment_ledger_shape,
+      (
+        to_regclass('budget_alert_thresholds') IS NOT NULL
+        AND to_regclass('budget_alerts') IS NOT NULL
+      ) AS budget_alerts_shape
   `);
 
   const status = result.rows[0];
@@ -170,6 +176,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     !status.invitation_reconciliation_state_shape ||
     !status.pending_resend_compensation_index
     || !status.commitment_ledger_shape
+    || !status.budget_alerts_shape
   ) {
     throw new Error(
       `Mandatory database migrations ${REQUIRED_MIGRATIONS.join(", ")} are not fully applied. ` +

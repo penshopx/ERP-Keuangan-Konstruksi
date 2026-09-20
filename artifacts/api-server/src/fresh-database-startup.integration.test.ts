@@ -21,11 +21,14 @@ const requiredMigrations = [
   "0008_record_invitation_acceptance_email.sql",
   "0009_add_project_petty_cash.sql",
   "0010_add_commitment_ledger.sql",
+  "0011_add_budget_alerts.sql",
 ];
 const expectedTables = [
   "actual_cost_allocations",
   "app_migrations",
   "audit_logs",
+  "budget_alert_thresholds",
+  "budget_alerts",
   "commitment_events",
   "commitment_lines",
   "commitments",

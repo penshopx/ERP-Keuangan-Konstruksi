@@ -10,6 +10,7 @@ import {
   CreateProjectCommitmentResponse, TransitionProjectCommitmentResponse,
 } from "@workspace/api-zod";
 import { canAccessProject, requirePermission } from "../middlewares/access";
+import { evaluateBudgetAlerts } from "../lib/budget-alerts";
 
 const router: IRouter = Router();
 
@@ -72,6 +73,7 @@ router.post("/projects/:projectId/commitments", requirePermission("commitments:w
     res.status(status).json({ error: error instanceof Error ? error.message : "Komitmen gagal dibuat" });
     return;
   }
+  await evaluateBudgetAlerts([project.id]);
   res.status(201).json(CreateProjectCommitmentResponse.parse(await commitmentResponse((await db.select().from(commitmentTable).where(eq(commitmentTable.id, id)))[0])));
 });
 
@@ -197,6 +199,7 @@ router.post("/projects/:projectId/commitments/:commitmentId/transition", require
     res.status(status).json({ error: error instanceof Error ? error.message : "Transisi komitmen gagal" });
     return;
   }
+  await evaluateBudgetAlerts([project.id]);
   res.json(TransitionProjectCommitmentResponse.parse(await commitmentResponse(result!)));
 });
 

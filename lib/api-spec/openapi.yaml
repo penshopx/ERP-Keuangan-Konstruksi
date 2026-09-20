@@ -52,6 +52,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
+  /budget-alerts:
+    get:
+      operationId: listBudgetAlerts
+      tags: [dashboard]
+      summary: List budget control alerts
+      responses:
+        "200":
+          description: Active and historical budget alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BudgetAlert" }
+  /budget-alerts/{alertId}/acknowledge:
+    post:
+      operationId: acknowledgeBudgetAlert
+      tags: [dashboard]
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Acknowledged alert
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BudgetAlert" }
+  /budget-alerts/{alertId}/resolve:
+    post:
+      operationId: resolveBudgetAlert
+      tags: [dashboard]
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Resolved alert
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BudgetAlert" }
   /projects:
     get:
       operationId: listProjects
@@ -754,6 +797,37 @@ components:
         title: { type: string }
         detail: { type: string }
         action: { type: string }
+    BudgetAlert:
+      type: object
+      required: [id, projectId, alertType, severity, owner, status, title, detail, evidence, auditHistory, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        baselineId: { type: ["string", "null"] }
+        alertType: { type: string, enum: [PROJECTED_EXPOSURE, ESTIMATE_AT_COMPLETION] }
+        severity: { type: string, enum: [info, warning, critical] }
+        owner: { type: string }
+        status: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED] }
+        title: { type: string }
+        detail: { type: string }
+        evidence: { type: object, additionalProperties: true }
+        auditHistory:
+          type: array
+          items: { $ref: "#/components/schemas/BudgetAlertAudit" }
+        acknowledgedAt: { type: ["string", "null"], format: date-time }
+        acknowledgedBy: { type: ["string", "null"] }
+        resolvedAt: { type: ["string", "null"], format: date-time }
+        resolvedBy: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    BudgetAlertAudit:
+      type: object
+      required: [action, detail, user, timestamp]
+      properties:
+        action: { type: string }
+        detail: { type: string }
+        user: { type: string }
+        timestamp: { type: string, format: date-time }
     CashflowPoint:
       type: object
       required: [month, inflow, outflow, net]

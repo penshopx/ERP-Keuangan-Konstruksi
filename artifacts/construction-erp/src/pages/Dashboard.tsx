@@ -12,6 +12,7 @@ import {
   Legend
 } from "recharts"
 import { Activity, AlertTriangle, Wallet, Building2, TrendingUp, CheckCircle2 } from "lucide-react"
+import { Link } from "wouter"
 
 export default function Dashboard() {
   const { data: summary, isLoading, error } = useGetDashboardSummary()
@@ -141,16 +142,16 @@ export default function Dashboard() {
                     <div className="mt-0.5">
                       <AlertTriangle className={cn(
                         "h-5 w-5",
-                        alert.severity === "high" ? "text-destructive" : 
-                        alert.severity === "medium" ? "text-amber-500" : "text-primary"
+                        alert.severity === "critical" ? "text-destructive" :
+                        alert.severity === "warning" ? "text-amber-500" : "text-primary"
                       )} />
                     </div>
                     <div className="flex flex-col gap-1">
                       <p className="text-sm font-semibold">{alert.title}</p>
                       <p className="text-xs text-muted-foreground">{alert.detail}</p>
-                      <button className="mt-2 text-left text-xs font-medium text-primary hover:underline">
-                        {alert.action} &rarr;
-                      </button>
+                      <Link href={alert.action} className="mt-2 text-left text-xs font-medium text-primary hover:underline">
+                        Tinjau penyebab &rarr;
+                      </Link>
                     </div>
                   </div>
                 ))

@@ -80,6 +80,96 @@ export const GetDashboardSummaryResponse = zod.object({
 
 
 /**
+ * @summary List budget control alerts
+ */
+export const ListBudgetAlertsResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string().nullish(),
+  "alertType": zod.enum(['PROJECTED_EXPOSURE', 'ESTIMATE_AT_COMPLETION']),
+  "severity": zod.enum(['info', 'warning', 'critical']),
+  "owner": zod.string(),
+  "status": zod.enum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED']),
+  "title": zod.string(),
+  "detail": zod.string(),
+  "evidence": zod.record(zod.string(), zod.unknown()),
+  "auditHistory": zod.array(zod.object({
+  "action": zod.string(),
+  "detail": zod.string(),
+  "user": zod.string(),
+  "timestamp": zod.coerce.date()
+})),
+  "acknowledgedAt": zod.coerce.date().nullish(),
+  "acknowledgedBy": zod.string().nullish(),
+  "resolvedAt": zod.coerce.date().nullish(),
+  "resolvedBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListBudgetAlertsResponse = zod.array(ListBudgetAlertsResponseItem)
+
+
+export const AcknowledgeBudgetAlertParams = zod.object({
+  "alertId": zod.coerce.string()
+})
+
+export const AcknowledgeBudgetAlertResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string().nullish(),
+  "alertType": zod.enum(['PROJECTED_EXPOSURE', 'ESTIMATE_AT_COMPLETION']),
+  "severity": zod.enum(['info', 'warning', 'critical']),
+  "owner": zod.string(),
+  "status": zod.enum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED']),
+  "title": zod.string(),
+  "detail": zod.string(),
+  "evidence": zod.record(zod.string(), zod.unknown()),
+  "auditHistory": zod.array(zod.object({
+  "action": zod.string(),
+  "detail": zod.string(),
+  "user": zod.string(),
+  "timestamp": zod.coerce.date()
+})),
+  "acknowledgedAt": zod.coerce.date().nullish(),
+  "acknowledgedBy": zod.string().nullish(),
+  "resolvedAt": zod.coerce.date().nullish(),
+  "resolvedBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const ResolveBudgetAlertParams = zod.object({
+  "alertId": zod.coerce.string()
+})
+
+export const ResolveBudgetAlertResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "baselineId": zod.string().nullish(),
+  "alertType": zod.enum(['PROJECTED_EXPOSURE', 'ESTIMATE_AT_COMPLETION']),
+  "severity": zod.enum(['info', 'warning', 'critical']),
+  "owner": zod.string(),
+  "status": zod.enum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED']),
+  "title": zod.string(),
+  "detail": zod.string(),
+  "evidence": zod.record(zod.string(), zod.unknown()),
+  "auditHistory": zod.array(zod.object({
+  "action": zod.string(),
+  "detail": zod.string(),
+  "user": zod.string(),
+  "timestamp": zod.coerce.date()
+})),
+  "acknowledgedAt": zod.coerce.date().nullish(),
+  "acknowledgedBy": zod.string().nullish(),
+  "resolvedAt": zod.coerce.date().nullish(),
+  "resolvedBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List projects
  */
 export const ListProjectsQueryParams = zod.object({

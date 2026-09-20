@@ -27,6 +27,7 @@ import type {
   AccessUserUpdate,
   Activity,
   ApprovalDecisionInput,
+  BudgetAlert,
   Commitment,
   CommitmentInput,
   CommitmentTransitionInput,
@@ -239,6 +240,219 @@ export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDash
 
 
 
+
+export const getListBudgetAlertsUrl = () => {
+
+
+
+
+  return `/api/budget-alerts`
+}
+
+/**
+ * @summary List budget control alerts
+ */
+export const listBudgetAlerts = async ( options?: Parameters<typeof customFetch>[1]): Promise<BudgetAlert[]> => {
+
+  return customFetch<BudgetAlert[]>(getListBudgetAlertsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBudgetAlertsQueryKey = () => {
+    return [
+    `/api/budget-alerts`
+    ] as const;
+    }
+
+
+export const getListBudgetAlertsQueryOptions = <TData = Awaited<ReturnType<typeof listBudgetAlerts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBudgetAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBudgetAlertsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBudgetAlerts>>> = ({ signal }) => listBudgetAlerts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBudgetAlerts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBudgetAlertsQueryResult = NonNullable<Awaited<ReturnType<typeof listBudgetAlerts>>>
+export type ListBudgetAlertsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List budget control alerts
+ */
+
+export function useListBudgetAlerts<TData = Awaited<ReturnType<typeof listBudgetAlerts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBudgetAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBudgetAlertsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAcknowledgeBudgetAlertUrl = (alertId: string,) => {
+
+
+
+
+  return `/api/budget-alerts/${alertId}/acknowledge`
+}
+
+export const acknowledgeBudgetAlert = async (alertId: string, options?: Parameters<typeof customFetch>[1]): Promise<BudgetAlert> => {
+
+  return customFetch<BudgetAlert>(getAcknowledgeBudgetAlertUrl(alertId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAcknowledgeBudgetAlertMutationKey = () => ['acknowledgeBudgetAlert'] as const;
+
+export const getAcknowledgeBudgetAlertMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgeBudgetAlert>>, TError,AcknowledgeBudgetAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acknowledgeBudgetAlert>>, TError,AcknowledgeBudgetAlertMutationVariables, TContext> => {
+
+const mutationKey = getAcknowledgeBudgetAlertMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acknowledgeBudgetAlert>>, AcknowledgeBudgetAlertMutationVariables> = (props) => {
+          const {alertId} = props ?? {};
+
+          return  acknowledgeBudgetAlert(alertId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcknowledgeBudgetAlertMutationResult = NonNullable<Awaited<ReturnType<typeof acknowledgeBudgetAlert>>>
+
+    export type AcknowledgeBudgetAlertMutationError = ErrorType<unknown>
+    export type AcknowledgeBudgetAlertMutationVariables = {alertId: string}
+
+    export const useAcknowledgeBudgetAlert = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgeBudgetAlert>>, TError,AcknowledgeBudgetAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acknowledgeBudgetAlert>>,
+        TError,
+        AcknowledgeBudgetAlertMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAcknowledgeBudgetAlertMutationOptions(options));
+    }
+
+export const getResolveBudgetAlertUrl = (alertId: string,) => {
+
+
+
+
+  return `/api/budget-alerts/${alertId}/resolve`
+}
+
+export const resolveBudgetAlert = async (alertId: string, options?: Parameters<typeof customFetch>[1]): Promise<BudgetAlert> => {
+
+  return customFetch<BudgetAlert>(getResolveBudgetAlertUrl(alertId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResolveBudgetAlertMutationKey = () => ['resolveBudgetAlert'] as const;
+
+export const getResolveBudgetAlertMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveBudgetAlert>>, TError,ResolveBudgetAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveBudgetAlert>>, TError,ResolveBudgetAlertMutationVariables, TContext> => {
+
+const mutationKey = getResolveBudgetAlertMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveBudgetAlert>>, ResolveBudgetAlertMutationVariables> = (props) => {
+          const {alertId} = props ?? {};
+
+          return  resolveBudgetAlert(alertId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveBudgetAlertMutationResult = NonNullable<Awaited<ReturnType<typeof resolveBudgetAlert>>>
+
+    export type ResolveBudgetAlertMutationError = ErrorType<unknown>
+    export type ResolveBudgetAlertMutationVariables = {alertId: string}
+
+    export const useResolveBudgetAlert = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveBudgetAlert>>, TError,ResolveBudgetAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveBudgetAlert>>,
+        TError,
+        ResolveBudgetAlertMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResolveBudgetAlertMutationOptions(options));
+    }
 
 export const getListProjectsUrl = (params?: ListProjectsParams,) => {
   const normalizedParams = new URLSearchParams();
