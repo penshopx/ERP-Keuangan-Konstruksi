@@ -27,3 +27,16 @@ export function getTaxPeriodOptions(
     return date.toISOString().slice(0, 7)
   })
 }
+
+export function resolveTaxPeriod(
+  requestedPeriod: string | null,
+  availablePeriods: readonly string[],
+): string {
+  if (availablePeriods.length === 0) {
+    throw new Error("At least one tax period must be available")
+  }
+
+  return requestedPeriod && availablePeriods.includes(requestedPeriod)
+    ? requestedPeriod
+    : availablePeriods[0]
+}

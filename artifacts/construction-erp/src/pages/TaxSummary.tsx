@@ -1,18 +1,39 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useGetTaxSummary } from "@workspace/api-client-react"
+import { useSearchParams } from "wouter"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatRupiah } from "@/lib/utils"
-import { formatTaxPeriodLabel, getTaxPeriodOptions } from "@/lib/tax-periods"
+import { formatTaxPeriodLabel, getTaxPeriodOptions, resolveTaxPeriod } from "@/lib/tax-periods"
 import { Download, FileCheck, CheckCircle2, AlertTriangle, FileText } from "lucide-react"
 
 export default function TaxSummary() {
   const [periods] = useState(getTaxPeriodOptions)
-  const [period, setPeriod] = useState(periods[0])
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedPeriod = searchParams.get("period")
+  const period = resolveTaxPeriod(requestedPeriod, periods)
   const { data: tax, isLoading } = useGetTaxSummary({ period })
+
+  useEffect(() => {
+    if (requestedPeriod === period) return
+
+    setSearchParams(previousParams => {
+      const nextParams = new URLSearchParams(previousParams)
+      nextParams.set("period", period)
+      return nextParams
+    }, { replace: true })
+  }, [period, requestedPeriod, setSearchParams])
+
+  function handlePeriodChange(nextPeriod: string) {
+    setSearchParams(previousParams => {
+      const nextParams = new URLSearchParams(previousParams)
+      nextParams.set("period", nextPeriod)
+      return nextParams
+    })
+  }
 
   if (isLoading || !tax) {
     return (
@@ -32,7 +53,7 @@ export default function TaxSummary() {
           <p className="text-muted-foreground">Monthly SPT PPN and PPh Final reporting console.</p>
         </div>
         <div className="flex items-center gap-4">
-          <Select value={period} onValueChange={setPeriod}>
+          <Select value={period} onValueChange={handlePeriodChange}>
             <SelectTrigger className="w-[180px]" data-testid="select-tax-period">
               <SelectValue placeholder="Select Period" />
             </SelectTrigger>
