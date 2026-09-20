@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+const INDONESIA_TIME_ZONE = 'Asia/Jakarta';
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -26,6 +28,7 @@ export function formatDate(dateString: string): string {
   if (!dateString) return '-';
   const date = new Date(dateString);
   return new Intl.DateTimeFormat('id-ID', {
+    timeZone: INDONESIA_TIME_ZONE,
     day: 'numeric',
     month: 'short',
     year: 'numeric'
