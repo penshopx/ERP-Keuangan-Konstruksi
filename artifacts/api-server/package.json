@@ -16,6 +16,7 @@
     "test:persistence-lock": "tsx --test src/testing/database-suite-lock.integration.test.ts",
     "test:reconciliation-crash": "tsx --test src/testing/invitation-reconciliation-crash.integration.test.ts",
     "test:reconciliation-process": "tsx --test src/testing/invitation-reconciliation-process.integration.test.ts",
+    "test:reconciliation-alert-startup": "tsx --test src/testing/invitation-reconciliation-alert-startup.integration.test.ts",
     "test:fresh-database": "tsx --test src/fresh-database-startup.integration.test.ts"
   },
   "dependencies": {
