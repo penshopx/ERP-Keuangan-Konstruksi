@@ -25,6 +25,13 @@ import {
   type AccessContext,
   type AccessProvisioningHooks,
 } from "../middlewares/access";
+import {
+  protectedMutationEndpoints,
+  roleHasPermission,
+  rolePermissions,
+  roles,
+  type Role,
+} from "../middlewares/access-policy";
 import { createApiRouter } from "./index";
 import type { AccessPersistenceHooks, AccessRouterDependencies } from "./access";
 import {
@@ -94,6 +101,45 @@ function staticAccessMiddleware(): RequestHandler {
     req.access = directorAccess;
     next();
   };
+}
+
+function mutationMatrixAccessMiddleware(): RequestHandler {
+  return (req, _res, next) => {
+    const role = req.header("x-test-role") as Role;
+    req.access = {
+      userId: `mutation-matrix-${role}`,
+      displayName: `Mutation Matrix ${role}`,
+      role,
+      assignedProjectIds: [],
+      permissions: [...rolePermissions[role]],
+    };
+    next();
+  };
+}
+
+type RouterLayer = {
+  route?: { path: string | string[]; methods: Record<string, boolean> };
+  handle?: { stack?: RouterLayer[] };
+};
+
+function mountedMutationRoutes(router: ReturnType<typeof createApiRouter>) {
+  const routes = new Set<string>();
+  const visit = (layers: RouterLayer[]) => {
+    for (const layer of layers) {
+      if (layer.route) {
+        for (const [method, enabled] of Object.entries(layer.route.methods)) {
+          if (!enabled || !["post", "put", "patch", "delete"].includes(method)) continue;
+          for (const path of Array.isArray(layer.route.path) ? layer.route.path : [layer.route.path]) {
+            routes.add(`${method.toUpperCase()} ${path}`);
+          }
+        }
+      } else if (layer.handle?.stack) {
+        visit(layer.handle.stack);
+      }
+    }
+  };
+  visit((router as unknown as { stack: RouterLayer[] }).stack);
+  return routes;
 }
 
 function clerkAccessMiddleware(
@@ -291,6 +337,48 @@ test("staff invitation concurrency and atomic provisioning", async (t) => {
   await db.insert(projectAssignmentsTable).values({
     userId: projectManagerId,
     projectId,
+  });
+
+  await t.test("every production mutation is declared and rejects every unauthorized role", async () => {
+    const declaredRoutes = new Set(
+      protectedMutationEndpoints.map(({ method, routePath }) => `${method} ${routePath}`),
+    );
+    const productionRoutes = mountedMutationRoutes(createApiRouter(mutationMatrixAccessMiddleware()));
+    // Copilot uses POST as a read/query transport and does not mutate domain state.
+    productionRoutes.delete("POST /ai/copilot");
+    productionRoutes.delete("POST /copilot");
+    assert.deepEqual(
+      [...declaredRoutes].sort(),
+      [...productionRoutes].sort(),
+      "Every new production write route must declare its authorization in protectedMutationEndpoints",
+    );
+
+    const server = await startServer(mutationMatrixAccessMiddleware());
+    try {
+      for (const endpoint of protectedMutationEndpoints) {
+        const unauthorizedRoles = roles.filter((role) => endpoint.allowedRoles
+          ? !endpoint.allowedRoles.includes(role)
+          : !roleHasPermission(role, endpoint.requiredPermission!));
+        assert.ok(unauthorizedRoles.length > 0, `${endpoint.id} must have at least one unauthorized role`);
+        for (const role of unauthorizedRoles) {
+          const response = await fetch(`${server.baseUrl}${endpoint.requestPath}`, {
+            method: endpoint.method,
+            headers: {
+              "content-type": "application/json",
+              "x-test-role": role,
+            },
+            body: JSON.stringify(endpoint.body ?? {}),
+          });
+          assert.equal(
+            response.status,
+            403,
+            `${endpoint.id} must reject unauthorized role ${role} before its mutation handler runs`,
+          );
+        }
+      }
+    } finally {
+      await server.close();
+    }
   });
 
   await t.test("assigned staff mutations follow the production permission matrix", async () => {
