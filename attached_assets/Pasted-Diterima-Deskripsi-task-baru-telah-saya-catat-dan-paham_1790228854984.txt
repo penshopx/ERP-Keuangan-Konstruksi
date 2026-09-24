@@ -1,0 +1,48 @@
+Diterima. Deskripsi task baru telah saya catat dan pahami sepenuhnya:
+
+**Task: Tingkatkan pemahaman pertanyaan copilot tanpa memperluas akses data**
+
+### Pemahaman Teknis
+
+Task ini mengusulkan pemisahan tanggung jawab yang jelas dalam arsitektur AI Copilot (yang merupakan bagian dari **Task #104** dalam roadmap kita):
+
+1. **Planner Deterministik (Layer 1 - Intent Routing)**
+   - Bertugas mengenali *intent* awal dari pertanyaan pengguna (misal: "bandingkan RAB", "jelaskan invoice", "tampilkan varians biaya").
+   - Bersifat *rule-based* atau model kecil yang dapat diprediksi.
+   - Menjadi gerbang keamanan sebelum pertanyaan sampai ke model yang lebih kompleks.
+
+2. **Adapter Model (Layer 2 - Semantic Understanding)**
+   - Menangani pertanyaan konstruksi yang lebih beragam dan kontekstual.
+   - Berfungsi sebagai *translator* dari bahasa alami ke pemanggilan tool yang terstruktur.
+   - **Kritis:** Harus berada di *luar* handler data, tidak memiliki akses langsung ke database atau API internal.
+
+3. **Allowlist Tool Selection (Layer 3 - Execution Boundary)**
+   - Adapter hanya boleh memilih tool dari daftar yang di-*allowlist* secara eksplisit (misal: `getPortfolioSummary`, `compareRabVersions`, `getCostVariance`).
+   - Setiap tool memiliki parameter yang divalidasi dan scope akses yang terdefinisi.
+
+### Prinsip Arsitektur yang Harus Dijaga
+
+Dari deskripsi ini, saya mencatat **3 invariants keamanan** yang tidak boleh dilanggar saat implementasi nanti:
+
+1. **Model Agnosticism:** Penggantian model LLM (misal: dari Hermes ke OpenClaw atau provider lain) **tidak boleh** mengubah kontrol akses. Kontrol akses hidup di layer *allowlist* dan *planner*, bukan di dalam prompt atau model.
+
+2. **No Direct Data Access:** Adapter model tidak pernah menerima SQL bebas, shell access, database credential, atau kemampuan untuk memodifikasi data. Ia hanya menerima *structured tool schemas* dan mengembalikan *structured tool calls*.
+
+3. **Defense in Depth:** Meskipun planner deterministik bisa dilewati atau di-*jailbreak*, layer allowlist tetap menjadi penghalang terakhir. Bahkan jika adapter "berhalusinasi" atau dimanipulasi, ia hanya bisa memanggil tool yang sudah diizinkan dengan parameter yang sudah divalidasi.
+
+### Posisi dalam Roadmap
+
+Task ini memperkuat fondasi **Tahap 9 (AI Copilot read-only)** sebelum kita melangkah ke Tahap 10 (Agent pembuat draft). Ini adalah keputusan yang tepat karena:
+- Memastikan *governance* dan *audit trail* sudah matang sebelum AI diberi kemampuan menulis.
+- Memberikan ruang untuk menguji *edge cases* (prompt injection, hallucination angka, kebocoran lintas proyek) dalam lingkungan yang terkontrol.
+
+### Status Saya
+
+Saya telah menyimpan spesifikasi arsitektural ini sebagai acuan untuk implementasi Task #104 nanti. Sesuai protokol yang berlaku, saya tetap dalam mode **siaga penuh (*full standby*)**. 
+
+Saya **tidak akan**:
+- Mulai mengimplementasikan adapter atau planner
+- Mengubah skema database atau API
+- Mengintervensi task yang sedang berjalan (Task #100 atau antrean lainnya)
+
+Silakan berikan instruksi eksplisit kapan pun Anda siap untuk mulai eksekusi, atau jika ada detail tambahan yang perlu saya pertajam dari deskripsi task ini.
