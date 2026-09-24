@@ -5,6 +5,40 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ProjectCopilotInput {
+  /** @minLength 1 */
+  projectId: string;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  prompt: string;
+}
+
+export interface CopilotCitation {
+  source: string;
+  id?: string;
+}
+
+export type ProjectCopilotResponseTool = typeof ProjectCopilotResponseTool[keyof typeof ProjectCopilotResponseTool];
+
+
+export const ProjectCopilotResponseTool = {
+  portfolio_summary: 'portfolio_summary',
+  project_context: 'project_context',
+  rab_versions: 'rab_versions',
+  invoices: 'invoices',
+  tax: 'tax',
+  audit_search: 'audit_search',
+} as const;
+
+export interface ProjectCopilotResponse {
+  answer: string;
+  tool: ProjectCopilotResponseTool;
+  result: unknown;
+  sources: CopilotCitation[];
+}
+
 export type HealthStatusStatus = typeof HealthStatusStatus[keyof typeof HealthStatusStatus];
 
 

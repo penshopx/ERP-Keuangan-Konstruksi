@@ -105,3 +105,35 @@ test("production audit_search resolves all ownership forms before LIMIT", async 
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+test("project-scoped portfolio wording returns only the active project", async () => {
+  const access: AccessContext = {
+    userId: `ai-project-user-${runId}`, displayName: "Test", role: "PROJECT_MANAGER",
+    assignedProjectIds: [targetProject, otherProject], permissions: ["projects:view"],
+  };
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.access = access; next(); });
+  app.use(createAiControlPlaneRouter());
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/ai/copilot`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "Ringkas semua proyek", projectId: targetProject }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      tool: string;
+      result: { id: string };
+      sources: Array<{ source: string; id: string }>;
+    };
+    assert.equal(body.tool, "project_context");
+    assert.equal(body.result.id, targetProject);
+    assert.deepEqual(body.sources, [{ source: "projects", id: targetProject }]);
+    assert.equal(body.sources.some((source) => source.id === otherProject), false);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});

@@ -9,6 +9,7 @@ import { Building2, Calendar, FileText, ArrowLeft, TrendingUp, AlertTriangle, Wa
 import { useQueryClient } from "@tanstack/react-query"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getProjectStatusBadgeVariant, isProjectCompleted } from "@/lib/project-status"
+import { ProjectCopilot } from "@/components/projects/ProjectCopilot"
 
 export default function ProjectDetail() {
   const { id } = useParams()
@@ -188,6 +189,8 @@ export default function ProjectDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <ProjectCopilot projectId={project.id} projectName={project.name} />
     </div>
   )
 }

@@ -234,8 +234,8 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
     }
     const plannedTool = body.tool === undefined && typeof body.prompt === "string"
       ? planCopilotPrompt(body.prompt) : null;
-    const tool = (body.tool ?? plannedTool) as AiTool;
-    if (!tool || !AI_TOOLS.includes(tool)
+    const requestedTool = (body.tool ?? plannedTool) as AiTool;
+    if (!requestedTool || !AI_TOOLS.includes(requestedTool)
       || (body.projectId !== undefined && typeof body.projectId !== "string")
       || (body.asOf !== undefined && (typeof body.asOf !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.asOf)))
       || (body.prompt !== undefined && typeof body.prompt !== "string")) {
@@ -244,6 +244,11 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
     }
     const projectId = body.projectId as string | undefined;
     const asOf = body.asOf as string | undefined;
+    // A project-page request must never escape into portfolio scope, even when
+    // natural language (or an explicit tool name) asks for all projects.
+    const tool: AiTool = projectId && requestedTool === "portfolio_summary"
+      ? "project_context"
+      : requestedTool;
     if (PROJECT_SCOPED_TOOLS.includes(tool) && !projectId) {
       res.status(400).json({ error: "projectId wajib diisi untuk tool ini" });
       return;

@@ -28,6 +28,8 @@ tags:
     description: Project petty cash requests, settlement, and reconciliation
   - name: estimator
     description: SKKNI-aligned estimator competency profiles and versioned AHS calculations
+  - name: copilot
+    description: Read-only, project-scoped analysis
 paths:
   /healthz:
     get:
@@ -174,6 +176,34 @@ paths:
                 $ref: "#/components/schemas/Project"
         "400":
           description: Invalid project update
+  /ai/copilot:
+    post:
+      operationId: askProjectCopilot
+      tags: [copilot]
+      summary: Ask the read-only copilot about a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCopilotInput"
+      responses:
+        "200":
+          description: Grounded copilot answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectCopilotResponse"
+        "400":
+          description: The question cannot be handled by an allowed read-only tool
+        "403":
+          description: The user lacks permission for the selected data
+        "404":
+          description: The project is unavailable to the user
+        "503":
+          description: Copilot is disabled by the operational kill switch
+        "504":
+          description: Copilot timed out
   /projects/{projectId}/rab:
     get:
       operationId: getProjectRab
@@ -896,6 +926,40 @@ components:
       schema:
         type: string
   schemas:
+    ProjectCopilotInput:
+      type: object
+      required: [projectId, prompt]
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    CopilotCitation:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+        id:
+          type: string
+    ProjectCopilotResponse:
+      type: object
+      required: [answer, tool, result, sources]
+      properties:
+        answer:
+          type: string
+        tool:
+          type: string
+          enum: [portfolio_summary, project_context, rab_versions, invoices, tax, audit_search]
+        result: {}
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CopilotCitation"
     HealthStatus:
       type: object
       properties:

@@ -300,6 +300,30 @@ export const UpdateProjectResponse = zod.object({
 
 
 /**
+ * @summary Ask the read-only copilot about a project
+ */
+
+export const askProjectCopilotBodyPromptMax = 1000;
+
+
+
+export const AskProjectCopilotBody = zod.object({
+  "projectId": zod.string().min(1),
+  "prompt": zod.string().min(1).max(askProjectCopilotBodyPromptMax)
+})
+
+export const AskProjectCopilotResponse = zod.object({
+  "answer": zod.string(),
+  "tool": zod.enum(['portfolio_summary', 'project_context', 'rab_versions', 'invoices', 'tax', 'audit_search']),
+  "result": zod.unknown(),
+  "sources": zod.array(zod.object({
+  "source": zod.string(),
+  "id": zod.string().optional()
+}))
+})
+
+
+/**
  * @summary Get project RAB baseline
  */
 export const GetProjectRabParams = zod.object({
