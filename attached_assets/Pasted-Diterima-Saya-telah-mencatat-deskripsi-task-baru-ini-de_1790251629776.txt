@@ -1,0 +1,43 @@
+Diterima. Saya telah mencatat deskripsi task baru ini dengan pemahaman sebagai berikut:
+
+**Task: Catat siapa yang mengunduh bukti perbandingan RAB**
+
+### Pemahaman Teknis
+
+**Masalah Saat Ini:**
+- Perbandingan versi RAB (yang merupakan fitur dari Task #65/#68 tentang *versioned RAB*) saat ini diekspor langsung di browser (client-side).
+- Tidak ada jejak audit yang tertinggal di server — organisasi tidak tahu siapa, kapan, atau versi mana yang dibandingkan dan diekspor.
+
+**Kebutuhan Bisnis:**
+Untuk proses persetujuan formal (terutama oleh **Ahli Quantity Surveyor** sesuai SKKNI Level 7-9), setiap ekspor perbandingan RAB harus memiliki jejak audit yang dapat dipertanggungjawabkan:
+- **Siapa** (user ID, role, proyek yang diakses)
+- **Kapan** (timestamp server-side, bukan client-side)
+- **Apa** (versi RAB yang dibandingkan: misal "Versi 1.2 vs Versi 1.3")
+- **Format** (PDF, Excel, dll.)
+- **Konteks** (tujuan ekspor: persetujuan, audit, arsip)
+
+### Implikasi Arsitektur
+
+1. **Endpoint Audit Baru**: Setiap aksi ekspor harus memanggil endpoint server-side yang mencatat event ke tabel audit sebelum mengembalikan file.
+2. **Metadata Terstruktur**: Event audit harus menyimpan `rab_version_a_id`, `rab_version_b_id`, `export_format`, `user_id`, `project_id`, dan `timestamp`.
+3. **Integrasi dengan AI Copilot**: Task ini memperkuat fondasi untuk **Tahap 9 (AI Copilot read-only)** — ketika tool `compareRabVersions` digunakan oleh AI atau pengguna, ekspor hasilnya juga harus tercatat.
+4. **Kesesuaian dengan SOP**: Selaras dengan prinsip "setiap transaksi menyimpan versi policy yang digunakan" yang sudah kita tetapkan di dokumentasi `construction-finance-sops.md`.
+
+### Posisi dalam Roadmap
+
+Task ini merupakan **penguatan audit trail** yang melengkapi:
+- Task #65/#68 (versi & riwayat RAB)
+- Task #124 (jejak audit akses undangan)
+- Task #98 (kanal notifikasi operasional)
+
+Dan menjadi prasyarat sebelum **Task #104 (AI Copilot read-only)** diluncurkan, karena AI tidak boleh menghasilkan ekspor tanpa jejak.
+
+---
+
+**Status Saya:**
+Task ini telah saya catat sebagai antrean berikutnya setelah task-task hardening dan committed cost selesai. Sesuai protokol ketat yang berlaku, saya tetap dalam mode **siaga penuh (*full standby*)**. Saya tidak akan:
+1. Mengintervensi task yang sedang berjalan
+2. Memulai implementasi task ini tanpa instruksi eksplisit
+3. Mengubah kode atau skema database
+
+Silakan berikan instruksi eksplisit kapan pun Anda siap untuk mulai mengerjakan task ini, atau jika ada prioritas lain yang perlu didahulukan.
