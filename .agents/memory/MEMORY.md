@@ -17,3 +17,4 @@
 - [Reconciliation event ordering](reconciliation-event-ordering.md) — order shared run events by when a pass starts, so older work finishing late cannot hide newer coordination state.
 - [Commitment exposure accounting](commitment-exposure-accounting.md) — receipts track physical progress; only posted vendor invoices move financial exposure from commitment to actual.
 - [Competency versus authorization](competency-versus-authorization.md) — professional SKKNI/SKKK evidence never grants ERP permissions automatically; authorization remains explicit and project-scoped.
+- [Managed AI provisioning availability](managed-ai-provisioning.md) — an adapter can compile while Replit AI provider provisioning is unavailable; verify live activation separately.

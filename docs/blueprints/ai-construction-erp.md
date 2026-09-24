@@ -599,6 +599,22 @@ Gate: kontrak API stabil, semua mutation memiliki policy dan audit, serta lapora
 
 Gate: tidak ada kebocoran lintas proyek dan grounded-answer evaluation mencapai target.
 
+Implementasi planner fase ini memakai adapter OpenAI melalui Replit AI Integrations
+(tanpa key manual). Model `gpt-5-nano` hanya menerima pertanyaan (maksimum 1.000
+karakter) dan deskripsi enam tool read-only: `portfolio_summary`,
+`project_context`, `rab_versions`, `invoices`, `tax`, dan `audit_search`.
+Panggilan dibatasi satu per pertanyaan, maksimum 8.192 token keluaran dan
+timeout tiga detik. Adapter tidak menerima hasil database, project ID, permission,
+atau sumber kutipan. Outputnya hanya JSON berisi satu nama tool yang harus
+tercantum dalam allowlist; field tambahan, pilihan tool palsu, kesalahan
+provider, dan timeout kembali ke planner deterministik. Tool eksplisit tidak
+memanggil model. Setelah pemilihan, server tetap memeriksa proyek aktif dan
+permission sebelum menjalankan handler data. Jawaban dan kutipan hanya disusun
+server dari hasil handler, bukan dari teks model. Jika integrasi belum
+tersedia, jalur deterministik tetap aktif. Pemakaian integrasi menggunakan
+kredit Replit; pengaturan kuota dan laporan biaya lintas pengguna merupakan
+pekerjaan terpisah.
+
 ### Fase 2 — Document intelligence dan Project Brain
 
 - upload dan classification;

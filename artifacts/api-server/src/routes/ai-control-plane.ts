@@ -10,6 +10,7 @@ import {
   taxRuleVersionsTable,
 } from "@workspace/db";
 import { canAccessProject } from "../middlewares/access";
+import { modelPromptAllowed, planWithReplitModel, validateModelPlan, type ModelPlanner } from "./copilot-model-planner";
 
 /**
  * The copilot deliberately has a closed set of capabilities. Do not add a
@@ -47,6 +48,7 @@ export type AiToolExecutor = (
 ) => Promise<ToolResult>;
 export type AiControlPlaneDependencies = {
   executeTool?: AiToolExecutor;
+  planWithModel?: ModelPlanner;
   recordAudit?: (entry: {
     action: string;
     tool: AiTool;
@@ -217,6 +219,7 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
   const router: IRouter = Router();
   const executeTool = dependencies.executeTool ?? runTool;
   const writeAudit = dependencies.recordAudit ?? recordAudit;
+  const modelPlanner = dependencies.planWithModel ?? planWithReplitModel;
   router.get("/ai/tools", (_req, res) => res.json({ tools: AI_TOOLS }));
   router.post(["/ai/copilot", "/copilot"], async (req, res) => {
     if (!enabled()) {
@@ -232,8 +235,30 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
       res.status(400).json({ error: "Input copilot tidak valid" });
       return;
     }
-    const plannedTool = body.tool === undefined && typeof body.prompt === "string"
-      ? planCopilotPrompt(body.prompt) : null;
+    // The provider is classification-only; on timeout, malformed output or
+    // outage, use the original deterministic planner. Never trust its scope.
+    let plannedTool: AiTool | null = null;
+    if (body.tool === undefined && typeof body.prompt === "string") {
+      if (!modelPromptAllowed(body.prompt)) {
+        res.status(400).json({ error: "Pertanyaan copilot tidak didukung" });
+        return;
+      }
+      let plannerTimer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const proposed = await Promise.race([
+          modelPlanner(body.prompt),
+          new Promise<null>((resolve) => {
+            plannerTimer = setTimeout(() => resolve(null), 3000);
+          }),
+        ]);
+        plannedTool = validateModelPlan(proposed);
+      } catch {
+        // Provider failures cannot grant additional access.
+      } finally {
+        if (plannerTimer) clearTimeout(plannerTimer);
+      }
+      plannedTool ??= planCopilotPrompt(body.prompt);
+    }
     const requestedTool = (body.tool ?? plannedTool) as AiTool;
     if (!requestedTool || !AI_TOOLS.includes(requestedTool)
       || (body.projectId !== undefined && typeof body.projectId !== "string")
