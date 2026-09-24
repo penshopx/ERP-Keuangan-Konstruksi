@@ -1,0 +1,36 @@
+**Ya.** Dokumentasi teknis `POST /api/v1/ai/assist` tersedia di proyek sebagai `docs/gaia-siap-ai-api.md` dan dapat dibagikan **tanpa menyertakan kunci API**. Berikut ringkasan kontrak yang sudah saya cocokkan dengan implementasinya.
+
+**Endpoint:** `POST https://gustafta.my.id/api/v1/ai/assist`  
+**Akses:** server-ke-server, `Authorization: Bearer <API_KEY>` dan `Content-Type: application/json`. Kunci tidak boleh digunakan di browser.
+
+```json
+{
+  "prompt": "Apa risiko utama dari dokumen ini?",
+  "context": "Teks dokumen yang dipilih dan disiapkan oleh ERP",
+  "case_id": "referensi-kasus-tanpa-data-pribadi",
+  "system_instruction": "Jawab dalam bahasa Indonesia; nyatakan bila bukti tidak cukup."
+}
+```
+
+`prompt` wajib (maksimum 8.000 karakter); `context` opsional (24.000); `case_id` opsional (120); dan `system_instruction` opsional (8.000). Body maksimum 256 KB. Field lain ditolak.
+
+Respons sukses saat ini hanya:
+
+```json
+{
+  "response": "Jawaban AI dalam teks",
+  "suggestions": []
+}
+```
+
+### Jawaban untuk syarat integrasi ERP Anda
+
+| Pertanyaan | Kondisi saat ini |
+|---|---|
+| **Kutipan sumber dan versi dokumen?** | **Belum ada dalam kontrak.** Respons tidak memiliki `citations`, ID dokumen, halaman, maupun versi. `suggestions` selalu kosong pada V1. |
+| **Cakupan proyek/tenant?** | **Belum dijaga oleh endpoint ini.** Tidak ada `tenant_id`/`project_id` terverifikasi, pemeriksaan izin dokumen, atau pencarian dokumen proyek. ERP harus memilih dan membatasi sendiri teks yang dikirim melalui `context`; `case_id` hanya referensi pencatatan, bukan kontrol akses. |
+| **Penyimpanan data?** | Implementasi endpoint mencatat `case_id` yang disanitasi, status, dan latensi; isi prompt dan kunci API tidak ditulis ke log endpoint ini. Namun, **belum ada kontrak retensi dan pemrosesan data menyeluruh**, termasuk pemrosesan oleh penyedia model AI. Jangan menganggapnya siap menerima dokumen rahasia ERP sebelum kebijakan itu ditetapkan. |
+| **Batas pemakaian?** | Default **60 permintaan/menit** untuk kunci yang dikonfigurasi. Respons `429` menyertakan `Retry-After`. V1 belum menyediakan pengelolaan kunci dan kuota terpisah per aplikasi/tenant. |
+| **Kegagalan?** | Antara lain `400` input tidak valid, `401` kunci salah, `413` body terlalu besar, `429` batas pemakaian, `502` penyedia AI gagal, dan `503` layanan sibuk atau belum dikonfigurasi. Tidak ada streaming pada V1. |
+
+**Kesimpulan:** dokumentasi ini boleh dibagikan untuk penilaian teknis, tetapi `ai/assist` saat ini adalah **API penyelesaian prompt**, bukan API *copilot dokumen proyek yang terikat tenant dan menghasilkan kutipan*. Saya **tidak menyarankan menyambungkan dokumen ERP sensitif langsung** ke endpoint ini. Untuk tahap awal, penggunaan yang masuk akal adalah uji coba dengan konteks yang sudah dipilih, dibatasi, dan disamarkan oleh backend ERP; integrasi produksi berbasis dokumen memerlukan kontrak baru untuk otorisasi proyek, provenance/kutipan, versi dokumen, serta retensi data.
