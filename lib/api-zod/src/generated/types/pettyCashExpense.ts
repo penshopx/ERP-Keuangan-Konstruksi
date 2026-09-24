@@ -12,5 +12,6 @@ export interface PettyCashExpense {
   expenseDate: string;
   description: string;
   amount: number;
-  receiptReference: string;
+  /** @nullable */
+  receiptReference?: string | null;
 }

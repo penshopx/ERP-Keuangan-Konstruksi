@@ -98,6 +98,9 @@ const REQUIRED_MIGRATIONS = [
   "0015_share_reconciliation_alert_incidents.sql",
   "0016_record_operational_alert_delivery.sql",
   "0017_add_copilot_usage.sql",
+  "0018_complete_petty_cash.sql",
+  "0019_unique_petty_cash_location.sql",
+  "0020_petty_cash_approval_matrix.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {

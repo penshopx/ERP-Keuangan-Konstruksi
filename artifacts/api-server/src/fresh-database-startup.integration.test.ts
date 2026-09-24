@@ -28,6 +28,9 @@ const requiredMigrations = [
   "0015_share_reconciliation_alert_incidents.sql",
   "0016_record_operational_alert_delivery.sql",
   "0017_add_copilot_usage.sql",
+  "0018_complete_petty_cash.sql",
+  "0019_unique_petty_cash_location.sql",
+  "0020_petty_cash_approval_matrix.sql",
 ];
 const expectedTables = [
   "actual_cost_allocations",
@@ -53,7 +56,10 @@ const expectedTables = [
   "materials",
   "operational_alert_delivery_status",
   "operational_state",
+  "petty_cash_exceptions",
   "petty_cash_expenses",
+  "petty_cash_fund_events",
+  "petty_cash_funds",
   "petty_cash_policy_versions",
   "petty_cash_requests",
   "project_assignments",
@@ -72,6 +78,45 @@ const expectedTables = [
   "user_competency_profiles",
   "user_roles",
 ];
+
+test("upgrading a database with open legacy petty cash requests preserves them", async (t) => {
+  const databaseName = `petty_upgrade_${randomUUID().replaceAll("-", "")}`;
+  await runPsql(`CREATE DATABASE "${databaseName}"`);
+  t.after(async () => {
+    await runPsql(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
+  });
+  await runPsql("CREATE TABLE projects (id text PRIMARY KEY)", databaseName);
+  const apply = async (name: string) => runCommand("psql", [
+    "-X", "-v", "ON_ERROR_STOP=1", "-f", path.join(workspaceRoot, "lib/db/migrations", name),
+  ], { ...process.env, PGDATABASE: databaseName });
+  await apply("0009_add_project_petty_cash.sql");
+  await runPsql(`
+    INSERT INTO projects(id) VALUES ('old-project');
+    INSERT INTO petty_cash_requests (
+      id, project_id, project_code, project_name, requester_user_id, requester_name,
+      purpose, cost_code, requested_amount, approved_amount, disbursed_amount,
+      spent_amount, returned_amount, status, requested_at, evidence_due_at,
+      policy_version_id, policy_version
+    ) VALUES
+      ('old-approved', 'old-project', 'OLD', 'Proyek Lama', 'requester', 'Pemohon',
+       'Operasional', 'OLD-CODE', 100000, 100000, NULL, NULL, NULL, 'DISETUJUI',
+       '2026-09-20', '2026-09-23', 'petty-cash-policy-initial', 'SOP-KAS-KECIL-INITIAL'),
+      ('old-settled', 'old-project', 'OLD', 'Proyek Lama', 'requester', 'Pemohon',
+       'Operasional', 'OLD-CODE', 100000, 100000, 100000, 80000, 20000, 'DIPERTANGGUNGJAWABKAN',
+       '2026-09-20', '2026-09-23', 'petty-cash-policy-initial', 'SOP-KAS-KECIL-INITIAL');
+  `, databaseName);
+  await apply("0018_complete_petty_cash.sql");
+  await apply("0019_unique_petty_cash_location.sql");
+  await apply("0020_petty_cash_approval_matrix.sql");
+  const rows = (await runPsql(`
+    SELECT id || ':' || status || ':' || coalesce(fund_id, 'NULL')
+    FROM petty_cash_requests ORDER BY id
+  `, databaseName)).trim().split("\n");
+  assert.deepEqual(rows, [
+    "old-approved:DISETUJUI:NULL",
+    "old-settled:DIPERTANGGUNGJAWABKAN:NULL",
+  ]);
+});
 
 function databaseUrlFor(databaseName: string): string {
   const url = new URL(process.env.DATABASE_URL!);

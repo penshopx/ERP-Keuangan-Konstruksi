@@ -12,10 +12,10 @@ export type ProtectedMutationEndpoint = {
 };
 
 export const rolePermissions: Record<Role, readonly string[]> = {
-  DIRECTOR: ["projects:view", "projects:write", "rab:estimate", "rab:review", "rab:approve", "commitments:view", "commitments:write", "commitments:approve", "commitments:post", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "budget-alerts:manage", "audit:view", "petty-cash:view", "petty-cash:request", "petty-cash:approve", "petty-cash:disburse", "petty-cash:settle", "petty-cash:reconcile"],
-  PROJECT_MANAGER: ["projects:view", "projects:write", "rab:review", "commitments:view", "commitments:write", "commitments:approve", "commitments:post", "invoices:view", "invoices:approve", "budget-alerts:manage", "petty-cash:view", "petty-cash:approve"],
+  DIRECTOR: ["projects:view", "projects:write", "rab:estimate", "rab:review", "rab:approve", "commitments:view", "commitments:write", "commitments:approve", "commitments:post", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "budget-alerts:manage", "audit:view", "petty-cash:view", "petty-cash:request", "petty-cash:approve", "petty-cash:disburse", "petty-cash:settle", "petty-cash:verify", "petty-cash:reconcile", "petty-cash:evaluate", "petty-cash:manage"],
+  PROJECT_MANAGER: ["projects:view", "projects:write", "rab:review", "commitments:view", "commitments:write", "commitments:approve", "commitments:post", "invoices:view", "invoices:approve", "budget-alerts:manage", "petty-cash:view", "petty-cash:approve", "petty-cash:verify", "petty-cash:evaluate"],
   SITE_MANAGER: ["projects:view", "commitments:view", "invoices:view", "petty-cash:view", "petty-cash:request", "petty-cash:settle"],
-  FINANCE: ["projects:view", "commitments:view", "commitments:write", "commitments:approve", "commitments:post", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view", "petty-cash:view", "petty-cash:approve", "petty-cash:disburse", "petty-cash:reconcile"],
+  FINANCE: ["projects:view", "commitments:view", "commitments:write", "commitments:approve", "commitments:post", "invoices:view", "invoices:write", "invoices:approve", "tax:view", "tax-rules:manage", "audit:view", "petty-cash:view", "petty-cash:approve", "petty-cash:disburse", "petty-cash:verify", "petty-cash:reconcile", "petty-cash:evaluate", "petty-cash:manage"],
   TAX_STAFF: ["invoices:view", "tax:view", "audit:view"],
   PROCUREMENT: ["projects:view", "commitments:view", "commitments:write"],
   JURU_HITUNG: ["projects:view", "rab:estimate", "rab:volume:write"],
@@ -43,6 +43,12 @@ export const protectedMutationEndpoints: readonly ProtectedMutationEndpoint[] = 
   { id: "import-rab", method: "POST", routePath: "/projects/:projectId/rab/import", requestPath: "/projects/missing/rab/import", requiredPermission: "projects:write" },
   { id: "record-rab-comparison-download", method: "POST", routePath: "/projects/:projectId/rab/comparison-downloads", requestPath: "/projects/missing/rab/comparison-downloads", requiredPermission: "projects:view", body: { fromVersion: 1, toVersion: 2, format: "CSV" } },
   { id: "request-petty-cash", method: "POST", routePath: "/petty-cash", requestPath: "/petty-cash", requiredPermission: "petty-cash:request" },
+  { id: "create-petty-cash-fund", method: "POST", routePath: "/petty-cash/funds", requestPath: "/petty-cash/funds", requiredPermission: "petty-cash:manage" },
+  { id: "replenish-petty-cash-fund", method: "POST", routePath: "/petty-cash/funds/:fundId/replenish", requestPath: "/petty-cash/funds/missing/replenish", requiredPermission: "petty-cash:manage" },
+  { id: "create-petty-cash-policy", method: "POST", routePath: "/petty-cash/policies", requestPath: "/petty-cash/policies", requiredPermission: "petty-cash:manage" },
+  { id: "resolve-petty-cash-evidence", method: "POST", routePath: "/petty-cash/:requestId/evidence", requestPath: "/petty-cash/missing/evidence", requiredPermission: "petty-cash:settle" },
+  { id: "verify-petty-cash", method: "POST", routePath: "/petty-cash/:requestId/verify", requestPath: "/petty-cash/missing/verify", requiredPermission: "petty-cash:verify" },
+  { id: "evaluate-petty-cash", method: "POST", routePath: "/petty-cash/:requestId/evaluate", requestPath: "/petty-cash/missing/evaluate", requiredPermission: "petty-cash:evaluate" },
   { id: "decide-petty-cash", method: "POST", routePath: "/petty-cash/:requestId/decision", requestPath: "/petty-cash/missing/decision", requiredPermission: "petty-cash:approve" },
   { id: "disburse-petty-cash", method: "POST", routePath: "/petty-cash/:requestId/disburse", requestPath: "/petty-cash/missing/disburse", requiredPermission: "petty-cash:disburse" },
   { id: "settle-petty-cash", method: "POST", routePath: "/petty-cash/:requestId/settle", requestPath: "/petty-cash/missing/settle", requiredPermission: "petty-cash:settle" },

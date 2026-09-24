@@ -5,12 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PettyCashException } from './pettyCashException';
 import type { PettyCashExpense } from './pettyCashExpense';
 import type { PettyCashRequestStatus } from './pettyCashRequestStatus';
 
 export interface PettyCashRequest {
   id: string;
   projectId: string;
+  /** @nullable */
+  fundId?: string | null;
   projectCode: string;
   projectName: string;
   requesterUserId: string;
@@ -35,6 +38,8 @@ export interface PettyCashRequest {
   evidenceDueAt: string;
   policyVersion: string;
   /** @nullable */
+  approverUserId?: string | null;
+  /** @nullable */
   approverName?: string | null;
   /** @nullable */
   approvalNote?: string | null;
@@ -42,6 +47,8 @@ export interface PettyCashRequest {
   approvedAt?: Date | null;
   /** @nullable */
   disburserName?: string | null;
+  /** @nullable */
+  disburserUserId?: string | null;
   /** @nullable */
   disbursementReference?: string | null;
   /** @nullable */
@@ -54,7 +61,18 @@ export interface PettyCashRequest {
   reconciliationNote?: string | null;
   /** @nullable */
   reconciledAt?: Date | null;
+  /** @nullable */
+  verifierName?: string | null;
+  /** @nullable */
+  verifierUserId?: string | null;
+  /** @nullable */
+  reconcilerUserId?: string | null;
+  /** @nullable */
+  evaluatorName?: string | null;
+  /** @nullable */
+  evaluationNote?: string | null;
   createdAt: Date;
   updatedAt: Date;
   expenses: PettyCashExpense[];
+  exceptions?: PettyCashException[];
 }

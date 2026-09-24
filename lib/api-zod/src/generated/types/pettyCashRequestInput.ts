@@ -8,6 +8,7 @@
 
 export interface PettyCashRequestInput {
   projectId: string;
+  fundId: string;
   /**
      * @minLength 3
      * @maxLength 500

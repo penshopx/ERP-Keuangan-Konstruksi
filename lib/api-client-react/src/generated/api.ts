@@ -49,6 +49,7 @@ import type {
   ListAccessInvitationsParams,
   ListAhsTemplatesParams,
   ListInvoicesParams,
+  ListPettyCashFundsParams,
   ListPettyCashRequestsParams,
   ListProjectsParams,
   MaterialExceptionUpdate,
@@ -58,7 +59,14 @@ import type {
   MaterialVarianceException,
   PettyCashDecisionInput,
   PettyCashDisbursementInput,
+  PettyCashEvaluationInput,
+  PettyCashEvidenceInput,
+  PettyCashFund,
+  PettyCashFundInput,
+  PettyCashPolicy,
+  PettyCashPolicyInput,
   PettyCashReconciliationInput,
+  PettyCashReplenishmentInput,
   PettyCashRequest,
   PettyCashRequestInput,
   PettyCashSettlementInput,
@@ -3097,6 +3105,636 @@ export const useCreatePettyCashRequest = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreatePettyCashRequestMutationOptions(options));
+    }
+
+export const getListPettyCashFundsUrl = (params?: ListPettyCashFundsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/petty-cash/funds?${stringifiedParams}` : `/api/petty-cash/funds`
+}
+
+export const listPettyCashFunds = async (params?: ListPettyCashFundsParams, options?: Parameters<typeof customFetch>[1]): Promise<PettyCashFund[]> => {
+
+  return customFetch<PettyCashFund[]>(getListPettyCashFundsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPettyCashFundsQueryKey = (params?: ListPettyCashFundsParams,) => {
+    return [
+    `/api/petty-cash/funds`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPettyCashFundsQueryOptions = <TData = Awaited<ReturnType<typeof listPettyCashFunds>>, TError = ErrorType<unknown>>(params?: ListPettyCashFundsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPettyCashFunds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPettyCashFundsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPettyCashFunds>>> = ({ signal }) => listPettyCashFunds(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPettyCashFunds>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPettyCashFundsQueryResult = NonNullable<Awaited<ReturnType<typeof listPettyCashFunds>>>
+export type ListPettyCashFundsQueryError = ErrorType<unknown>
+
+
+
+export function useListPettyCashFunds<TData = Awaited<ReturnType<typeof listPettyCashFunds>>, TError = ErrorType<unknown>>(
+ params?: ListPettyCashFundsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPettyCashFunds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPettyCashFundsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePettyCashFundUrl = () => {
+
+
+
+
+  return `/api/petty-cash/funds`
+}
+
+export const createPettyCashFund = async (pettyCashFundInput: PettyCashFundInput, options?: Parameters<typeof customFetch>[1]): Promise<PettyCashFund> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PettyCashFund>(getCreatePettyCashFundUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pettyCashFundInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePettyCashFundMutationKey = () => ['createPettyCashFund'] as const;
+
+export const getCreatePettyCashFundMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPettyCashFund>>, TError,CreatePettyCashFundMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPettyCashFund>>, TError,CreatePettyCashFundMutationVariables, TContext> => {
+
+const mutationKey = getCreatePettyCashFundMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPettyCashFund>>, CreatePettyCashFundMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPettyCashFund(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePettyCashFundMutationResult = NonNullable<Awaited<ReturnType<typeof createPettyCashFund>>>
+    export type CreatePettyCashFundMutationBody = BodyType<PettyCashFundInput>
+    export type CreatePettyCashFundMutationError = ErrorType<unknown>
+    export type CreatePettyCashFundMutationVariables = {data: BodyType<PettyCashFundInput>}
+
+    export const useCreatePettyCashFund = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPettyCashFund>>, TError,CreatePettyCashFundMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPettyCashFund>>,
+        TError,
+        CreatePettyCashFundMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePettyCashFundMutationOptions(options));
+    }
+
+export const getReplenishPettyCashFundUrl = (fundId: string,) => {
+
+
+
+
+  return `/api/petty-cash/funds/${fundId}/replenish`
+}
+
+export const replenishPettyCashFund = async (fundId: string,
+    pettyCashReplenishmentInput: PettyCashReplenishmentInput, options?: Parameters<typeof customFetch>[1]): Promise<PettyCashFund> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PettyCashFund>(getReplenishPettyCashFundUrl(fundId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pettyCashReplenishmentInput)
+  }
+);}
+
+
+
+
+
+export const getReplenishPettyCashFundMutationKey = () => ['replenishPettyCashFund'] as const;
+
+export const getReplenishPettyCashFundMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replenishPettyCashFund>>, TError,ReplenishPettyCashFundMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof replenishPettyCashFund>>, TError,ReplenishPettyCashFundMutationVariables, TContext> => {
+
+const mutationKey = getReplenishPettyCashFundMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof replenishPettyCashFund>>, ReplenishPettyCashFundMutationVariables> = (props) => {
+          const {fundId,data} = props ?? {};
+
+          return  replenishPettyCashFund(fundId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReplenishPettyCashFundMutationResult = NonNullable<Awaited<ReturnType<typeof replenishPettyCashFund>>>
+    export type ReplenishPettyCashFundMutationBody = BodyType<PettyCashReplenishmentInput>
+    export type ReplenishPettyCashFundMutationError = ErrorType<unknown>
+    export type ReplenishPettyCashFundMutationVariables = {fundId: string;data: BodyType<PettyCashReplenishmentInput>}
+
+    export const useReplenishPettyCashFund = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replenishPettyCashFund>>, TError,ReplenishPettyCashFundMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof replenishPettyCashFund>>,
+        TError,
+        ReplenishPettyCashFundMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReplenishPettyCashFundMutationOptions(options));
+    }
+
+export const getListPettyCashPoliciesUrl = () => {
+
+
+
+
+  return `/api/petty-cash/policies`
+}
+
+export const listPettyCashPolicies = async ( options?: Parameters<typeof customFetch>[1]): Promise<PettyCashPolicy[]> => {
+
+  return customFetch<PettyCashPolicy[]>(getListPettyCashPoliciesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPettyCashPoliciesQueryKey = () => {
+    return [
+    `/api/petty-cash/policies`
+    ] as const;
+    }
+
+
+export const getListPettyCashPoliciesQueryOptions = <TData = Awaited<ReturnType<typeof listPettyCashPolicies>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPettyCashPolicies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPettyCashPoliciesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPettyCashPolicies>>> = ({ signal }) => listPettyCashPolicies({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPettyCashPolicies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPettyCashPoliciesQueryResult = NonNullable<Awaited<ReturnType<typeof listPettyCashPolicies>>>
+export type ListPettyCashPoliciesQueryError = ErrorType<unknown>
+
+
+
+export function useListPettyCashPolicies<TData = Awaited<ReturnType<typeof listPettyCashPolicies>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPettyCashPolicies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPettyCashPoliciesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePettyCashPolicyUrl = () => {
+
+
+
+
+  return `/api/petty-cash/policies`
+}
+
+export const createPettyCashPolicy = async (pettyCashPolicyInput: PettyCashPolicyInput, options?: Parameters<typeof customFetch>[1]): Promise<PettyCashPolicy> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PettyCashPolicy>(getCreatePettyCashPolicyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pettyCashPolicyInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePettyCashPolicyMutationKey = () => ['createPettyCashPolicy'] as const;
+
+export const getCreatePettyCashPolicyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPettyCashPolicy>>, TError,CreatePettyCashPolicyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPettyCashPolicy>>, TError,CreatePettyCashPolicyMutationVariables, TContext> => {
+
+const mutationKey = getCreatePettyCashPolicyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPettyCashPolicy>>, CreatePettyCashPolicyMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPettyCashPolicy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePettyCashPolicyMutationResult = NonNullable<Awaited<ReturnType<typeof createPettyCashPolicy>>>
+    export type CreatePettyCashPolicyMutationBody = BodyType<PettyCashPolicyInput>
+    export type CreatePettyCashPolicyMutationError = ErrorType<unknown>
+    export type CreatePettyCashPolicyMutationVariables = {data: BodyType<PettyCashPolicyInput>}
+
+    export const useCreatePettyCashPolicy = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPettyCashPolicy>>, TError,CreatePettyCashPolicyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPettyCashPolicy>>,
+        TError,
+        CreatePettyCashPolicyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePettyCashPolicyMutationOptions(options));
+    }
+
+export const getResolvePettyCashEvidenceUrl = (requestId: string,) => {
+
+
+
+
+  return `/api/petty-cash/${requestId}/evidence`
+}
+
+export const resolvePettyCashEvidence = async (requestId: string,
+    pettyCashEvidenceInput: PettyCashEvidenceInput, options?: Parameters<typeof customFetch>[1]): Promise<PettyCashRequest> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PettyCashRequest>(getResolvePettyCashEvidenceUrl(requestId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pettyCashEvidenceInput)
+  }
+);}
+
+
+
+
+
+export const getResolvePettyCashEvidenceMutationKey = () => ['resolvePettyCashEvidence'] as const;
+
+export const getResolvePettyCashEvidenceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolvePettyCashEvidence>>, TError,ResolvePettyCashEvidenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolvePettyCashEvidence>>, TError,ResolvePettyCashEvidenceMutationVariables, TContext> => {
+
+const mutationKey = getResolvePettyCashEvidenceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolvePettyCashEvidence>>, ResolvePettyCashEvidenceMutationVariables> = (props) => {
+          const {requestId,data} = props ?? {};
+
+          return  resolvePettyCashEvidence(requestId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolvePettyCashEvidenceMutationResult = NonNullable<Awaited<ReturnType<typeof resolvePettyCashEvidence>>>
+    export type ResolvePettyCashEvidenceMutationBody = BodyType<PettyCashEvidenceInput>
+    export type ResolvePettyCashEvidenceMutationError = ErrorType<unknown>
+    export type ResolvePettyCashEvidenceMutationVariables = {requestId: string;data: BodyType<PettyCashEvidenceInput>}
+
+    export const useResolvePettyCashEvidence = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolvePettyCashEvidence>>, TError,ResolvePettyCashEvidenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolvePettyCashEvidence>>,
+        TError,
+        ResolvePettyCashEvidenceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResolvePettyCashEvidenceMutationOptions(options));
+    }
+
+export const getVerifyPettyCashRequestUrl = (requestId: string,) => {
+
+
+
+
+  return `/api/petty-cash/${requestId}/verify`
+}
+
+export const verifyPettyCashRequest = async (requestId: string, options?: Parameters<typeof customFetch>[1]): Promise<PettyCashRequest> => {
+
+  return customFetch<PettyCashRequest>(getVerifyPettyCashRequestUrl(requestId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyPettyCashRequestMutationKey = () => ['verifyPettyCashRequest'] as const;
+
+export const getVerifyPettyCashRequestMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPettyCashRequest>>, TError,VerifyPettyCashRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyPettyCashRequest>>, TError,VerifyPettyCashRequestMutationVariables, TContext> => {
+
+const mutationKey = getVerifyPettyCashRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyPettyCashRequest>>, VerifyPettyCashRequestMutationVariables> = (props) => {
+          const {requestId} = props ?? {};
+
+          return  verifyPettyCashRequest(requestId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyPettyCashRequestMutationResult = NonNullable<Awaited<ReturnType<typeof verifyPettyCashRequest>>>
+
+    export type VerifyPettyCashRequestMutationError = ErrorType<unknown>
+    export type VerifyPettyCashRequestMutationVariables = {requestId: string}
+
+    export const useVerifyPettyCashRequest = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPettyCashRequest>>, TError,VerifyPettyCashRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyPettyCashRequest>>,
+        TError,
+        VerifyPettyCashRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getVerifyPettyCashRequestMutationOptions(options));
+    }
+
+export const getEvaluatePettyCashRequestUrl = (requestId: string,) => {
+
+
+
+
+  return `/api/petty-cash/${requestId}/evaluate`
+}
+
+export const evaluatePettyCashRequest = async (requestId: string,
+    pettyCashEvaluationInput: PettyCashEvaluationInput, options?: Parameters<typeof customFetch>[1]): Promise<PettyCashRequest> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PettyCashRequest>(getEvaluatePettyCashRequestUrl(requestId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pettyCashEvaluationInput)
+  }
+);}
+
+
+
+
+
+export const getEvaluatePettyCashRequestMutationKey = () => ['evaluatePettyCashRequest'] as const;
+
+export const getEvaluatePettyCashRequestMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluatePettyCashRequest>>, TError,EvaluatePettyCashRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof evaluatePettyCashRequest>>, TError,EvaluatePettyCashRequestMutationVariables, TContext> => {
+
+const mutationKey = getEvaluatePettyCashRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof evaluatePettyCashRequest>>, EvaluatePettyCashRequestMutationVariables> = (props) => {
+          const {requestId,data} = props ?? {};
+
+          return  evaluatePettyCashRequest(requestId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EvaluatePettyCashRequestMutationResult = NonNullable<Awaited<ReturnType<typeof evaluatePettyCashRequest>>>
+    export type EvaluatePettyCashRequestMutationBody = BodyType<PettyCashEvaluationInput>
+    export type EvaluatePettyCashRequestMutationError = ErrorType<unknown>
+    export type EvaluatePettyCashRequestMutationVariables = {requestId: string;data: BodyType<PettyCashEvaluationInput>}
+
+    export const useEvaluatePettyCashRequest = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluatePettyCashRequest>>, TError,EvaluatePettyCashRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof evaluatePettyCashRequest>>,
+        TError,
+        EvaluatePettyCashRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getEvaluatePettyCashRequestMutationOptions(options));
     }
 
 export const getDecidePettyCashRequestUrl = (requestId: string,) => {

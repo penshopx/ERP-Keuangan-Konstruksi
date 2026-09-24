@@ -678,6 +678,128 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PettyCashRequest"
+  /petty-cash/funds:
+    get:
+      operationId: listPettyCashFunds
+      tags: [petty-cash]
+      parameters:
+        - name: projectId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Funds by project and location
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PettyCashFund" }
+    post:
+      operationId: createPettyCashFund
+      tags: [petty-cash]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashFundInput" }
+      responses:
+        "201":
+          description: Created fund
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashFund" }
+  /petty-cash/funds/{fundId}/replenish:
+    post:
+      operationId: replenishPettyCashFund
+      tags: [petty-cash]
+      parameters:
+        - name: fundId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashReplenishmentInput" }
+      responses:
+        "200":
+          description: Replenished fund
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashFund" }
+  /petty-cash/policies:
+    get:
+      operationId: listPettyCashPolicies
+      tags: [petty-cash]
+      responses:
+        "200":
+          description: Effective-dated policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PettyCashPolicy" }
+    post:
+      operationId: createPettyCashPolicy
+      tags: [petty-cash]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashPolicyInput" }
+      responses:
+        "201":
+          description: New policy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashPolicy" }
+  /petty-cash/{requestId}/evidence:
+    post:
+      operationId: resolvePettyCashEvidence
+      tags: [petty-cash]
+      parameters:
+        - $ref: "#/components/parameters/PettyCashRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashEvidenceInput" }
+      responses:
+        "200":
+          description: Updated request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashRequest" }
+  /petty-cash/{requestId}/verify:
+    post:
+      operationId: verifyPettyCashRequest
+      tags: [petty-cash]
+      parameters:
+        - $ref: "#/components/parameters/PettyCashRequestId"
+      responses:
+        "200":
+          description: Verified request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashRequest" }
+  /petty-cash/{requestId}/evaluate:
+    post:
+      operationId: evaluatePettyCashRequest
+      tags: [petty-cash]
+      parameters:
+        - $ref: "#/components/parameters/PettyCashRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashEvaluationInput" }
+      responses:
+        "200":
+          description: Evaluated request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashRequest" }
   /petty-cash/{requestId}/decision:
     post:
       operationId: decidePettyCashRequest
@@ -1650,6 +1772,7 @@ components:
       properties:
         id: { type: string }
         projectId: { type: string }
+        fundId: { type: [string, "null"] }
         projectCode: { type: string }
         projectName: { type: string }
         requesterUserId: { type: string }
@@ -1662,40 +1785,123 @@ components:
         spentAmount: { type: [number, "null"] }
         returnedAmount: { type: [number, "null"] }
         physicalCashAmount: { type: [number, "null"] }
-        status: { type: string, enum: [DIAJUKAN, DISETUJUI, DITOLAK, DICAIRKAN, DIPERTANGGUNGJAWABKAN, DIREKONSILIASI] }
+        status: { type: string, enum: [DIAJUKAN, DISETUJUI, DITOLAK, DICAIRKAN, DIPERTANGGUNGJAWABKAN, DIVERIFIKASI, DIREKONSILIASI, DIEVALUASI] }
         requestedAt: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         evidenceDueAt: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         policyVersion: { type: string }
+        approverUserId: { type: [string, "null"] }
         approverName: { type: [string, "null"] }
         approvalNote: { type: [string, "null"] }
         approvedAt: { type: [string, "null"], format: date-time }
         disburserName: { type: [string, "null"] }
+        disburserUserId: { type: [string, "null"] }
         disbursementReference: { type: [string, "null"] }
         disbursedAt: { type: [string, "null"], format: date-time }
         settledAt: { type: [string, "null"], format: date-time }
         reconcilerName: { type: [string, "null"] }
         reconciliationNote: { type: [string, "null"] }
         reconciledAt: { type: [string, "null"], format: date-time }
+        verifierName: { type: [string, "null"] }
+        verifierUserId: { type: [string, "null"] }
+        reconcilerUserId: { type: [string, "null"] }
+        evaluatorName: { type: [string, "null"] }
+        evaluationNote: { type: [string, "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         expenses:
           type: array
           items:
             $ref: "#/components/schemas/PettyCashExpense"
+        exceptions:
+          type: array
+          items: { $ref: "#/components/schemas/PettyCashException" }
+    PettyCashFund:
+      type: object
+      required: [id, projectId, location, custodianUserId, custodianName, bookBalance, createdAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        location: { type: string }
+        custodianUserId: { type: string }
+        custodianName: { type: string }
+        bookBalance: { type: number }
+        createdAt: { type: string, format: date-time }
+    PettyCashFundInput:
+      type: object
+      required: [projectId, location, custodianUserId, custodianName]
+      properties:
+        projectId: { type: string }
+        location: { type: string, minLength: 1 }
+        custodianUserId: { type: string, minLength: 1 }
+        custodianName: { type: string, minLength: 1 }
+    PettyCashReplenishmentInput:
+      type: object
+      required: [amount, reference]
+      properties:
+        amount: { type: number, minimum: 1 }
+        reference: { type: string, minLength: 1 }
+    PettyCashPolicy:
+      type: object
+      required: [id, version, effectiveFrom, sourceNote, evidenceDueDays, maxRequestAmount, directorApprovalAbove, standardApproverRole, highApproverRole]
+      properties:
+        id: { type: string }
+        version: { type: string }
+        effectiveFrom: { type: string }
+        effectiveTo: { type: [string, "null"] }
+        sourceNote: { type: string }
+        evidenceDueDays: { type: integer }
+        maxRequestAmount: { type: number }
+        directorApprovalAbove: { type: number }
+        standardApproverRole: { type: string, enum: [PROJECT_MANAGER, FINANCE, DIRECTOR] }
+        highApproverRole: { type: string, enum: [PROJECT_MANAGER, FINANCE, DIRECTOR] }
+    PettyCashPolicyInput:
+      type: object
+      required: [version, effectiveFrom, sourceNote, evidenceDueDays, maxRequestAmount, directorApprovalAbove, standardApproverRole, highApproverRole]
+      properties:
+        version: { type: string, minLength: 1 }
+        effectiveFrom: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        effectiveTo: { type: [string, "null"] }
+        sourceNote: { type: string, minLength: 1 }
+        evidenceDueDays: { type: integer, minimum: 1 }
+        maxRequestAmount: { type: number, minimum: 1 }
+        directorApprovalAbove: { type: number, minimum: 0 }
+        standardApproverRole: { type: string, enum: [PROJECT_MANAGER, FINANCE, DIRECTOR] }
+        highApproverRole: { type: string, enum: [PROJECT_MANAGER, FINANCE, DIRECTOR] }
+    PettyCashException:
+      type: object
+      required: [id, expenseId, ownerUserId, dueAt, status]
+      properties:
+        id: { type: string }
+        expenseId: { type: string }
+        ownerUserId: { type: string }
+        dueAt: { type: string }
+        status: { type: string }
+    PettyCashEvidenceInput:
+      type: object
+      required: [expenseId, receiptReference]
+      properties:
+        expenseId: { type: string }
+        receiptReference: { type: string, minLength: 1 }
+    PettyCashEvaluationInput:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1 }
     PettyCashExpense:
       type: object
-      required: [id, expenseDate, description, amount, receiptReference]
+      required: [id, expenseDate, description, amount]
       properties:
         id: { type: string }
         expenseDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         description: { type: string }
         amount: { type: number }
-        receiptReference: { type: string }
+        receiptReference: { type: [string, "null"] }
     PettyCashRequestInput:
       type: object
-      required: [projectId, purpose, costCode, requestedAmount, requestedAt]
+      required: [projectId, fundId, purpose, costCode, requestedAmount, requestedAt]
       properties:
         projectId: { type: string }
+        fundId: { type: string }
         purpose: { type: string, minLength: 3, maxLength: 500 }
         costCode: { type: string, minLength: 1, maxLength: 100 }
         requestedAmount: { type: number, minimum: 1 }
@@ -1718,14 +1924,15 @@ components:
       required: [returnedAmount, expenses]
       properties:
         returnedAmount: { type: number, minimum: 0 }
+        returnReference: { type: string, minLength: 1, maxLength: 200 }
         expenses:
           type: array
-          minItems: 1
+          minItems: 0
           items:
             $ref: "#/components/schemas/PettyCashExpenseInput"
     PettyCashExpenseInput:
       type: object
-      required: [expenseDate, description, amount, receiptReference]
+      required: [expenseDate, description, amount]
       properties:
         expenseDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         description: { type: string, minLength: 1, maxLength: 300 }

@@ -10,6 +10,11 @@ import type { PettyCashExpenseInput } from './pettyCashExpenseInput';
 export interface PettyCashSettlementInput {
   /** @minimum 0 */
   returnedAmount: number;
-  /** @minItems 1 */
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  returnReference?: string;
+  /** @minItems 0 */
   expenses: PettyCashExpenseInput[];
 }

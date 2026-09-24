@@ -20,5 +20,5 @@ export interface PettyCashExpenseInput {
      * @minLength 1
      * @maxLength 500
      */
-  receiptReference: string;
+  receiptReference?: string;
 }

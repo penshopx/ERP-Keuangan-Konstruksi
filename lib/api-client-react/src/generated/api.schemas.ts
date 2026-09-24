@@ -797,7 +797,9 @@ export const PettyCashRequestStatus = {
   DITOLAK: 'DITOLAK',
   DICAIRKAN: 'DICAIRKAN',
   DIPERTANGGUNGJAWABKAN: 'DIPERTANGGUNGJAWABKAN',
+  DIVERIFIKASI: 'DIVERIFIKASI',
   DIREKONSILIASI: 'DIREKONSILIASI',
+  DIEVALUASI: 'DIEVALUASI',
 } as const;
 
 export interface PettyCashExpense {
@@ -806,12 +808,23 @@ export interface PettyCashExpense {
   expenseDate: string;
   description: string;
   amount: number;
-  receiptReference: string;
+  /** @nullable */
+  receiptReference?: string | null;
+}
+
+export interface PettyCashException {
+  id: string;
+  expenseId: string;
+  ownerUserId: string;
+  dueAt: string;
+  status: string;
 }
 
 export interface PettyCashRequest {
   id: string;
   projectId: string;
+  /** @nullable */
+  fundId?: string | null;
   projectCode: string;
   projectName: string;
   requesterUserId: string;
@@ -836,6 +849,8 @@ export interface PettyCashRequest {
   evidenceDueAt: string;
   policyVersion: string;
   /** @nullable */
+  approverUserId?: string | null;
+  /** @nullable */
   approverName?: string | null;
   /** @nullable */
   approvalNote?: string | null;
@@ -843,6 +858,8 @@ export interface PettyCashRequest {
   approvedAt?: string | null;
   /** @nullable */
   disburserName?: string | null;
+  /** @nullable */
+  disburserUserId?: string | null;
   /** @nullable */
   disbursementReference?: string | null;
   /** @nullable */
@@ -855,13 +872,132 @@ export interface PettyCashRequest {
   reconciliationNote?: string | null;
   /** @nullable */
   reconciledAt?: string | null;
+  /** @nullable */
+  verifierName?: string | null;
+  /** @nullable */
+  verifierUserId?: string | null;
+  /** @nullable */
+  reconcilerUserId?: string | null;
+  /** @nullable */
+  evaluatorName?: string | null;
+  /** @nullable */
+  evaluationNote?: string | null;
   createdAt: string;
   updatedAt: string;
   expenses: PettyCashExpense[];
+  exceptions?: PettyCashException[];
+}
+
+export interface PettyCashFund {
+  id: string;
+  projectId: string;
+  location: string;
+  custodianUserId: string;
+  custodianName: string;
+  bookBalance: number;
+  createdAt: string;
+}
+
+export interface PettyCashFundInput {
+  projectId: string;
+  /** @minLength 1 */
+  location: string;
+  /** @minLength 1 */
+  custodianUserId: string;
+  /** @minLength 1 */
+  custodianName: string;
+}
+
+export interface PettyCashReplenishmentInput {
+  /** @minimum 1 */
+  amount: number;
+  /** @minLength 1 */
+  reference: string;
+}
+
+export type PettyCashPolicyStandardApproverRole = typeof PettyCashPolicyStandardApproverRole[keyof typeof PettyCashPolicyStandardApproverRole];
+
+
+export const PettyCashPolicyStandardApproverRole = {
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  FINANCE: 'FINANCE',
+  DIRECTOR: 'DIRECTOR',
+} as const;
+
+export type PettyCashPolicyHighApproverRole = typeof PettyCashPolicyHighApproverRole[keyof typeof PettyCashPolicyHighApproverRole];
+
+
+export const PettyCashPolicyHighApproverRole = {
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  FINANCE: 'FINANCE',
+  DIRECTOR: 'DIRECTOR',
+} as const;
+
+export interface PettyCashPolicy {
+  id: string;
+  version: string;
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+  sourceNote: string;
+  evidenceDueDays: number;
+  maxRequestAmount: number;
+  directorApprovalAbove: number;
+  standardApproverRole: PettyCashPolicyStandardApproverRole;
+  highApproverRole: PettyCashPolicyHighApproverRole;
+}
+
+export type PettyCashPolicyInputStandardApproverRole = typeof PettyCashPolicyInputStandardApproverRole[keyof typeof PettyCashPolicyInputStandardApproverRole];
+
+
+export const PettyCashPolicyInputStandardApproverRole = {
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  FINANCE: 'FINANCE',
+  DIRECTOR: 'DIRECTOR',
+} as const;
+
+export type PettyCashPolicyInputHighApproverRole = typeof PettyCashPolicyInputHighApproverRole[keyof typeof PettyCashPolicyInputHighApproverRole];
+
+
+export const PettyCashPolicyInputHighApproverRole = {
+  PROJECT_MANAGER: 'PROJECT_MANAGER',
+  FINANCE: 'FINANCE',
+  DIRECTOR: 'DIRECTOR',
+} as const;
+
+export interface PettyCashPolicyInput {
+  /** @minLength 1 */
+  version: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+  /** @minLength 1 */
+  sourceNote: string;
+  /** @minimum 1 */
+  evidenceDueDays: number;
+  /** @minimum 1 */
+  maxRequestAmount: number;
+  /** @minimum 0 */
+  directorApprovalAbove: number;
+  standardApproverRole: PettyCashPolicyInputStandardApproverRole;
+  highApproverRole: PettyCashPolicyInputHighApproverRole;
+}
+
+export interface PettyCashEvidenceInput {
+  expenseId: string;
+  /** @minLength 1 */
+  receiptReference: string;
+}
+
+export interface PettyCashEvaluationInput {
+  /** @minLength 1 */
+  note: string;
 }
 
 export interface PettyCashRequestInput {
   projectId: string;
+  fundId: string;
   /**
      * @minLength 3
      * @maxLength 500
@@ -921,13 +1057,18 @@ export interface PettyCashExpenseInput {
      * @minLength 1
      * @maxLength 500
      */
-  receiptReference: string;
+  receiptReference?: string;
 }
 
 export interface PettyCashSettlementInput {
   /** @minimum 0 */
   returnedAmount: number;
-  /** @minItems 1 */
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  returnReference?: string;
+  /** @minItems 0 */
   expenses: PettyCashExpenseInput[];
 }
 
@@ -1483,6 +1624,10 @@ projectId?: string;
 export type ListPettyCashRequestsParams = {
 projectId?: string;
 status?: string;
+};
+
+export type ListPettyCashFundsParams = {
+projectId?: string;
 };
 
 export type GetTaxSummaryParams = {
