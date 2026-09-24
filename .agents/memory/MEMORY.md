@@ -18,3 +18,4 @@
 - [Commitment exposure accounting](commitment-exposure-accounting.md) — receipts track physical progress; only posted vendor invoices move financial exposure from commitment to actual.
 - [Competency versus authorization](competency-versus-authorization.md) — professional SKKNI/SKKK evidence never grants ERP permissions automatically; authorization remains explicit and project-scoped.
 - [Managed AI provisioning availability](managed-ai-provisioning.md) — an adapter can compile while Replit AI provider provisioning is unavailable; verify live activation separately.
+- [Gustafta integration boundary](gustafta-integration-boundary.md) — ERP read-only does not mean zero data egress; pilot AI only with safe context and human review.
