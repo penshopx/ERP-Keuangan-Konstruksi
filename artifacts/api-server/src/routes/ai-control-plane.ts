@@ -11,6 +11,8 @@ import {
 } from "@workspace/db";
 import { canAccessProject } from "../middlewares/access";
 import { modelPromptAllowed, planWithReplitModel, validateModelPlan, type ModelPlanner } from "./copilot-model-planner";
+import { copilotAdmission, getCopilotUsage, saveCopilotLimit, type CopilotAdmission } from "./copilot-usage";
+import { isRole } from "../middlewares/access-policy";
 
 /**
  * The copilot deliberately has a closed set of capabilities. Do not add a
@@ -49,6 +51,7 @@ export type AiToolExecutor = (
 export type AiControlPlaneDependencies = {
   executeTool?: AiToolExecutor;
   planWithModel?: ModelPlanner;
+  admission?: CopilotAdmission;
   recordAudit?: (entry: {
     action: string;
     tool: AiTool;
@@ -220,7 +223,39 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
   const executeTool = dependencies.executeTool ?? runTool;
   const writeAudit = dependencies.recordAudit ?? recordAudit;
   const modelPlanner = dependencies.planWithModel ?? planWithReplitModel;
+  const admission = dependencies.admission ?? copilotAdmission;
   router.get("/ai/tools", (_req, res) => res.json({ tools: AI_TOOLS }));
+  router.get("/ai/usage", async (req, res) => {
+    if (req.access?.role !== "DIRECTOR") {
+      res.status(403).json({ error: "Hanya Director dapat melihat penggunaan copilot" });
+      return;
+    }
+    res.json(await getCopilotUsage());
+  });
+  router.put("/ai/limits", async (req, res) => {
+    if (req.access?.role !== "DIRECTOR") {
+      res.status(403).json({ error: "Hanya Director dapat mengubah batas copilot" });
+      return;
+    }
+    const { scope, scopeId, dailyLimit } = req.body ?? {};
+    if (!["role", "project"].includes(scope) || typeof scopeId !== "string" || !scopeId.trim()
+      || scopeId.length > 128 || !Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 100000
+      || Object.keys(req.body).some((key) => !["scope", "scopeId", "dailyLimit"].includes(key))
+      || (scope === "role" && !isRole(scopeId))) {
+      res.status(400).json({ error: "Batas harian, peran, atau proyek tidak valid" });
+      return;
+    }
+    if (scope === "project") {
+      const [project] = await db.select({ id: projectsTable.id }).from(projectsTable)
+        .where(eq(projectsTable.id, scopeId)).limit(1);
+      if (!project) {
+        res.status(404).json({ error: "Proyek tidak ditemukan" });
+        return;
+      }
+    }
+    await saveCopilotLimit(scope, scopeId, dailyLimit);
+    res.json({ scope, scopeId, dailyLimit });
+  });
   router.post(["/ai/copilot", "/copilot"], async (req, res) => {
     if (!enabled()) {
       res.status(503).json({ error: "Copilot sedang dinonaktifkan oleh kill switch" });
@@ -235,6 +270,33 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
       res.status(400).json({ error: "Input copilot tidak valid" });
       return;
     }
+    if (!req.access) {
+      res.status(403).json({ error: "Akses copilot tidak tersedia" });
+      return;
+    }
+    if ((body.prompt !== undefined && !modelPromptAllowed(body.prompt))
+      || (body.asOf !== undefined && (typeof body.asOf !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.asOf)))
+      || (body.tool !== undefined && !AI_TOOLS.includes(body.tool as AiTool))) {
+      res.status(400).json({ error: "Pertanyaan atau tool copilot tidak didukung" });
+      return;
+    }
+    if (body.projectId !== undefined && (typeof body.projectId !== "string" || !canAccessProject(req, body.projectId))) {
+      res.status(404).json({ error: "Proyek tidak ditemukan atau Anda tidak memiliki akses" });
+      return;
+    }
+    if (!AI_TOOLS.some((tool) => req.access!.permissions.includes(permissions[tool]))) {
+      res.status(403).json({ error: "Jabatan Anda tidak memiliki hak untuk copilot" });
+      return;
+    }
+    const reservation = await admission.reserve({ role: req.access.role, projectId: body.projectId });
+    if (!reservation) {
+      res.status(429).json({ error: "Kuota harian copilot untuk peran atau proyek ini telah tercapai. Coba lagi besok (UTC) atau hubungi Director." });
+      return;
+    }
+    const usageStarted = Date.now();
+    let usageTool: AiTool | "planning" = "planning";
+    let usageStatus: "SUCCESS" | "FAILED" | "TIMEOUT" = "FAILED";
+    try {
     // The provider is classification-only; on timeout, malformed output or
     // outage, use the original deterministic planner. Never trust its scope.
     let plannedTool: AiTool | null = null;
@@ -274,6 +336,7 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
     const tool: AiTool = projectId && requestedTool === "portfolio_summary"
       ? "project_context"
       : requestedTool;
+    usageTool = tool;
     if (PROJECT_SCOPED_TOOLS.includes(tool) && !projectId) {
       res.status(400).json({ error: "projectId wajib diisi untuk tool ini" });
       return;
@@ -301,6 +364,7 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
           action: "AI_COPILOT_READ", tool, projectId, userId: req.access.userId, role: req.access.role,
           metadata: { projectId: projectId ?? null, durationMs: Date.now() - started, sources: result.sources },
         });
+        usageStatus = "SUCCESS";
         res.json({ answer, tool, result: result.data, sources: result.sources });
       } finally {
         if (timer) clearTimeout(timer);
@@ -308,6 +372,7 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
     } catch (error) {
       const status = typeof error === "object" && error && "statusCode" in error
         ? Number((error as { statusCode: number }).statusCode) : 500;
+      usageStatus = status === 504 ? "TIMEOUT" : "FAILED";
       // Failure audits contain only operational metadata, never the prompt,
       // database payload, credentials, or model reasoning.
       if (req.access) {
@@ -317,6 +382,10 @@ export function createAiControlPlaneRouter(dependencies: AiControlPlaneDependenc
         }).catch(() => undefined);
       }
       res.status(status).json({ error: error instanceof Error ? error.message : "Copilot gagal menjalankan tool" });
+    }
+    } finally {
+      await admission.finish(reservation, usageTool, usageStatus, Date.now() - usageStarted)
+        .catch((error: unknown) => req.log?.error({ error }, "Gagal mencatat hasil penggunaan copilot"));
     }
   });
   return router;

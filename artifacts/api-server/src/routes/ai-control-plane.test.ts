@@ -39,6 +39,7 @@ function appFor(executeTool: AiToolExecutor, audits: unknown[] = [], planWithMod
     executeTool,
     planWithModel,
     recordAudit: async (entry) => { audits.push(entry); },
+    admission: { reserve: async () => "test", finish: async () => undefined },
   }));
   return app;
 }

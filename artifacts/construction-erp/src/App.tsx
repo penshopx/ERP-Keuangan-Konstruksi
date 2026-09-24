@@ -29,6 +29,7 @@ import Invoices from '@/pages/Invoices';
 import TaxSummary from '@/pages/TaxSummary';
 import TaxRules from '@/pages/TaxRules';
 import AuditActivity from '@/pages/AuditActivity';
+import CopilotUsage from '@/pages/CopilotUsage';
 import AccessManagement from '@/pages/AccessManagement';
 import PettyCash from '@/pages/PettyCash';
 
@@ -90,6 +91,7 @@ function Portal() {
           <Route path="/portal/tax" component={TaxSummary} />
           <Route path="/portal/tax-rules" component={TaxRules} />
           <Route path="/portal/audit" component={AuditActivity} />
+          <Route path="/portal/copilot-usage" component={CopilotUsage} />
           <Route path="/portal/access" component={AccessManagement} />
           <Route component={NotFound} />
         </Switch>

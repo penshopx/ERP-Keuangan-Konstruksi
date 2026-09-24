@@ -204,6 +204,38 @@ paths:
           description: Copilot is disabled by the operational kill switch
         "504":
           description: Copilot timed out
+        "429":
+          description: Daily role or project quota reached
+  /ai/usage:
+    get:
+      operationId: getCopilotUsage
+      tags: [copilot]
+      summary: Director-only copilot usage and limits
+      responses:
+        "200":
+          description: Usage during the last seven UTC days and today's counters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotUsageReport"
+  /ai/limits:
+    put:
+      operationId: updateCopilotLimit
+      tags: [copilot]
+      summary: Director-only daily limit for a role or project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopilotLimit"
+      responses:
+        "200":
+          description: Saved limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotLimit"
   /projects/{projectId}/rab:
     get:
       operationId: getProjectRab
@@ -960,6 +992,62 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CopilotCitation"
+    CopilotLimit:
+      type: object
+      required: [scope, scopeId, dailyLimit]
+      properties:
+        scope:
+          type: string
+          enum: [role, project]
+        scopeId:
+          type: string
+        dailyLimit:
+          type: integer
+          minimum: 0
+          maximum: 100000
+    CopilotUsageReport:
+      type: object
+      required: [today, since, defaultRoleDailyLimit, limits, tools, todayUsage]
+      properties:
+        today:
+          type: string
+        since:
+          type: string
+        defaultRoleDailyLimit:
+          type: integer
+        limits:
+          type: array
+          items:
+            $ref: "#/components/schemas/CopilotLimit"
+        tools:
+          type: array
+          items:
+            type: object
+            required: [tool, executions, failures, timeouts, durationMs]
+            properties:
+              tool:
+                type: string
+              executions:
+                type: integer
+              failures:
+                type: integer
+              timeouts:
+                type: integer
+              durationMs:
+                type: integer
+        todayUsage:
+          type: array
+          items:
+            type: object
+            required: [role, count]
+            properties:
+              role:
+                type: string
+              projectId:
+                type: string
+                nullable: true
+              count:
+                type: integer
     HealthStatus:
       type: object
       properties:

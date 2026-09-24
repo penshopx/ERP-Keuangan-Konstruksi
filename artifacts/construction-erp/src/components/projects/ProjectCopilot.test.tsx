@@ -68,6 +68,19 @@ describe("ProjectCopilot", () => {
     expect(screen.getByTestId("status-copilot-error").textContent).toContain("tidak memiliki hak")
   })
 
+  test("menjelaskan kuota tercapai tanpa menampilkan jawaban palsu", async () => {
+    const user = userEvent.setup()
+    askProjectCopilot.mockRejectedValue({
+      status: 429, data: { error: "Kuota harian copilot untuk proyek ini telah tercapai. Coba lagi besok (UTC)." },
+    })
+    render(<ProjectCopilot projectId="project-aktif" projectName="Gedung Utama" />)
+    await user.type(screen.getByTestId("input-copilot-question"), "Ringkas invoice")
+    await user.click(screen.getByTestId("button-ask-copilot"))
+    await waitFor(() => expect(screen.getByTestId("status-copilot-error").textContent).toContain("Kuota copilot tercapai"))
+    expect(screen.getByTestId("status-copilot-error").textContent).toContain("besok (UTC)")
+    expect(screen.queryByTestId("text-copilot-answer")).toBeNull()
+  })
+
   test("menghapus jawaban lama saat pertanyaan berikutnya gagal", async () => {
     const user = userEvent.setup()
     askProjectCopilot

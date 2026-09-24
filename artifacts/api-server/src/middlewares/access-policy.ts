@@ -33,6 +33,7 @@ export const protectedMutationEndpoints: readonly ProtectedMutationEndpoint[] = 
   { id: "revoke-invitation", method: "POST", routePath: "/access/invitations/:invitationId/revoke", requestPath: "/access/invitations/missing/revoke", allowedRoles: ["DIRECTOR"] },
   { id: "resend-invitation", method: "POST", routePath: "/access/invitations/:invitationId/resend", requestPath: "/access/invitations/missing/resend", allowedRoles: ["DIRECTOR"] },
   { id: "update-access", method: "PUT", routePath: "/access/users/:userId", requestPath: "/access/users/missing", allowedRoles: ["DIRECTOR"] },
+  { id: "update-copilot-limit", method: "PUT", routePath: "/ai/limits", requestPath: "/ai/limits", allowedRoles: ["DIRECTOR"], body: { scope: "role", scopeId: "DIRECTOR", dailyLimit: 100 } },
   { id: "decide-invoice", method: "POST", routePath: "/invoices/:invoiceId/decision", requestPath: "/invoices/missing/decision", requiredPermission: "invoices:approve" },
   { id: "acknowledge-budget-alert", method: "POST", routePath: "/budget-alerts/:alertId/acknowledge", requestPath: "/budget-alerts/missing/acknowledge", requiredPermission: "budget-alerts:manage" },
   { id: "resolve-budget-alert", method: "POST", routePath: "/budget-alerts/:alertId/resolve", requestPath: "/budget-alerts/missing/resolve", requiredPermission: "budget-alerts:manage" },

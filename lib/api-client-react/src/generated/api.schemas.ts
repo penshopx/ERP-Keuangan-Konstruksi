@@ -39,6 +39,47 @@ export interface ProjectCopilotResponse {
   sources: CopilotCitation[];
 }
 
+export type CopilotLimitScope = typeof CopilotLimitScope[keyof typeof CopilotLimitScope];
+
+
+export const CopilotLimitScope = {
+  role: 'role',
+  project: 'project',
+} as const;
+
+export interface CopilotLimit {
+  scope: CopilotLimitScope;
+  scopeId: string;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  dailyLimit: number;
+}
+
+export type CopilotUsageReportToolsItem = {
+  tool: string;
+  executions: number;
+  failures: number;
+  timeouts: number;
+  durationMs: number;
+};
+
+export type CopilotUsageReportTodayUsageItem = {
+  role: string;
+  projectId?: string | null;
+  count: number;
+};
+
+export interface CopilotUsageReport {
+  today: string;
+  since: string;
+  defaultRoleDailyLimit: number;
+  limits: CopilotLimit[];
+  tools: CopilotUsageReportToolsItem[];
+  todayUsage: CopilotUsageReportTodayUsageItem[];
+}
+
 export type HealthStatusStatus = typeof HealthStatusStatus[keyof typeof HealthStatusStatus];
 
 

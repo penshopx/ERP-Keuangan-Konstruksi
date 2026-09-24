@@ -27,6 +27,7 @@ const requiredMigrations = [
   "0014_neutralize_competency_reference_labels.sql",
   "0015_share_reconciliation_alert_incidents.sql",
   "0016_record_operational_alert_delivery.sql",
+  "0017_add_copilot_usage.sql",
 ];
 const expectedTables = [
   "actual_cost_allocations",
@@ -40,6 +41,8 @@ const expectedTables = [
   "commitment_lines",
   "commitments",
   "competency_catalog",
+  "copilot_limits",
+  "copilot_usage",
   "estimate_previews",
   "inventory_movements",
   "invitation_reconciliation_state",

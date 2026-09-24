@@ -24,6 +24,7 @@ const navigation = [
   { name: "Aturan Pajak", href: "/portal/tax-rules", icon: Scale, permission: "tax-rules:manage" },
   { name: "Audit Trail", href: "/portal/audit", icon: History, permission: "audit:view" },
   { name: "Hak Akses", href: "/portal/access", icon: Settings, role: "DIRECTOR" },
+  { name: "Penggunaan Copilot", href: "/portal/copilot-usage", icon: History, role: "DIRECTOR" },
 ]
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 

@@ -5,9 +5,10 @@ import http from "node:http";
 import express from "express";
 import { eq, inArray } from "drizzle-orm";
 import {
-  auditLogsTable, db, invoicesTable, projectsTable, rabBaselinesTable,
+  auditLogsTable, copilotLimitsTable, copilotUsageTable, db, invoicesTable, projectsTable, rabBaselinesTable,
 } from "@workspace/db";
 import { createAiControlPlaneRouter } from "./ai-control-plane";
+import { copilotAdmission, getCopilotUsage, saveCopilotLimit } from "./copilot-usage";
 import type { AccessContext } from "../middlewares/access";
 import {
   acquirePersistenceDatabaseSuiteLock,
@@ -69,6 +70,8 @@ before(async () => {
 });
 
 after(async () => {
+  await db.delete(copilotUsageTable).where(inArray(copilotUsageTable.projectId, [targetProject, otherProject]));
+  await db.delete(copilotLimitsTable).where(eq(copilotLimitsTable.scopeId, otherProject));
   await db.delete(auditLogsTable).where(
     inArray(auditLogsTable.id, [...targetAuditIds, ...Array.from({ length: 205 }, (_, index) =>
       `ai-audit-unrelated-${runId}-${index}`)]),
@@ -78,6 +81,44 @@ after(async () => {
   await db.delete(projectsTable).where(inArray(projectsTable.id, [targetProject, otherProject]));
   if (lock) await releasePersistenceDatabaseSuiteLock(lock);
   lock = undefined;
+});
+
+test("concurrent reservations cannot exceed a project quota and metrics survive completion", async () => {
+  await saveCopilotLimit("project", otherProject, 1);
+  const results = await Promise.all(Array.from({ length: 4 }, () =>
+    copilotAdmission.reserve({ role: "PROJECT_MANAGER", projectId: otherProject })));
+  assert.equal(results.filter(Boolean).length, 1);
+  const id = results.find((value): value is string => Boolean(value))!;
+  await copilotAdmission.finish(id, "invoices", "TIMEOUT", 42);
+  const report = await getCopilotUsage();
+  assert.ok(report.tools.some((row) => row.tool === "invoices" && row.timeouts >= 1 && row.durationMs >= 42));
+
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    req.access = { userId: "test", displayName: "Test", role: "PROJECT_MANAGER",
+      assignedProjectIds: [otherProject], permissions: ["projects:view"] };
+    next();
+  });
+  app.use(createAiControlPlaneRouter({ executeTool: async () => ({ data: {}, sources: [] }) }));
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/ai/copilot`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tool: "project_context", projectId: otherProject }),
+    });
+    assert.equal(response.status, 429);
+    assert.match(JSON.stringify(await response.json()), /Kuota harian/);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/ai/usage`)).status, 403);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/ai/limits`, {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scope: "project", scopeId: otherProject, dailyLimit: 100 }),
+    })).status, 403);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 
 test("production audit_search resolves all ownership forms before LIMIT", async () => {

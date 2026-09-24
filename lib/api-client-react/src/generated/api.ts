@@ -33,6 +33,8 @@ import type {
   CommitmentInput,
   CommitmentTransitionInput,
   CompetencyCatalogEntry,
+  CopilotLimit,
+  CopilotUsageReport,
   CurrentUser,
   DashboardSummary,
   EstimateBaselineInput,
@@ -897,6 +899,171 @@ export const useAskProjectCopilot = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getAskProjectCopilotMutationOptions(options));
+    }
+
+export const getGetCopilotUsageUrl = () => {
+
+
+
+
+  return `/api/ai/usage`
+}
+
+/**
+ * @summary Director-only copilot usage and limits
+ */
+export const getCopilotUsage = async ( options?: Parameters<typeof customFetch>[1]): Promise<CopilotUsageReport> => {
+
+  return customFetch<CopilotUsageReport>(getGetCopilotUsageUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCopilotUsageQueryKey = () => {
+    return [
+    `/api/ai/usage`
+    ] as const;
+    }
+
+
+export const getGetCopilotUsageQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotUsage>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCopilotUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotUsageQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotUsage>>> = ({ signal }) => getCopilotUsage({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotUsage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCopilotUsageQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotUsage>>>
+export type GetCopilotUsageQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Director-only copilot usage and limits
+ */
+
+export function useGetCopilotUsage<TData = Awaited<ReturnType<typeof getCopilotUsage>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCopilotUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCopilotUsageQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateCopilotLimitUrl = () => {
+
+
+
+
+  return `/api/ai/limits`
+}
+
+/**
+ * @summary Director-only daily limit for a role or project
+ */
+export const updateCopilotLimit = async (copilotLimit: CopilotLimit, options?: Parameters<typeof customFetch>[1]): Promise<CopilotLimit> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CopilotLimit>(getUpdateCopilotLimitUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(copilotLimit)
+  }
+);}
+
+
+
+
+
+export const getUpdateCopilotLimitMutationKey = () => ['updateCopilotLimit'] as const;
+
+export const getUpdateCopilotLimitMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotLimit>>, TError,UpdateCopilotLimitMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCopilotLimit>>, TError,UpdateCopilotLimitMutationVariables, TContext> => {
+
+const mutationKey = getUpdateCopilotLimitMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCopilotLimit>>, UpdateCopilotLimitMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateCopilotLimit(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCopilotLimitMutationResult = NonNullable<Awaited<ReturnType<typeof updateCopilotLimit>>>
+    export type UpdateCopilotLimitMutationBody = BodyType<CopilotLimit>
+    export type UpdateCopilotLimitMutationError = ErrorType<unknown>
+    export type UpdateCopilotLimitMutationVariables = {data: BodyType<CopilotLimit>}
+
+    /**
+ * @summary Director-only daily limit for a role or project
+ */
+export const useUpdateCopilotLimit = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotLimit>>, TError,UpdateCopilotLimitMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCopilotLimit>>,
+        TError,
+        UpdateCopilotLimitMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateCopilotLimitMutationOptions(options));
     }
 
 export const getGetProjectRabUrl = (projectId: string,) => {

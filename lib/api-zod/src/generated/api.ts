@@ -324,6 +324,64 @@ export const AskProjectCopilotResponse = zod.object({
 
 
 /**
+ * @summary Director-only copilot usage and limits
+ */
+export const getCopilotUsageResponseLimitsItemDailyLimitMin = 0;
+export const getCopilotUsageResponseLimitsItemDailyLimitMax = 100000;
+
+
+
+export const GetCopilotUsageResponse = zod.object({
+  "today": zod.string(),
+  "since": zod.string(),
+  "defaultRoleDailyLimit": zod.number().int(),
+  "limits": zod.array(zod.object({
+  "scope": zod.enum(['role', 'project']),
+  "scopeId": zod.string(),
+  "dailyLimit": zod.number().int().min(getCopilotUsageResponseLimitsItemDailyLimitMin).max(getCopilotUsageResponseLimitsItemDailyLimitMax)
+})),
+  "tools": zod.array(zod.object({
+  "tool": zod.string(),
+  "executions": zod.number().int(),
+  "failures": zod.number().int(),
+  "timeouts": zod.number().int(),
+  "durationMs": zod.number().int()
+})),
+  "todayUsage": zod.array(zod.object({
+  "role": zod.string(),
+  "projectId": zod.string().nullish(),
+  "count": zod.number().int()
+}))
+})
+
+
+/**
+ * @summary Director-only daily limit for a role or project
+ */
+export const updateCopilotLimitBodyDailyLimitMin = 0;
+export const updateCopilotLimitBodyDailyLimitMax = 100000;
+
+
+
+export const UpdateCopilotLimitBody = zod.object({
+  "scope": zod.enum(['role', 'project']),
+  "scopeId": zod.string(),
+  "dailyLimit": zod.number().int().min(updateCopilotLimitBodyDailyLimitMin).max(updateCopilotLimitBodyDailyLimitMax)
+})
+
+export const updateCopilotLimitResponseDailyLimitMin = 0;
+export const updateCopilotLimitResponseDailyLimitMax = 100000;
+
+
+
+export const UpdateCopilotLimitResponse = zod.object({
+  "scope": zod.enum(['role', 'project']),
+  "scopeId": zod.string(),
+  "dailyLimit": zod.number().int().min(updateCopilotLimitResponseDailyLimitMin).max(updateCopilotLimitResponseDailyLimitMax)
+})
+
+
+/**
  * @summary Get project RAB baseline
  */
 export const GetProjectRabParams = zod.object({

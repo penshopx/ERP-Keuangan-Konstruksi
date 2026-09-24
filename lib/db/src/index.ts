@@ -97,6 +97,7 @@ const REQUIRED_MIGRATIONS = [
   "0011_add_budget_alerts.sql",
   "0015_share_reconciliation_alert_incidents.sql",
   "0016_record_operational_alert_delivery.sql",
+  "0017_add_copilot_usage.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -122,6 +123,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     commitment_ledger_shape: boolean;
     budget_alerts_shape: boolean;
     operational_alert_delivery_status_shape: boolean;
+    copilot_usage_shape: boolean;
   }>(`
     SELECT
       EXISTS (
@@ -235,7 +237,9 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
               AND is_nullable = 'NO'
             )
           )
-      ) AS operational_alert_delivery_status_shape
+       ) AS operational_alert_delivery_status_shape,
+       (to_regclass('copilot_limits') IS NOT NULL
+         AND to_regclass('copilot_usage') IS NOT NULL) AS copilot_usage_shape
   `);
 
   const status = result.rows[0];
@@ -250,7 +254,8 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     !status.pending_resend_compensation_index
     || !status.commitment_ledger_shape
     || !status.budget_alerts_shape
-    || !status.operational_alert_delivery_status_shape
+     || !status.operational_alert_delivery_status_shape
+     || !status.copilot_usage_shape
   ) {
     throw new Error(
       `Mandatory database migrations ${REQUIRED_MIGRATIONS.join(", ")} are not fully applied. ` +

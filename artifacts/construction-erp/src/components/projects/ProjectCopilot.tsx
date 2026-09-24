@@ -34,6 +34,7 @@ function citationHref(citation: CopilotCitation, projectId: string) {
 
 function errorPresentation(error: CopilotError) {
   const detail = error.data?.error ?? error.message ?? "Copilot tidak dapat menjawab saat ini."
+  if (error.status === 429) return { title: "Kuota copilot tercapai", detail }
   if (error.status === 504) return { title: "Waktu tunggu habis", detail: "Analisis melewati batas waktu. Coba pertanyaan yang lebih spesifik." }
   if (error.status === 503) return { title: "Copilot sedang dinonaktifkan", detail }
   if (error.status === 403 || error.status === 404) return { title: "Akses ditolak", detail }
