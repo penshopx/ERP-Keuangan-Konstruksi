@@ -6,6 +6,11 @@ import { createElement } from "react"
 import type { ReactNode } from "react"
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest"
 import ProjectRab from "./ProjectRab"
+import { downloadRabComparisonPdf } from "@/lib/rab-comparison-pdf"
+
+vi.mock("@/lib/rab-comparison-pdf", () => ({
+  downloadRabComparisonPdf: vi.fn().mockResolvedValue(undefined),
+}))
 
 const latestRab = {
   projectId: "project-1",
@@ -67,6 +72,7 @@ vi.mock("@workspace/api-client-react", async (importOriginal) => {
   const original = await importOriginal<typeof import("@workspace/api-client-react")>()
   return {
     ...original,
+    useGetProject: () => ({ data: { id: "project-1", name: "Proyek Contoh" }, isLoading: false, isError: false }),
     useGetProjectRab: () => ({ data: latestRab, isLoading: false, isError: false }),
     useListProjectRabVersions: () => ({
       data: [
@@ -90,6 +96,7 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  vi.clearAllMocks()
   window.history.replaceState({}, "", "/portal/projects/project-1/rab")
   URL.createObjectURL = vi.fn(() => "blob:rab-comparison")
   URL.revokeObjectURL = vi.fn()
@@ -138,6 +145,7 @@ describe("riwayat versi RAB", () => {
     expect(screen.getByTestId("row-rab-comparison-B.1").textContent).toContain("DIHAPUS")
     expect(screen.getByTestId("row-rab-comparison-C.1").textContent).toContain("BARU")
     expect(screen.getByTestId("button-download-rab-comparison")).not.toHaveProperty("disabled", true)
+    expect(screen.getByTestId("button-download-rab-comparison-pdf")).not.toHaveProperty("disabled", true)
   })
 
   test("memulihkan pasangan perbandingan dari URL yang dapat dibagikan", async () => {
@@ -147,6 +155,14 @@ describe("riwayat versi RAB", () => {
 
     expect(await screen.findByText("Perbandingan Versi RAB")).toBeTruthy()
     expect(screen.getByTestId("row-rab-comparison-A.1")).toBeTruthy()
+  })
+
+  test("mengunduh PDF dari versi yang terlihat dengan identitas proyek", async () => {
+    const user = userEvent.setup()
+    render(createElement(ProjectRab))
+    await user.click(screen.getByTestId("button-compare-rab-versions"))
+    await user.click(screen.getByTestId("button-download-rab-comparison-pdf"))
+    await waitFor(() => expect(downloadRabComparisonPdf).toHaveBeenCalledWith(historicalRab, latestRab, "Proyek Contoh"))
   })
 
   test("mengabaikan parameter versi yang tidak valid tanpa meminta versi tersebut", async () => {

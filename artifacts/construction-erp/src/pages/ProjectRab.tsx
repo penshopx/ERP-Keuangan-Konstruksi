@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import {
   getGetProjectRabVersionQueryKey,
   getListProjectRabVersionsQueryKey,
+  useGetProject,
   useGetProjectRab,
   useGetProjectRabVersion,
   useListProjectRabVersions,
@@ -14,6 +15,8 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, AlertTriangle, Download, GitCompareArrows, History } from "lucide-react"
 import { formatRupiah, formatPercent } from "@/lib/utils"
 import { downloadRabComparisonCsv, getRabComparisonRows } from "@/lib/rab-comparison-export"
+import { downloadRabComparisonPdf } from "@/lib/rab-comparison-pdf"
+import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -33,6 +36,8 @@ export default function ProjectRab() {
   const highlightedCommitment = drilldown.get("commitmentId")
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
   const [comparisonVersions, setComparisonVersions] = useState<{ from: number; to: number } | null>(null)
+  const [pdfDownloading, setPdfDownloading] = useState(false)
+  const projectQuery = useGetProject(projectId)
   const latestQuery = useGetProjectRab(projectId)
   const versionsQuery = useListProjectRabVersions(projectId, {
     query: {
@@ -178,6 +183,33 @@ export default function ProjectRab() {
             >
               <Download className="mr-2 h-4 w-4" />
               Unduh CSV
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                pdfDownloading ||
+                comparisonLoading ||
+                comparisonError ||
+                !comparisonFrom ||
+                !comparisonTo ||
+                comparisonVersions.from === comparisonVersions.to
+              }
+              onClick={async () => {
+                if (!comparisonFrom || !comparisonTo) return
+                setPdfDownloading(true)
+                try {
+                  await downloadRabComparisonPdf(comparisonFrom, comparisonTo, projectQuery.data?.name)
+                } catch {
+                  toast.error("PDF perbandingan RAB gagal dibuat. Coba lagi.")
+                } finally {
+                  setPdfDownloading(false)
+                }
+              }}
+              data-testid="button-download-rab-comparison-pdf"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {pdfDownloading ? "Menyiapkan PDF…" : "Unduh PDF"}
             </Button>
           </div>
         </div>
