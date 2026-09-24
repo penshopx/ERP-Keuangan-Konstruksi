@@ -112,6 +112,8 @@ export * from './projectDetail';
 export * from './projectInput';
 export * from './projectStatus';
 export * from './projectUpdate';
+export * from './rabComparisonDownloadInput';
+export * from './rabComparisonDownloadInputFormat';
 export * from './rabItem';
 export * from './rabSummary';
 export * from './rabTemplate';

@@ -7,9 +7,12 @@ import type { ReactNode } from "react"
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest"
 import ProjectRab from "./ProjectRab"
 import { downloadRabComparisonPdf } from "@/lib/rab-comparison-pdf"
+import { recordRabComparisonDownload } from "@workspace/api-client-react"
 
 vi.mock("@/lib/rab-comparison-pdf", () => ({
-  downloadRabComparisonPdf: vi.fn().mockResolvedValue(undefined),
+  downloadRabComparisonPdf: vi.fn().mockImplementation(
+    async (_from, _to, _name, beforeDownload: () => Promise<void>) => beforeDownload(),
+  ),
 }))
 
 const latestRab = {
@@ -83,6 +86,7 @@ vi.mock("@workspace/api-client-react", async (importOriginal) => {
       isError: false,
     }),
     useGetProjectRabVersion: (_projectId: string, version: number) => ({ data: version === 1 ? historicalRab : latestRab, isLoading: false, isError: false }),
+    recordRabComparisonDownload: vi.fn().mockResolvedValue({}),
     useListProjectCommitments: () => ({ data: [], isLoading: false, isError: false }),
   }
 })
@@ -97,6 +101,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(recordRabComparisonDownload).mockResolvedValue({} as never)
   window.history.replaceState({}, "", "/portal/projects/project-1/rab")
   URL.createObjectURL = vi.fn(() => "blob:rab-comparison")
   URL.revokeObjectURL = vi.fn()
@@ -162,7 +167,27 @@ describe("riwayat versi RAB", () => {
     render(createElement(ProjectRab))
     await user.click(screen.getByTestId("button-compare-rab-versions"))
     await user.click(screen.getByTestId("button-download-rab-comparison-pdf"))
-    await waitFor(() => expect(downloadRabComparisonPdf).toHaveBeenCalledWith(historicalRab, latestRab, "Proyek Contoh"))
+    await waitFor(() => expect(downloadRabComparisonPdf).toHaveBeenCalledWith(historicalRab, latestRab, "Proyek Contoh", expect.any(Function)))
+    expect(recordRabComparisonDownload).toHaveBeenCalledWith("project-1", {
+      fromVersion: 1, toVersion: 2, format: "PDF",
+    })
+  })
+
+  test("CSV hanya diunduh sesudah audit berhasil; kegagalan audit tidak membuat berkas", async () => {
+    const user = userEvent.setup()
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
+    render(createElement(ProjectRab))
+    await user.click(screen.getByTestId("button-compare-rab-versions"))
+    vi.mocked(recordRabComparisonDownload).mockRejectedValueOnce(new Error("Audit unavailable"))
+    await user.click(screen.getByTestId("button-download-rab-comparison"))
+    await waitFor(() => expect(recordRabComparisonDownload).toHaveBeenCalledWith("project-1", {
+      fromVersion: 1, toVersion: 2, format: "CSV",
+    }))
+    await waitFor(() => expect(screen.getByTestId("button-download-rab-comparison").hasAttribute("disabled")).toBe(false))
+    expect(click).not.toHaveBeenCalled()
+    await user.click(screen.getByTestId("button-download-rab-comparison"))
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
+    click.mockRestore()
   })
 
   test("mengabaikan parameter versi yang tidak valid tanpa meminta versi tersebut", async () => {

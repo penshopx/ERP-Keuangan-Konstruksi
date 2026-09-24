@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import {
   getGetProjectRabVersionQueryKey,
   getListProjectRabVersionsQueryKey,
+  recordRabComparisonDownload,
   useGetProject,
   useGetProjectRab,
   useGetProjectRabVersion,
@@ -36,7 +37,7 @@ export default function ProjectRab() {
   const highlightedCommitment = drilldown.get("commitmentId")
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
   const [comparisonVersions, setComparisonVersions] = useState<{ from: number; to: number } | null>(null)
-  const [pdfDownloading, setPdfDownloading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const projectQuery = useGetProject(projectId)
   const latestQuery = useGetProjectRab(projectId)
   const versionsQuery = useListProjectRabVersions(projectId, {
@@ -114,6 +115,31 @@ export default function ProjectRab() {
     })
   }
 
+  const exportComparison = async (format: "CSV" | "PDF") => {
+    if (exporting || !comparisonVersions || !comparisonFromQuery.data || !comparisonToQuery.data) return
+    const from = comparisonFromQuery.data
+    const to = comparisonToQuery.data
+    setExporting(true)
+    const record = async () => {
+      await recordRabComparisonDownload(projectId, {
+        fromVersion: from.version,
+        toVersion: to.version,
+        format,
+      })
+    }
+    try {
+      if (format === "CSV") {
+        await downloadRabComparisonCsv(from, to, record)
+      } else {
+        await downloadRabComparisonPdf(from, to, projectQuery.data?.name, record)
+      }
+    } catch {
+      toast.error("Unduhan dibatalkan: bukti tidak dapat disiapkan atau aktivitas ekspor tidak tercatat. Coba lagi.")
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -168,48 +194,35 @@ export default function ProjectRab() {
               type="button"
               variant="outline"
               disabled={
+                exporting ||
                 comparisonLoading ||
                 comparisonError ||
                 !comparisonFrom ||
                 !comparisonTo ||
                 comparisonVersions.from === comparisonVersions.to
               }
-              onClick={() => {
-                if (comparisonFrom && comparisonTo) {
-                  downloadRabComparisonCsv(comparisonFrom, comparisonTo)
-                }
-              }}
+              onClick={() => void exportComparison("CSV")}
               data-testid="button-download-rab-comparison"
             >
               <Download className="mr-2 h-4 w-4" />
-              Unduh CSV
+              {exporting ? "Menyiapkan unduhan…" : "Unduh CSV"}
             </Button>
             <Button
               type="button"
               variant="outline"
               disabled={
-                pdfDownloading ||
+                exporting ||
                 comparisonLoading ||
                 comparisonError ||
                 !comparisonFrom ||
                 !comparisonTo ||
                 comparisonVersions.from === comparisonVersions.to
               }
-              onClick={async () => {
-                if (!comparisonFrom || !comparisonTo) return
-                setPdfDownloading(true)
-                try {
-                  await downloadRabComparisonPdf(comparisonFrom, comparisonTo, projectQuery.data?.name)
-                } catch {
-                  toast.error("PDF perbandingan RAB gagal dibuat. Coba lagi.")
-                } finally {
-                  setPdfDownloading(false)
-                }
-              }}
+              onClick={() => void exportComparison("PDF")}
               data-testid="button-download-rab-comparison-pdf"
             >
               <Download className="mr-2 h-4 w-4" />
-              {pdfDownloading ? "Menyiapkan PDF…" : "Unduh PDF"}
+              Unduh PDF
             </Button>
           </div>
         </div>

@@ -488,6 +488,34 @@ export const GetProjectRabVersionResponse = zod.object({
 
 
 /**
+ * @summary Authorize and record a prepared RAB comparison export
+ */
+export const RecordRabComparisonDownloadParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+
+
+export const RecordRabComparisonDownloadBody = zod.object({
+  "fromVersion": zod.number().int().min(1),
+  "toVersion": zod.number().int().min(1),
+  "format": zod.enum(['CSV', 'PDF'])
+})
+
+export const RecordRabComparisonDownloadResponse = zod.object({
+  "id": zod.string(),
+  "action": zod.string(),
+  "entity": zod.string(),
+  "detail": zod.string(),
+  "user": zod.string(),
+  "timestamp": zod.string(),
+  "tone": zod.string()
+})
+
+
+/**
  * @summary Import a reusable RAB template as a new draft baseline
  */
 export const ImportProjectRabTemplateParams = zod.object({

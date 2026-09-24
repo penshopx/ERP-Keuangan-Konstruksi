@@ -829,6 +829,89 @@ test("API persistence and invoice atomicity survive regressions", async (t) => {
     assert.deepEqual(auditsAfter, auditsBefore);
   });
 
+  await t.test("RAB comparison exports record actor, project, versions, format and reject unauthorized or invalid requests", async () => {
+    const server = await startTestServer();
+    const created = await requestJson(server.baseUrl, "/projects", {
+      method: "POST",
+      body: JSON.stringify({
+        code: `TST-${randomUUID().slice(0, 8)}`, name: "Proyek Bukti Ekspor",
+        owner: "Regression Test", contractValue: 100_000, endDate: "2027-12-31",
+      }),
+    });
+    const exportProjectId = String(created.id);
+    const [first] = await db.select({ version: rabBaselinesTable.version })
+      .from(rabBaselinesTable).where(eq(rabBaselinesTable.projectId, exportProjectId)).limit(1);
+    assert.ok(first);
+    const secondVersion = first.version + 1;
+    await db.insert(rabBaselinesTable).values({
+      id: randomUUID(), projectId: exportProjectId, version: secondVersion, status: "DRAF",
+    });
+    const endpoint = `/projects/${exportProjectId}/rab/comparison-downloads`;
+    try {
+      for (const format of ["CSV", "PDF"]) {
+        const result = await requestJson(server.baseUrl, endpoint, {
+          method: "POST",
+          body: JSON.stringify({ fromVersion: first.version, toVersion: secondVersion, format }),
+        });
+        assert.equal(result.action, "DIUNDUH");
+        assert.match(String(result.detail), new RegExp(`v${first.version}\\.0.*v${secondVersion}\\.0.*${format}`));
+        const [record] = await db.select().from(auditLogsTable).where(eq(auditLogsTable.id, String(result.id)));
+        assert.equal(record.actorUserId, access.userId);
+        assert.equal(record.entityId, exportProjectId);
+        assert.deepEqual(record.metadata, {
+          projectId: exportProjectId, fromVersion: first.version, toVersion: secondVersion, format,
+        });
+        assert.equal(new Date(String(result.timestamp)).toISOString(), record.timestamp.toISOString());
+      }
+      const activityResponse = await requestJson(server.baseUrl, "/activity");
+      const activity = activityResponse as unknown as Array<Record<string, unknown>>;
+      assert.ok(activity.some((item) => item.entity === "Perbandingan RAB"
+        && String(item.detail).includes("Proyek Bukti Ekspor")
+        && String(item.detail).includes("PDF")
+        && item.user === access.displayName));
+      for (const data of [
+        { fromVersion: first.version, toVersion: first.version, format: "CSV" },
+        { fromVersion: first.version, toVersion: 99999, format: "PDF" },
+        { fromVersion: 0, toVersion: secondVersion, format: "CSV" },
+      ]) {
+        const response = await fetch(`${server.baseUrl}${endpoint}`, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data),
+        });
+        assert.equal(response.status, data.toVersion === 99999 ? 404 : 400);
+      }
+    } finally {
+      await server.close();
+    }
+    const restricted = await startTestServer({}, {
+      ...access, role: "PROJECT_MANAGER", assignedProjectIds: [],
+    });
+    try {
+      const response = await fetch(`${restricted.baseUrl}${endpoint}`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fromVersion: first.version, toVersion: secondVersion, format: "CSV" }),
+      });
+      assert.equal(response.status, 403);
+    } finally {
+      await restricted.close();
+    }
+    const failing = await startTestServer({}, access, {
+      beforeComparisonAuditInsert: async () => { throw new Error("Injected comparison audit failure"); },
+    });
+    try {
+      const response = await fetch(`${failing.baseUrl}${endpoint}`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fromVersion: first.version, toVersion: secondVersion, format: "CSV" }),
+      });
+      assert.equal(response.status, 500);
+    } finally {
+      await failing.close();
+    }
+    const records = await db.select().from(auditLogsTable).where(and(
+      eq(auditLogsTable.entityId, exportProjectId), eq(auditLogsTable.action, "DIUNDUH"),
+    ));
+    assert.equal(records.length, 2);
+  });
+
   await t.test("RAB import rolls back baseline, items, project totals, and audit when audit insert fails", async () => {
     const templateId = `test-rab-import-${runId}`;
     await db.insert(rabTemplatesTable).values({

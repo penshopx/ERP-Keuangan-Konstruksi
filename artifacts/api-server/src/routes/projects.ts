@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
-import { and, desc, eq, ilike, max, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, max, or, sql } from "drizzle-orm";
 import {
   auditLogsTable,
   db,
@@ -29,6 +29,9 @@ import {
   ListProjectRabVersionsResponse,
   ListProjectsQueryParams,
   ListProjectsResponse,
+  RecordRabComparisonDownloadBody,
+  RecordRabComparisonDownloadParams,
+  RecordRabComparisonDownloadResponse,
   UpdateProjectBody,
   UpdateProjectParams,
   UpdateProjectResponse,
@@ -42,6 +45,7 @@ export type ProjectPersistenceHooks = {
   beforeUpdateAuditInsert?: (projectId: string) => Promise<void>;
   beforeRabImportVersionLock?: (projectId: string, baselineId: string) => Promise<void>;
   beforeRabImportAuditInsert?: (projectId: string, baselineId: string, version: number) => Promise<void>;
+  beforeComparisonAuditInsert?: (projectId: string) => Promise<void>;
   rabImportLockTimeoutMs?: number;
 };
 
@@ -335,6 +339,58 @@ router.get("/projects/:projectId/rab/versions/:version", requirePermission("proj
     return;
   }
   res.json(GetProjectRabVersionResponse.parse(await rabSummary(project.id, baseline)));
+});
+
+router.post("/projects/:projectId/rab/comparison-downloads", requirePermission("projects:view"), async (req, res): Promise<void> => {
+  const params = RecordRabComparisonDownloadParams.safeParse(req.params);
+  const body = RecordRabComparisonDownloadBody.safeParse(req.body);
+  if (!params.success || !body.success || body.data.fromVersion === body.data.toVersion) {
+    res.status(400).json({ error: "Pilih dua versi RAB berbeda dan format ekspor yang valid" });
+    return;
+  }
+  const [project] = await db.select({ id: projectsTable.id, name: projectsTable.name })
+    .from(projectsTable).where(eq(projectsTable.id, params.data.projectId)).limit(1);
+  if (!project) {
+    res.status(404).json({ error: "Proyek tidak ditemukan" });
+    return;
+  }
+  if (!canAccessProject(req, project.id)) {
+    res.status(403).json({ error: "Proyek berada di luar penugasan Anda" });
+    return;
+  }
+  const baselines = await db.select({ version: rabBaselinesTable.version })
+    .from(rabBaselinesTable).where(and(
+      eq(rabBaselinesTable.projectId, project.id),
+      inArray(rabBaselinesTable.version, [body.data.fromVersion, body.data.toVersion]),
+    ));
+  if (new Set(baselines.map((baseline) => baseline.version)).size !== 2) {
+    res.status(404).json({ error: "Versi RAB tidak ditemukan" });
+    return;
+  }
+  const timestamp = new Date();
+  const activity = {
+    id: randomUUID(),
+    action: "DIUNDUH",
+    entity: "Perbandingan RAB",
+    entityId: project.id,
+    detail: `${project.name} · v${body.data.fromVersion}.0 → v${body.data.toVersion}.0 · ${body.data.format}`,
+    user: req.access!.displayName,
+    actorUserId: req.access!.userId,
+    actorRole: req.access!.role,
+    tone: "info",
+    timestamp,
+    metadata: {
+      projectId: project.id,
+      fromVersion: body.data.fromVersion,
+      toVersion: body.data.toVersion,
+      format: body.data.format,
+    },
+  };
+  await hooks.beforeComparisonAuditInsert?.(project.id);
+  await db.insert(auditLogsTable).values(activity);
+  res.status(201).json(RecordRabComparisonDownloadResponse.parse({
+    ...activity, timestamp: timestamp.toISOString(),
+  }));
 });
 
 router.post("/projects/:projectId/rab/import", requirePermission("projects:write"), async (req, res) => {

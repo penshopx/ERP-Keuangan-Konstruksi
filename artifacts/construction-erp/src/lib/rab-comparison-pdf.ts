@@ -156,10 +156,11 @@ export async function buildRabComparisonPdf(
   return pdf.save()
 }
 
-export async function downloadRabComparisonPdf(from: RabComparisonVersion, to: RabComparisonVersion, projectName?: string) {
+export async function downloadRabComparisonPdf(from: RabComparisonVersion, to: RabComparisonVersion, projectName: string | undefined, beforeDownload: () => Promise<void>) {
   const response = await fetch(fontUrl)
   if (!response.ok) throw new Error("Font dokumen PDF tidak dapat dimuat.")
   const bytes = await buildRabComparisonPdf(from, to, new Uint8Array(await response.arrayBuffer()), projectName)
+  await beforeDownload()
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }))
   const link = document.createElement("a")
   link.href = url

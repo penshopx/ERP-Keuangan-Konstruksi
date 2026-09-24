@@ -6,8 +6,9 @@ import { History, Shield, CheckCircle2, AlertTriangle, Info } from "lucide-react
 import { cn } from "@/lib/utils"
 
 export default function AuditActivity() {
-  const { data: activities, isLoading } = useListActivity()
+  const { data: activities, isLoading, isError } = useListActivity()
 
+  if (isError) return <p className="text-destructive">Aktivitas audit tidak dapat dimuat. Coba muat ulang halaman.</p>
   if (isLoading || !activities) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -29,7 +30,7 @@ export default function AuditActivity() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">Audit Trail</h1>
-        <p className="text-muted-foreground">Immutable timeline of critical financial operations.</p>
+        <p className="text-muted-foreground">Riwayat aktivitas keuangan dan unduhan bukti, termasuk proyek, versi RAB, pengguna, dan waktu ekspor.</p>
       </div>
 
       <div className="relative border-l border-muted ml-4 md:ml-6 mt-4 pb-8 space-y-8">
@@ -62,7 +63,7 @@ export default function AuditActivity() {
                   <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
                     {activity.user.charAt(0)}
                   </div>
-                  <span>Authorized by <span className="font-medium text-foreground">{activity.user}</span></span>
+                  <span>Dilakukan oleh <span className="font-medium text-foreground">{activity.user}</span></span>
                 </div>
               </CardContent>
             </Card>

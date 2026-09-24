@@ -286,6 +286,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RabSummary"
+  /projects/{projectId}/rab/comparison-downloads:
+    post:
+      operationId: recordRabComparisonDownload
+      tags: [projects, rab]
+      summary: Authorize and record a prepared RAB comparison export
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RabComparisonDownloadInput"
+      responses:
+        "201":
+          description: Export recorded before browser download
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
+        "400":
+          description: Invalid versions or format
+        "403":
+          description: Project access denied
+        "404":
+          description: Project or RAB version missing
   /projects/{projectId}/rab/import:
     post:
       operationId: importProjectRabTemplate
@@ -1796,6 +1822,13 @@ components:
         user: { type: string }
         timestamp: { type: string }
         tone: { type: string }
+    RabComparisonDownloadInput:
+      type: object
+      required: [fromVersion, toVersion, format]
+      properties:
+        fromVersion: { type: integer, minimum: 1 }
+        toVersion: { type: integer, minimum: 1 }
+        format: { type: string, enum: [CSV, PDF] }
     CompetencyCatalogEntry:
       type: object
       required: [id, schemeCode, schemeType, occupation, title, level, sourceUrl, validityStatus]

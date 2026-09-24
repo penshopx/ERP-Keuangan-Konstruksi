@@ -121,11 +121,13 @@ export function getRabComparisonFilename(projectId: string, fromVersion: number,
   return `perbandingan-rab-${safeProjectId}-v${fromVersion}-ke-v${toVersion}.csv`
 }
 
-export function downloadRabComparisonCsv(
+export async function downloadRabComparisonCsv(
   fromVersion: RabComparisonVersion,
   toVersion: RabComparisonVersion,
+  beforeDownload: () => Promise<void>,
 ) {
   const csv = buildRabComparisonCsv(fromVersion, toVersion)
+  await beforeDownload()
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
   const link = document.createElement("a")
   link.href = url

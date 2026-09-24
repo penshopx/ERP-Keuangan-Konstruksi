@@ -1089,6 +1089,22 @@ export interface Activity {
   tone: string;
 }
 
+export type RabComparisonDownloadInputFormat = typeof RabComparisonDownloadInputFormat[keyof typeof RabComparisonDownloadInputFormat];
+
+
+export const RabComparisonDownloadInputFormat = {
+  CSV: 'CSV',
+  PDF: 'PDF',
+} as const;
+
+export interface RabComparisonDownloadInput {
+  /** @minimum 1 */
+  fromVersion: number;
+  /** @minimum 1 */
+  toVersion: number;
+  format: RabComparisonDownloadInputFormat;
+}
+
 export type CompetencyCatalogEntrySchemeType = typeof CompetencyCatalogEntrySchemeType[keyof typeof CompetencyCatalogEntrySchemeType];
 
 

@@ -41,6 +41,7 @@ export const protectedMutationEndpoints: readonly ProtectedMutationEndpoint[] = 
   { id: "create-project", method: "POST", routePath: "/projects", requestPath: "/projects", requiredPermission: "projects:write" },
   { id: "update-project", method: "PATCH", routePath: "/projects/:projectId", requestPath: "/projects/missing", requiredPermission: "projects:write" },
   { id: "import-rab", method: "POST", routePath: "/projects/:projectId/rab/import", requestPath: "/projects/missing/rab/import", requiredPermission: "projects:write" },
+  { id: "record-rab-comparison-download", method: "POST", routePath: "/projects/:projectId/rab/comparison-downloads", requestPath: "/projects/missing/rab/comparison-downloads", requiredPermission: "projects:view", body: { fromVersion: 1, toVersion: 2, format: "CSV" } },
   { id: "request-petty-cash", method: "POST", routePath: "/petty-cash", requestPath: "/petty-cash", requiredPermission: "petty-cash:request" },
   { id: "decide-petty-cash", method: "POST", routePath: "/petty-cash/:requestId/decision", requestPath: "/petty-cash/missing/decision", requiredPermission: "petty-cash:approve" },
   { id: "disburse-petty-cash", method: "POST", routePath: "/petty-cash/:requestId/disburse", requestPath: "/petty-cash/missing/disburse", requiredPermission: "petty-cash:disburse" },
