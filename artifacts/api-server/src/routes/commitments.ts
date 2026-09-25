@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  auditLogsTable, commitmentEventsTable, commitmentLinesTable, commitmentTable, actualCostAllocationsTable,
-  db, projectCostCodesTable, projectsTable, rabBaselinesTable, rabItemsTable,
+  auditLogsTable, commitmentEventsTable, commitmentLinesTable, commitmentTable,
+  db, projectCostCodesTable, projectsTable, rabBaselinesTable, rabItemsTable, vendorInvoicesTable,
 } from "@workspace/db";
 import {
   CreateProjectCommitmentBody, TransitionProjectCommitmentBody, ListProjectCommitmentsResponse,
@@ -64,7 +64,7 @@ router.post("/projects/:projectId/commitments", requirePermission("commitments:w
         }
       }
       await tx.insert(commitmentTable).values({ id, projectId: project.id, baselineId: baseline.id, documentType: parsed.data.documentType, documentNumber: parsed.data.documentNumber, vendorName: parsed.data.vendorName, totalAmount, createdBy: req.access!.userId });
-      await tx.insert(commitmentLinesTable).values(parsed.data.lines.map((line) => ({ id: randomUUID(), commitmentId: id, costCodeId: line.costCodeId, rabItemId: line.rabItemId ?? null, description: line.description, amount: line.amount })));
+      await tx.insert(commitmentLinesTable).values(parsed.data.lines.map((line) => ({ id: randomUUID(), commitmentId: id, costCodeId: line.costCodeId, rabItemId: line.rabItemId ?? null, description: line.description, amount: line.amount, quantity: line.quantity ?? 1, taxBasisPoints: line.taxBasisPoints ?? 0, retentionBasisPoints: line.retentionBasisPoints ?? 0 })));
       await tx.insert(commitmentEventsTable).values({ id: randomUUID(), commitmentId: id, eventType: "CREATED", actorUserId: req.access!.userId, amount: totalAmount });
       await tx.insert(auditLogsTable).values({ id: randomUUID(), action: "DIBUAT", entity: "Commitment", entityId: id, detail: `${parsed.data.documentType} ${parsed.data.documentNumber}`, user: req.access!.displayName, actorUserId: req.access!.userId, actorRole: req.access!.role, tone: "info", metadata: { projectId: project.id, totalAmount } });
     });
@@ -91,13 +91,21 @@ router.post("/projects/:projectId/commitments/:commitmentId/transition", require
     res.status(403).json({ error: "Jabatan Anda tidak memiliki hak posting komitmen" });
     return;
   }
+  if (action === "INVOICE") {
+    res.status(410).json({ error: "Posting invoice langsung dihentikan. Gunakan pencocokan invoice vendor dan review." });
+    return;
+  }
+  if (action === "RECEIVE" && !parsed.data.note?.trim()) {
+    res.status(400).json({ error: "Referensi bukti penerimaan barang/jasa wajib diisi" });
+    return;
+  }
   let result: typeof commitmentTable.$inferSelect | undefined;
   try {
     await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${req.params.commitmentId}))`);
     const [current] = await tx.select().from(commitmentTable).where(and(eq(commitmentTable.id, String(req.params.commitmentId)), eq(commitmentTable.projectId, project.id))).limit(1);
     if (!current) throw Object.assign(new Error("Komitmen tidak ditemukan"), { status: 404 });
-    const isFinancialAction = action === "RECEIVE" || action === "INVOICE";
+    const isFinancialAction = action === "RECEIVE";
     if (isFinancialAction && !parsed.data.idempotencyKey) {
       throw Object.assign(new Error("idempotencyKey wajib diisi untuk penerimaan atau invoice"), { status: 400 });
     }
@@ -111,15 +119,20 @@ router.post("/projects/:projectId/commitments/:commitmentId/transition", require
       [result] = await tx.select().from(commitmentTable).where(eq(commitmentTable.id, current.id)).limit(1);
       return;
     }
-    const allowed: Record<string, string[]> = { SUBMIT: ["DRAFT"], APPROVE: ["PENDING_APPROVAL"], REJECT: ["PENDING_APPROVAL"], CANCEL: ["DRAFT", "PENDING_APPROVAL", "APPROVED"], RECEIVE: ["APPROVED"], INVOICE: ["APPROVED"], AMEND: ["APPROVED"] };
+    const allowed: Record<string, string[]> = { SUBMIT: ["DRAFT"], APPROVE: ["PENDING_APPROVAL"], REJECT: ["PENDING_APPROVAL"], CANCEL: ["DRAFT", "PENDING_APPROVAL", "APPROVED"], RECEIVE: ["APPROVED"], AMEND: ["APPROVED"] };
     if (!allowed[action]?.includes(current.status)) throw Object.assign(new Error("Transisi status komitmen tidak valid"), { status: 409 });
     if (action === "APPROVE" && current.createdBy === req.access!.userId) throw Object.assign(new Error("Pembuat komitmen tidak dapat menyetujui sendiri"), { status: 403 });
     if (action === "CANCEL" && current.status === "APPROVED" && !req.access!.permissions.includes("commitments:approve")) {
       throw Object.assign(new Error("Komitmen yang disetujui hanya dapat dibatalkan oleh approver"), { status: 403 });
     }
-    let status = action === "SUBMIT" ? "PENDING_APPROVAL" : action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : action === "CANCEL" ? "CANCELLED" : current.status;
+    if (action === "CANCEL") {
+      const [activeInvoice] = await tx.select({ id: vendorInvoicesTable.id }).from(vendorInvoicesTable)
+        .where(and(eq(vendorInvoicesTable.commitmentId, current.id), inArray(vendorInvoicesTable.status, ["MATCHED", "EXCEPTION", "REVIEWED"]))).limit(1);
+      if (activeInvoice) throw Object.assign(new Error("Batalkan atau tolak invoice vendor yang aktif sebelum membatalkan PO/SPK"), { status: 409 });
+    }
+    const status = action === "SUBMIT" ? "PENDING_APPROVAL" : action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : action === "CANCEL" ? "CANCELLED" : current.status;
     const amount = parsed.data.amount ?? current.totalAmount;
-    if ((action === "RECEIVE" || action === "INVOICE") && (amount <= 0 || amount > current.totalAmount)) throw Object.assign(new Error("Nilai penerimaan tidak valid"), { status: 400 });
+    if (action === "RECEIVE" && (amount <= 0 || amount > current.totalAmount)) throw Object.assign(new Error("Nilai penerimaan tidak valid"), { status: 400 });
     if (action === "AMEND") {
       const existingLines = await tx.select().from(commitmentLinesTable).where(eq(commitmentLinesTable.commitmentId, current.id));
       if (existingLines.some((line) => line.receivedAmount > 0 || line.invoicedAmount > 0)) {
@@ -157,7 +170,7 @@ router.post("/projects/:projectId/commitments/:commitmentId/transition", require
       const nextId = randomUUID();
       const total = parsed.data.lines.reduce((sum, line) => sum + line.amount, 0);
       await tx.insert(commitmentTable).values({ ...current, id: nextId, status: "DRAFT", version: current.version + 1, totalAmount: total, createdBy: req.access!.userId, approvedBy: null, approvedAt: null, createdAt: new Date(), updatedAt: new Date() });
-      await tx.insert(commitmentLinesTable).values(parsed.data.lines.map((line) => ({ id: randomUUID(), commitmentId: nextId, costCodeId: line.costCodeId, rabItemId: line.rabItemId ?? null, description: line.description, amount: line.amount })));
+      await tx.insert(commitmentLinesTable).values(parsed.data.lines.map((line) => ({ id: randomUUID(), commitmentId: nextId, costCodeId: line.costCodeId, rabItemId: line.rabItemId ?? null, description: line.description, amount: line.amount, quantity: line.quantity ?? 1, taxBasisPoints: line.taxBasisPoints ?? 0, retentionBasisPoints: line.retentionBasisPoints ?? 0 })));
       await tx.update(commitmentTable).set({ status: "CLOSED" }).where(eq(commitmentTable.id, current.id));
       await tx.insert(commitmentEventsTable).values({ id: randomUUID(), commitmentId: current.id, eventType: "AMENDED", actorUserId: req.access!.userId, amount: total, sourceId });
       await tx.insert(commitmentEventsTable).values({ id: randomUUID(), commitmentId: nextId, eventType: "CREATED", actorUserId: req.access!.userId, amount: total, sourceId });
@@ -165,33 +178,17 @@ router.post("/projects/:projectId/commitments/:commitmentId/transition", require
       return;
     }
     const lineId = parsed.data.lineId;
-    if (isFinancialAction && !lineId) throw Object.assign(new Error("lineId wajib diisi untuk penerimaan atau invoice"), { status: 400 });
+    if (isFinancialAction && !lineId) throw Object.assign(new Error("lineId wajib diisi untuk penerimaan"), { status: 400 });
     const [targetLine] = lineId ? await tx.select().from(commitmentLinesTable).where(and(eq(commitmentLinesTable.id, lineId), eq(commitmentLinesTable.commitmentId, current.id))).limit(1) : [];
     if (isFinancialAction && !targetLine) throw Object.assign(new Error("Baris komitmen tidak ditemukan"), { status: 400 });
     if (targetLine && action === "RECEIVE" && targetLine.receivedAmount + amount > targetLine.amount) throw Object.assign(new Error("Penerimaan kumulatif melebihi nilai baris"), { status: 400 });
-    if (targetLine && action === "INVOICE" && targetLine.invoicedAmount + amount > targetLine.amount) throw Object.assign(new Error("Invoice kumulatif melebihi nilai baris"), { status: 400 });
-    if (action === "RECEIVE" || action === "INVOICE") {
+    if (action === "RECEIVE") {
       const [line] = targetLine ? [targetLine] : [];
       if (!line) throw Object.assign(new Error("Komitmen tidak memiliki baris biaya"), { status: 400 });
-      await tx.update(commitmentLinesTable).set({
-        receivedAmount: action === "RECEIVE" ? line.receivedAmount + amount : line.receivedAmount,
-        invoicedAmount: action === "INVOICE" ? line.invoicedAmount + amount : line.invoicedAmount,
-      }).where(eq(commitmentLinesTable.id, line.id));
-      if (action === "INVOICE") {
-        await tx.insert(actualCostAllocationsTable).values({
-          id: randomUUID(), projectId: project.id, baselineId: current.baselineId, costCodeId: line.costCodeId,
-          commitmentId: current.id, sourceType: "COMMITMENT_INVOICE", sourceId: `${current.id}:${sourceId}`, amount,
-        }).onConflictDoNothing();
-      }
-    }
-    if (action === "INVOICE") {
-      const [remaining] = await tx.select({
-        amount: sql<number>`coalesce(sum(${commitmentLinesTable.amount} - ${commitmentLinesTable.invoicedAmount}), 0)`,
-      }).from(commitmentLinesTable).where(eq(commitmentLinesTable.commitmentId, current.id));
-      if (Number(remaining.amount) === 0) status = "CLOSED";
+      await tx.update(commitmentLinesTable).set({ receivedAmount: line.receivedAmount + amount }).where(eq(commitmentLinesTable.id, line.id));
     }
     [result] = await tx.update(commitmentTable).set({ status, approvedBy: action === "APPROVE" ? req.access!.userId : current.approvedBy, approvedAt: action === "APPROVE" ? new Date() : current.approvedAt }).where(eq(commitmentTable.id, current.id)).returning();
-    await tx.insert(commitmentEventsTable).values({ id: randomUUID(), commitmentId: current.id, eventType: action, actorUserId: req.access!.userId, amount, sourceId, metadata: JSON.stringify({ note: parsed.data.note }) });
+    await tx.insert(commitmentEventsTable).values({ id: randomUUID(), commitmentId: current.id, eventType: action, actorUserId: req.access!.userId, amount, sourceId, metadata: JSON.stringify({ note: parsed.data.note, lineId: targetLine?.id ?? null }) });
     await tx.insert(auditLogsTable).values({ id: randomUUID(), action, entity: "Commitment", entityId: current.id, detail: `${current.documentNumber}: ${current.status} → ${status}`, user: req.access!.displayName, actorUserId: req.access!.userId, actorRole: req.access!.role, tone: "info", metadata: { amount, projectId: project.id } });
     });
   } catch (error) {

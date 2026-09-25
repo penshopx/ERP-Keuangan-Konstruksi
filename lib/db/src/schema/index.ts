@@ -8,6 +8,7 @@ export * from "./rab-templates";
 export * from "./access-control";
 export * from "./petty-cash";
 export * from "./procurement";
+export * from "./vendor-payments";
 export * from "./budget-alerts";
 export * from "./material-reconciliation";
 export * from "./estimator-workbench";

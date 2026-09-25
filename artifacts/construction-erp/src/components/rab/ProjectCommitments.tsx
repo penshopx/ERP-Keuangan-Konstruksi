@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertTriangle, Plus, FileText, Check, X, RefreshCw, Send, Trash2, ArrowRight } from "lucide-react"
 import { CreateCommitmentSheet } from "./CreateCommitmentSheet"
 import { TransitionCommitmentDialog } from "./TransitionCommitmentDialog"
+import { VendorMatching } from "./VendorMatching"
 
 interface ProjectCommitmentsProps {
   projectId: string
@@ -93,6 +94,8 @@ export function ProjectCommitments({ projectId, rabVersion, highlightedCommitmen
           ))}
         </div>
       )}
+
+      {!isHistorical && <VendorMatching projectId={projectId} />}
 
       {isCreateOpen && (
         <CreateCommitmentSheet 
@@ -212,9 +215,6 @@ function CommitmentCard({
               </Button>
               <Button size="sm" variant="secondary" onClick={() => onTransition("RECEIVE")} data-testid={`button-receive-${commitment.id}`}>
                 <ArrowRight className="w-4 h-4 mr-2" /> Progress / Terima
-              </Button>
-              <Button size="sm" variant="default" onClick={() => onTransition("INVOICE")} data-testid={`button-invoice-${commitment.id}`}>
-                <FileText className="w-4 h-4 mr-2" /> Tagih (Invoice)
               </Button>
             </>
           )}

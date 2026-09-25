@@ -42,6 +42,9 @@ export const commitmentLinesTable = pgTable("commitment_lines", {
   rabItemId: text("rab_item_id").references(() => rabItemsTable.id, { onDelete: "restrict" }),
   description: text("description").notNull(),
   amount: bigint("amount", { mode: "number" }).notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  taxBasisPoints: integer("tax_basis_points").notNull().default(0),
+  retentionBasisPoints: integer("retention_basis_points").notNull().default(0),
   receivedAmount: bigint("received_amount", { mode: "number" }).notNull().default(0),
   invoicedAmount: bigint("invoiced_amount", { mode: "number" }).notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -70,7 +73,7 @@ export const actualCostAllocationsTable = pgTable("actual_cost_allocations", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("actual_cost_allocations_source_idx").on(table.sourceType, table.sourceId, table.costCodeId),
-  check("actual_cost_allocations_amount_nonnegative", sql`${table.amount} >= 0`),
+  check("actual_cost_allocations_amount_nonnegative", sql`${table.amount} >= 0 OR ${table.sourceType} IN ('VENDOR_CREDIT', 'VENDOR_CANCEL')`),
 ]);
 
 export const insertProjectCostCodeSchema = createInsertSchema(projectCostCodesTable).omit({ createdAt: true });

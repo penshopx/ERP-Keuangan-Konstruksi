@@ -184,29 +184,22 @@ test("commitment ledger persists, scopes, versions, and reconciles without doubl
       method: "POST",
       body: JSON.stringify({ action: "INVOICE", lineId: line1, amount: 40_000 }),
     });
-    assert.equal(missingIdempotencyKey.response.status, 400);
+    assert.equal(missingIdempotencyKey.response.status, 410);
 
     let result = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "INVOICE", lineId: line1, amount: 40_000, idempotencyKey: "invoice-1" }) });
-    assert.equal(result.response.status, 200);
-    result = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "INVOICE", lineId: line1, amount: 40_000, idempotencyKey: "invoice-1" }) });
-    assert.equal(result.response.status, 200);
-    result = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "INVOICE", lineId: line1, amount: 40_000, idempotencyKey: "invoice-same-amount-but-distinct" }) });
-    assert.equal(result.response.status, 200);
+    assert.equal(result.response.status, 410, "Posting invoice lama tidak boleh melewati matching");
     const summary = await json(base, `/projects/${projectId}/rab`);
-    assert.equal(summary.body.committed, 70_000);
-    assert.equal(summary.body.actual, 80_000);
+    assert.equal(summary.body.committed, 150_000);
+    assert.equal(summary.body.actual, 0);
     assert.equal(summary.body.availableBudget, 150_000);
     const over = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "INVOICE", lineId: line1, amount: 20_001, idempotencyKey: "invoice-over" }) });
-    assert.equal(over.response.status, 400);
-    const receive = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "RECEIVE", lineId: line2, amount: 50_000, idempotencyKey: "receive-2" }) });
+    assert.equal(over.response.status, 410);
+    const receive = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "RECEIVE", lineId: line2, amount: 50_000, idempotencyKey: "receive-2", note: "BA penerimaan 2" }) });
     assert.equal(receive.response.status, 200);
     const afterReceive = await json(base, `/projects/${projectId}/rab`);
-    assert.equal(afterReceive.body.committed, 70_000);
-    assert.equal(afterReceive.body.actual, 80_000);
-    await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "INVOICE", lineId: line1, amount: 20_000, idempotencyKey: "invoice-2" }) });
-    const closed = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "INVOICE", lineId: line2, amount: 50_000, idempotencyKey: "invoice-3" }) });
-    assert.equal(closed.body.status, "CLOSED");
-    assert.equal((await json(base, `/projects/${projectId}/commitments`)).body[0].status, "CLOSED");
+    assert.equal(afterReceive.body.committed, 150_000);
+    assert.equal(afterReceive.body.actual, 0);
+    assert.equal((await json(base, `/projects/${projectId}/commitments`)).body[0].status, "APPROVED");
 
     const amendment = await json(base, `/projects/${projectId}/commitments/${commitmentId}/transition`, { method: "POST", body: JSON.stringify({ action: "AMEND", lines: [{ costCodeId: code1, description: "Changed", amount: 10_000 }] }) });
     assert.equal(amendment.response.status, 409);
@@ -244,7 +237,7 @@ test("commitment ledger persists, scopes, versions, and reconciles without doubl
     await new Promise<void>((resolve) => procurementServer.once("listening", () => resolve()));
     const procurementBase = `http://127.0.0.1:${(procurementServer.address() as { port: number }).port}/api`;
     const forbiddenReceipt = await json(procurementBase, `/projects/${projectId}/commitments/${secondId}/transition`, {
-      method: "POST", body: JSON.stringify({ action: "RECEIVE", lineId: secondLineId, amount: 1_000, idempotencyKey: "procurement-receive" }),
+      method: "POST", body: JSON.stringify({ action: "RECEIVE", lineId: secondLineId, amount: 1_000, idempotencyKey: "procurement-receive", note: "BA penerimaan pengadaan" }),
     });
     assert.equal(forbiddenReceipt.response.status, 403);
     const forbiddenCancel = await json(procurementBase, `/projects/${projectId}/commitments/${secondId}/transition`, {
@@ -273,9 +266,9 @@ test("commitment ledger persists, scopes, versions, and reconciles without doubl
       method: "POST",
       body: JSON.stringify({ action: "INVOICE", lineId: secondLineId, amount: 10_000, idempotencyKey: "invoice-1" }),
     });
-    assert.equal(reusedKeyAcrossCommitments.response.status, 200);
+    assert.equal(reusedKeyAcrossCommitments.response.status, 410);
     const afterReusedKey = await json(base, `/projects/${projectId}/rab`);
-    assert.equal(afterReusedKey.body.actual, 160_000);
+    assert.equal(afterReusedKey.body.actual, 0);
     assert.equal(afterReusedKey.body.availableBudget, 140_000);
     const scoped = await json(base, `/projects/not-${projectId}/commitments`);
     assert.equal(scoped.response.status, 404);

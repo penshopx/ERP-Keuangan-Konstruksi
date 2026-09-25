@@ -101,6 +101,8 @@ const REQUIRED_MIGRATIONS = [
   "0018_complete_petty_cash.sql",
   "0019_unique_petty_cash_location.sql",
   "0020_petty_cash_approval_matrix.sql",
+  "0021_vendor_matching.sql",
+  "0022_allow_vendor_credit_offsets.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {

@@ -11,6 +11,18 @@ export type CommitmentTransitionInputLinesItem = {
   description: string;
   /** @minimum 0 */
   amount: number;
+  /** @minimum 1 */
+  quantity?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  taxBasisPoints?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  retentionBasisPoints?: number;
   /** @nullable */
   rabItemId?: string | null;
 };

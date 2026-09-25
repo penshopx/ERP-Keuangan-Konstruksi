@@ -11,6 +11,7 @@ import { requireAccess } from "../middlewares/access";
 import aiControlPlaneRouter from "./ai-control-plane";
 import pettyCashRouter from "./petty-cash";
 import commitmentsRouter from "./commitments";
+import vendorPaymentsRouter from "./vendor-payments";
 import materialReconciliationRouter from "./material-reconciliation";
 import estimatorWorkbenchRouter from "./estimator-workbench";
 
@@ -31,6 +32,7 @@ export function createApiRouter(
   router.use(createProjectsRouter(projectPersistenceHooks));
   router.use(pettyCashRouter);
   router.use(commitmentsRouter);
+  router.use(vendorPaymentsRouter);
   router.use(materialReconciliationRouter);
   router.use(estimatorWorkbenchRouter);
   router.use(rabTemplatesRouter);

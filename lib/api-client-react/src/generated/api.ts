@@ -86,7 +86,16 @@ import type {
   TaxRuleInput,
   TaxSummary,
   UserCompetencyProfile,
-  UserCompetencyProfileInput
+  UserCompetencyProfileInput,
+  VendorDecisionInput,
+  VendorInvoice,
+  VendorInvoiceInput,
+  VendorMatchPolicy,
+  VendorMatchPolicyInput,
+  VendorPayment,
+  VendorPaymentDecisionInput,
+  VendorPaymentInput,
+  VendorReceipt
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -2751,6 +2760,704 @@ export function useListRabTemplates<TData = Awaited<ReturnType<typeof listRabTem
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListRabTemplatesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListVendorInvoicesUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/vendor-invoices`
+}
+
+export const listVendorInvoices = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<VendorInvoice[]> => {
+
+  return customFetch<VendorInvoice[]>(getListVendorInvoicesUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVendorInvoicesQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/vendor-invoices`
+    ] as const;
+    }
+
+
+export const getListVendorInvoicesQueryOptions = <TData = Awaited<ReturnType<typeof listVendorInvoices>>, TError = ErrorType<unknown>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorInvoices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVendorInvoicesQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVendorInvoices>>> = ({ signal }) => listVendorInvoices(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVendorInvoices>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVendorInvoicesQueryResult = NonNullable<Awaited<ReturnType<typeof listVendorInvoices>>>
+export type ListVendorInvoicesQueryError = ErrorType<unknown>
+
+
+
+export function useListVendorInvoices<TData = Awaited<ReturnType<typeof listVendorInvoices>>, TError = ErrorType<unknown>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorInvoices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVendorInvoicesQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateVendorInvoiceUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/vendor-invoices`
+}
+
+export const createVendorInvoice = async (projectId: string,
+    vendorInvoiceInput: VendorInvoiceInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorInvoice> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VendorInvoice>(getCreateVendorInvoiceUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(vendorInvoiceInput)
+  }
+);}
+
+
+
+
+
+export const getCreateVendorInvoiceMutationKey = () => ['createVendorInvoice'] as const;
+
+export const getCreateVendorInvoiceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorInvoice>>, TError,CreateVendorInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVendorInvoice>>, TError,CreateVendorInvoiceMutationVariables, TContext> => {
+
+const mutationKey = getCreateVendorInvoiceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVendorInvoice>>, CreateVendorInvoiceMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createVendorInvoice(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVendorInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof createVendorInvoice>>>
+    export type CreateVendorInvoiceMutationBody = BodyType<VendorInvoiceInput>
+    export type CreateVendorInvoiceMutationError = ErrorType<unknown>
+    export type CreateVendorInvoiceMutationVariables = {projectId: string;data: BodyType<VendorInvoiceInput>}
+
+    export const useCreateVendorInvoice = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorInvoice>>, TError,CreateVendorInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVendorInvoice>>,
+        TError,
+        CreateVendorInvoiceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateVendorInvoiceMutationOptions(options));
+    }
+
+export const getListVendorReceiptsUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/vendor-receipts`
+}
+
+export const listVendorReceipts = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<VendorReceipt[]> => {
+
+  return customFetch<VendorReceipt[]>(getListVendorReceiptsUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVendorReceiptsQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/vendor-receipts`
+    ] as const;
+    }
+
+
+export const getListVendorReceiptsQueryOptions = <TData = Awaited<ReturnType<typeof listVendorReceipts>>, TError = ErrorType<unknown>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorReceipts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVendorReceiptsQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVendorReceipts>>> = ({ signal }) => listVendorReceipts(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVendorReceipts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVendorReceiptsQueryResult = NonNullable<Awaited<ReturnType<typeof listVendorReceipts>>>
+export type ListVendorReceiptsQueryError = ErrorType<unknown>
+
+
+
+export function useListVendorReceipts<TData = Awaited<ReturnType<typeof listVendorReceipts>>, TError = ErrorType<unknown>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorReceipts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVendorReceiptsQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListVendorMatchPoliciesUrl = () => {
+
+
+
+
+  return `/api/vendor-match-policies`
+}
+
+export const listVendorMatchPolicies = async ( options?: Parameters<typeof customFetch>[1]): Promise<VendorMatchPolicy[]> => {
+
+  return customFetch<VendorMatchPolicy[]>(getListVendorMatchPoliciesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVendorMatchPoliciesQueryKey = () => {
+    return [
+    `/api/vendor-match-policies`
+    ] as const;
+    }
+
+
+export const getListVendorMatchPoliciesQueryOptions = <TData = Awaited<ReturnType<typeof listVendorMatchPolicies>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorMatchPolicies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVendorMatchPoliciesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVendorMatchPolicies>>> = ({ signal }) => listVendorMatchPolicies({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVendorMatchPolicies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVendorMatchPoliciesQueryResult = NonNullable<Awaited<ReturnType<typeof listVendorMatchPolicies>>>
+export type ListVendorMatchPoliciesQueryError = ErrorType<unknown>
+
+
+
+export function useListVendorMatchPolicies<TData = Awaited<ReturnType<typeof listVendorMatchPolicies>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorMatchPolicies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVendorMatchPoliciesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateVendorMatchPolicyUrl = () => {
+
+
+
+
+  return `/api/vendor-match-policies`
+}
+
+export const createVendorMatchPolicy = async (vendorMatchPolicyInput: VendorMatchPolicyInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorMatchPolicy> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VendorMatchPolicy>(getCreateVendorMatchPolicyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(vendorMatchPolicyInput)
+  }
+);}
+
+
+
+
+
+export const getCreateVendorMatchPolicyMutationKey = () => ['createVendorMatchPolicy'] as const;
+
+export const getCreateVendorMatchPolicyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorMatchPolicy>>, TError,CreateVendorMatchPolicyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVendorMatchPolicy>>, TError,CreateVendorMatchPolicyMutationVariables, TContext> => {
+
+const mutationKey = getCreateVendorMatchPolicyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVendorMatchPolicy>>, CreateVendorMatchPolicyMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createVendorMatchPolicy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVendorMatchPolicyMutationResult = NonNullable<Awaited<ReturnType<typeof createVendorMatchPolicy>>>
+    export type CreateVendorMatchPolicyMutationBody = BodyType<VendorMatchPolicyInput>
+    export type CreateVendorMatchPolicyMutationError = ErrorType<unknown>
+    export type CreateVendorMatchPolicyMutationVariables = {data: BodyType<VendorMatchPolicyInput>}
+
+    export const useCreateVendorMatchPolicy = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorMatchPolicy>>, TError,CreateVendorMatchPolicyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVendorMatchPolicy>>,
+        TError,
+        CreateVendorMatchPolicyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateVendorMatchPolicyMutationOptions(options));
+    }
+
+export const getDecideVendorInvoiceUrl = (invoiceId: string,) => {
+
+
+
+
+  return `/api/vendor-invoices/${invoiceId}/decision`
+}
+
+export const decideVendorInvoice = async (invoiceId: string,
+    vendorDecisionInput: VendorDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorInvoice> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VendorInvoice>(getDecideVendorInvoiceUrl(invoiceId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(vendorDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getDecideVendorInvoiceMutationKey = () => ['decideVendorInvoice'] as const;
+
+export const getDecideVendorInvoiceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideVendorInvoice>>, TError,DecideVendorInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideVendorInvoice>>, TError,DecideVendorInvoiceMutationVariables, TContext> => {
+
+const mutationKey = getDecideVendorInvoiceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideVendorInvoice>>, DecideVendorInvoiceMutationVariables> = (props) => {
+          const {invoiceId,data} = props ?? {};
+
+          return  decideVendorInvoice(invoiceId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideVendorInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof decideVendorInvoice>>>
+    export type DecideVendorInvoiceMutationBody = BodyType<VendorDecisionInput>
+    export type DecideVendorInvoiceMutationError = ErrorType<unknown>
+    export type DecideVendorInvoiceMutationVariables = {invoiceId: string;data: BodyType<VendorDecisionInput>}
+
+    export const useDecideVendorInvoice = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideVendorInvoice>>, TError,DecideVendorInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideVendorInvoice>>,
+        TError,
+        DecideVendorInvoiceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDecideVendorInvoiceMutationOptions(options));
+    }
+
+export const getRequestVendorPaymentUrl = (invoiceId: string,) => {
+
+
+
+
+  return `/api/vendor-invoices/${invoiceId}/payments`
+}
+
+export const requestVendorPayment = async (invoiceId: string,
+    vendorPaymentInput: VendorPaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorPayment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VendorPayment>(getRequestVendorPaymentUrl(invoiceId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(vendorPaymentInput)
+  }
+);}
+
+
+
+
+
+export const getRequestVendorPaymentMutationKey = () => ['requestVendorPayment'] as const;
+
+export const getRequestVendorPaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestVendorPayment>>, TError,RequestVendorPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestVendorPayment>>, TError,RequestVendorPaymentMutationVariables, TContext> => {
+
+const mutationKey = getRequestVendorPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestVendorPayment>>, RequestVendorPaymentMutationVariables> = (props) => {
+          const {invoiceId,data} = props ?? {};
+
+          return  requestVendorPayment(invoiceId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestVendorPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof requestVendorPayment>>>
+    export type RequestVendorPaymentMutationBody = BodyType<VendorPaymentInput>
+    export type RequestVendorPaymentMutationError = ErrorType<unknown>
+    export type RequestVendorPaymentMutationVariables = {invoiceId: string;data: BodyType<VendorPaymentInput>}
+
+    export const useRequestVendorPayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestVendorPayment>>, TError,RequestVendorPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestVendorPayment>>,
+        TError,
+        RequestVendorPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestVendorPaymentMutationOptions(options));
+    }
+
+export const getDecideVendorPaymentUrl = (paymentId: string,) => {
+
+
+
+
+  return `/api/vendor-payments/${paymentId}/decision`
+}
+
+export const decideVendorPayment = async (paymentId: string,
+    vendorPaymentDecisionInput: VendorPaymentDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorPayment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VendorPayment>(getDecideVendorPaymentUrl(paymentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(vendorPaymentDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getDecideVendorPaymentMutationKey = () => ['decideVendorPayment'] as const;
+
+export const getDecideVendorPaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideVendorPayment>>, TError,DecideVendorPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideVendorPayment>>, TError,DecideVendorPaymentMutationVariables, TContext> => {
+
+const mutationKey = getDecideVendorPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideVendorPayment>>, DecideVendorPaymentMutationVariables> = (props) => {
+          const {paymentId,data} = props ?? {};
+
+          return  decideVendorPayment(paymentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideVendorPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof decideVendorPayment>>>
+    export type DecideVendorPaymentMutationBody = BodyType<VendorPaymentDecisionInput>
+    export type DecideVendorPaymentMutationError = ErrorType<unknown>
+    export type DecideVendorPaymentMutationVariables = {paymentId: string;data: BodyType<VendorPaymentDecisionInput>}
+
+    export const useDecideVendorPayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideVendorPayment>>, TError,DecideVendorPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideVendorPayment>>,
+        TError,
+        DecideVendorPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDecideVendorPaymentMutationOptions(options));
+    }
+
+export const getListVendorPaymentsUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/vendor-payments`
+}
+
+export const listVendorPayments = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<VendorPayment[]> => {
+
+  return customFetch<VendorPayment[]>(getListVendorPaymentsUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVendorPaymentsQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/vendor-payments`
+    ] as const;
+    }
+
+
+export const getListVendorPaymentsQueryOptions = <TData = Awaited<ReturnType<typeof listVendorPayments>>, TError = ErrorType<unknown>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVendorPaymentsQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVendorPayments>>> = ({ signal }) => listVendorPayments(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVendorPayments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVendorPaymentsQueryResult = NonNullable<Awaited<ReturnType<typeof listVendorPayments>>>
+export type ListVendorPaymentsQueryError = ErrorType<unknown>
+
+
+
+export function useListVendorPayments<TData = Awaited<ReturnType<typeof listVendorPayments>>, TError = ErrorType<unknown>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVendorPaymentsQueryOptions(projectId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

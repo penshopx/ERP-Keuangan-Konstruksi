@@ -16,6 +16,7 @@
 - [Operational alert delivery status](operational-alert-delivery-status.md) — persist only channel-safe outcomes, and never let status recording affect the primary alerting path.
 - [Reconciliation event ordering](reconciliation-event-ordering.md) — order shared run events by when a pass starts, so older work finishing late cannot hide newer coordination state.
 - [Commitment exposure accounting](commitment-exposure-accounting.md) — receipts track physical progress; only posted vendor invoices move financial exposure from commitment to actual.
+- [Legacy receipt attribution](legacy-receipt-attribution.md) — do not infer multi-line PO receipt allocation from amount alone; ambiguous historical receipts must remain exceptions.
 - [Legacy petty cash balances](legacy-petty-cash-balances.md) — never assign historical fundless requests a fabricated location balance; keep their completion path separate.
 - [Competency versus authorization](competency-versus-authorization.md) — professional SKKNI/SKKK evidence never grants ERP permissions automatically; authorization remains explicit and project-scoped.
 - [Managed AI provisioning availability](managed-ai-provisioning.md) — an adapter can compile while Replit AI provider provisioning is unavailable; verify live activation separately.

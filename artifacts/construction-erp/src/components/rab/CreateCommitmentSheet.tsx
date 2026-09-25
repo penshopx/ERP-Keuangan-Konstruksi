@@ -27,6 +27,9 @@ const commitmentSchema = z.object({
     costCodeId: z.string().min(1, "WBS / Cost Code wajib dipilih"),
     description: z.string().min(1, "Deskripsi wajib diisi"),
     amount: z.coerce.number().min(1, "Nilai harus lebih dari 0"),
+    quantity: z.coerce.number().int().min(1, "Kuantitas minimal satu"),
+    taxBasisPoints: z.coerce.number().int().min(0).max(10000),
+    retentionBasisPoints: z.coerce.number().int().min(0).max(10000),
     rabItemId: z.string().nullable().optional()
   })).min(1, "Minimal satu item komitmen diperlukan")
 })
@@ -49,7 +52,7 @@ export function CreateCommitmentSheet({ projectId, open, onOpenChange }: CreateC
       documentType: "PO",
       documentNumber: "",
       vendorName: "",
-      lines: [{ costCodeId: "", description: "", amount: 0, rabItemId: null }]
+      lines: [{ costCodeId: "", description: "", amount: 0, quantity: 1, taxBasisPoints: 0, retentionBasisPoints: 0, rabItemId: null }]
     }
   })
 
@@ -157,7 +160,7 @@ export function CreateCommitmentSheet({ projectId, open, onOpenChange }: CreateC
                   type="button" 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => append({ costCodeId: "", description: "", amount: 0, rabItemId: null })}
+                  onClick={() => append({ costCodeId: "", description: "", amount: 0, quantity: 1, taxBasisPoints: 0, retentionBasisPoints: 0, rabItemId: null })}
                   data-testid="button-add-line"
                 >
                   <Plus className="h-4 w-4 mr-2" /> Tambah Item
@@ -242,6 +245,18 @@ export function CreateCommitmentSheet({ projectId, open, onOpenChange }: CreateC
                           )}
                         />
                       </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {(["quantity", "taxBasisPoints", "retentionBasisPoints"] as const).map((key) => (
+                          <FormField key={key} control={form.control} name={`lines.${index}.${key}`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{key === "quantity" ? "Kuantitas" : key === "taxBasisPoints" ? "Pajak (basis poin)" : "Retensi (basis poin)"}</FormLabel>
+                              <FormControl><Input type="number" min={key === "quantity" ? 1 : 0} max={key === "quantity" ? undefined : 10000} step="1" {...field} data-testid={`input-${key}-${index}`} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Harga satuan acuan = nilai komitmen ÷ kuantitas. Pajak dan retensi mengikuti baris PO/SPK ini.</p>
                     </div>
                   </CardContent>
                 </Card>

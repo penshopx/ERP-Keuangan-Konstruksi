@@ -1039,6 +1039,13 @@ export const ListProjectCommitmentsParams = zod.object({
 
 export const listProjectCommitmentsResponseLinesItemAmountMin = 0;
 
+
+export const listProjectCommitmentsResponseLinesItemTaxBasisPointsMin = 0;
+export const listProjectCommitmentsResponseLinesItemTaxBasisPointsMax = 10000;
+
+export const listProjectCommitmentsResponseLinesItemRetentionBasisPointsMin = 0;
+export const listProjectCommitmentsResponseLinesItemRetentionBasisPointsMax = 10000;
+
 export const listProjectCommitmentsResponseLinesItemReceivedAmountMin = 0;
 
 export const listProjectCommitmentsResponseLinesItemInvoicedAmountMin = 0;
@@ -1065,6 +1072,9 @@ export const ListProjectCommitmentsResponseItem = zod.object({
   "costCodeId": zod.string(),
   "description": zod.string(),
   "amount": zod.number().min(listProjectCommitmentsResponseLinesItemAmountMin),
+  "quantity": zod.number().int().min(1),
+  "taxBasisPoints": zod.number().int().min(listProjectCommitmentsResponseLinesItemTaxBasisPointsMin).max(listProjectCommitmentsResponseLinesItemTaxBasisPointsMax),
+  "retentionBasisPoints": zod.number().int().min(listProjectCommitmentsResponseLinesItemRetentionBasisPointsMin).max(listProjectCommitmentsResponseLinesItemRetentionBasisPointsMax),
   "receivedAmount": zod.number().min(listProjectCommitmentsResponseLinesItemReceivedAmountMin),
   "invoicedAmount": zod.number().min(listProjectCommitmentsResponseLinesItemInvoicedAmountMin)
 }))
@@ -1084,6 +1094,13 @@ export const CreateProjectCommitmentParams = zod.object({
 export const createProjectCommitmentBodyLinesItemAmountMin = 0;
 
 
+export const createProjectCommitmentBodyLinesItemTaxBasisPointsMin = 0;
+export const createProjectCommitmentBodyLinesItemTaxBasisPointsMax = 10000;
+
+export const createProjectCommitmentBodyLinesItemRetentionBasisPointsMin = 0;
+export const createProjectCommitmentBodyLinesItemRetentionBasisPointsMax = 10000;
+
+
 
 
 export const CreateProjectCommitmentBody = zod.object({
@@ -1095,11 +1112,21 @@ export const CreateProjectCommitmentBody = zod.object({
   "costCodeId": zod.string(),
   "description": zod.string(),
   "amount": zod.number().min(createProjectCommitmentBodyLinesItemAmountMin),
+  "quantity": zod.number().int().min(1).optional(),
+  "taxBasisPoints": zod.number().int().min(createProjectCommitmentBodyLinesItemTaxBasisPointsMin).max(createProjectCommitmentBodyLinesItemTaxBasisPointsMax).optional(),
+  "retentionBasisPoints": zod.number().int().min(createProjectCommitmentBodyLinesItemRetentionBasisPointsMin).max(createProjectCommitmentBodyLinesItemRetentionBasisPointsMax).optional(),
   "rabItemId": zod.string().nullish()
 })).min(1)
 })
 
 export const createProjectCommitmentResponseLinesItemAmountMin = 0;
+
+
+export const createProjectCommitmentResponseLinesItemTaxBasisPointsMin = 0;
+export const createProjectCommitmentResponseLinesItemTaxBasisPointsMax = 10000;
+
+export const createProjectCommitmentResponseLinesItemRetentionBasisPointsMin = 0;
+export const createProjectCommitmentResponseLinesItemRetentionBasisPointsMax = 10000;
 
 export const createProjectCommitmentResponseLinesItemReceivedAmountMin = 0;
 
@@ -1127,6 +1154,9 @@ export const CreateProjectCommitmentResponse = zod.object({
   "costCodeId": zod.string(),
   "description": zod.string(),
   "amount": zod.number().min(createProjectCommitmentResponseLinesItemAmountMin),
+  "quantity": zod.number().int().min(1),
+  "taxBasisPoints": zod.number().int().min(createProjectCommitmentResponseLinesItemTaxBasisPointsMin).max(createProjectCommitmentResponseLinesItemTaxBasisPointsMax),
+  "retentionBasisPoints": zod.number().int().min(createProjectCommitmentResponseLinesItemRetentionBasisPointsMin).max(createProjectCommitmentResponseLinesItemRetentionBasisPointsMax),
   "receivedAmount": zod.number().min(createProjectCommitmentResponseLinesItemReceivedAmountMin),
   "invoicedAmount": zod.number().min(createProjectCommitmentResponseLinesItemInvoicedAmountMin)
 }))
@@ -1146,6 +1176,13 @@ export const transitionProjectCommitmentBodyAmountMin = 0;
 export const transitionProjectCommitmentBodyLinesItemAmountMin = 0;
 
 
+export const transitionProjectCommitmentBodyLinesItemTaxBasisPointsMin = 0;
+export const transitionProjectCommitmentBodyLinesItemTaxBasisPointsMax = 10000;
+
+export const transitionProjectCommitmentBodyLinesItemRetentionBasisPointsMin = 0;
+export const transitionProjectCommitmentBodyLinesItemRetentionBasisPointsMax = 10000;
+
+
 
 export const TransitionProjectCommitmentBody = zod.object({
   "action": zod.enum(['SUBMIT', 'APPROVE', 'REJECT', 'RECEIVE', 'INVOICE', 'CANCEL', 'AMEND']),
@@ -1157,11 +1194,21 @@ export const TransitionProjectCommitmentBody = zod.object({
   "costCodeId": zod.string(),
   "description": zod.string(),
   "amount": zod.number().min(transitionProjectCommitmentBodyLinesItemAmountMin),
+  "quantity": zod.number().int().min(1).optional(),
+  "taxBasisPoints": zod.number().int().min(transitionProjectCommitmentBodyLinesItemTaxBasisPointsMin).max(transitionProjectCommitmentBodyLinesItemTaxBasisPointsMax).optional(),
+  "retentionBasisPoints": zod.number().int().min(transitionProjectCommitmentBodyLinesItemRetentionBasisPointsMin).max(transitionProjectCommitmentBodyLinesItemRetentionBasisPointsMax).optional(),
   "rabItemId": zod.string().nullish()
 })).optional()
 })
 
 export const transitionProjectCommitmentResponseLinesItemAmountMin = 0;
+
+
+export const transitionProjectCommitmentResponseLinesItemTaxBasisPointsMin = 0;
+export const transitionProjectCommitmentResponseLinesItemTaxBasisPointsMax = 10000;
+
+export const transitionProjectCommitmentResponseLinesItemRetentionBasisPointsMin = 0;
+export const transitionProjectCommitmentResponseLinesItemRetentionBasisPointsMax = 10000;
 
 export const transitionProjectCommitmentResponseLinesItemReceivedAmountMin = 0;
 
@@ -1189,6 +1236,9 @@ export const TransitionProjectCommitmentResponse = zod.object({
   "costCodeId": zod.string(),
   "description": zod.string(),
   "amount": zod.number().min(transitionProjectCommitmentResponseLinesItemAmountMin),
+  "quantity": zod.number().int().min(1),
+  "taxBasisPoints": zod.number().int().min(transitionProjectCommitmentResponseLinesItemTaxBasisPointsMin).max(transitionProjectCommitmentResponseLinesItemTaxBasisPointsMax),
+  "retentionBasisPoints": zod.number().int().min(transitionProjectCommitmentResponseLinesItemRetentionBasisPointsMin).max(transitionProjectCommitmentResponseLinesItemRetentionBasisPointsMax),
   "receivedAmount": zod.number().min(transitionProjectCommitmentResponseLinesItemReceivedAmountMin),
   "invoicedAmount": zod.number().min(transitionProjectCommitmentResponseLinesItemInvoicedAmountMin)
 }))
@@ -1222,6 +1272,283 @@ export const ListRabTemplatesResponseItem = zod.object({
 }))
 })
 export const ListRabTemplatesResponse = zod.array(ListRabTemplatesResponseItem)
+
+
+export const ListVendorInvoicesParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const ListVendorInvoicesResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "commitmentId": zod.string(),
+  "lineId": zod.string(),
+  "costCodeId": zod.string(),
+  "vendorKey": zod.string(),
+  "invoiceNumber": zod.string(),
+  "kind": zod.string(),
+  "originalInvoiceId": zod.string().nullish(),
+  "quantity": zod.number().int(),
+  "unitPrice": zod.number(),
+  "tax": zod.number(),
+  "retention": zod.number(),
+  "total": zod.number(),
+  "receiptEventIds": zod.array(zod.string()),
+  "evidence": zod.string(),
+  "status": zod.string(),
+  "exceptions": zod.array(zod.string()),
+  "policyVersion": zod.number().int(),
+  "policySnapshot": zod.record(zod.string(), zod.number()),
+  "eligibleAmount": zod.number(),
+  "makerId": zod.string(),
+  "reviewerId": zod.string().nullish(),
+  "reviewEvidence": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVendorInvoicesResponse = zod.array(ListVendorInvoicesResponseItem)
+
+
+export const CreateVendorInvoiceParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+export const createVendorInvoiceBodyUnitPriceMin = 0;
+
+export const createVendorInvoiceBodyTaxMin = 0;
+
+export const createVendorInvoiceBodyRetentionMin = 0;
+
+export const createVendorInvoiceBodyTotalMin = 0;
+
+
+
+
+
+export const CreateVendorInvoiceBody = zod.object({
+  "commitmentId": zod.string(),
+  "lineId": zod.string(),
+  "invoiceNumber": zod.string().min(1),
+  "kind": zod.enum(['INVOICE', 'CREDIT_NOTE']).optional(),
+  "originalInvoiceId": zod.string().optional(),
+  "quantity": zod.number().int().min(1),
+  "unitPrice": zod.number().int().min(createVendorInvoiceBodyUnitPriceMin),
+  "tax": zod.number().int().min(createVendorInvoiceBodyTaxMin),
+  "retention": zod.number().int().min(createVendorInvoiceBodyRetentionMin),
+  "total": zod.number().int().min(createVendorInvoiceBodyTotalMin),
+  "receiptEventIds": zod.array(zod.string()).min(1),
+  "evidence": zod.string().min(1)
+})
+
+export const CreateVendorInvoiceResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "commitmentId": zod.string(),
+  "lineId": zod.string(),
+  "costCodeId": zod.string(),
+  "vendorKey": zod.string(),
+  "invoiceNumber": zod.string(),
+  "kind": zod.string(),
+  "originalInvoiceId": zod.string().nullish(),
+  "quantity": zod.number().int(),
+  "unitPrice": zod.number(),
+  "tax": zod.number(),
+  "retention": zod.number(),
+  "total": zod.number(),
+  "receiptEventIds": zod.array(zod.string()),
+  "evidence": zod.string(),
+  "status": zod.string(),
+  "exceptions": zod.array(zod.string()),
+  "policyVersion": zod.number().int(),
+  "policySnapshot": zod.record(zod.string(), zod.number()),
+  "eligibleAmount": zod.number(),
+  "makerId": zod.string(),
+  "reviewerId": zod.string().nullish(),
+  "reviewEvidence": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const ListVendorReceiptsParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const ListVendorReceiptsResponseItem = zod.object({
+  "id": zod.string(),
+  "commitmentId": zod.string(),
+  "lineId": zod.string(),
+  "amount": zod.number(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVendorReceiptsResponse = zod.array(ListVendorReceiptsResponseItem)
+
+
+export const ListVendorMatchPoliciesResponseItem = zod.object({
+  "id": zod.string(),
+  "version": zod.number().int(),
+  "effectiveFrom": zod.coerce.date(),
+  "quantityToleranceBasisPoints": zod.number().int(),
+  "priceToleranceBasisPoints": zod.number().int(),
+  "taxTolerance": zod.number(),
+  "retentionTolerance": zod.number(),
+  "totalTolerance": zod.number()
+})
+export const ListVendorMatchPoliciesResponse = zod.array(ListVendorMatchPoliciesResponseItem)
+
+
+export const createVendorMatchPolicyBodyQuantityToleranceBasisPointsMin = 0;
+export const createVendorMatchPolicyBodyQuantityToleranceBasisPointsMax = 10000;
+
+export const createVendorMatchPolicyBodyPriceToleranceBasisPointsMin = 0;
+export const createVendorMatchPolicyBodyPriceToleranceBasisPointsMax = 10000;
+
+export const createVendorMatchPolicyBodyTaxToleranceMin = 0;
+
+export const createVendorMatchPolicyBodyRetentionToleranceMin = 0;
+
+export const createVendorMatchPolicyBodyTotalToleranceMin = 0;
+
+
+
+export const CreateVendorMatchPolicyBody = zod.object({
+  "effectiveFrom": zod.coerce.date(),
+  "quantityToleranceBasisPoints": zod.number().int().min(createVendorMatchPolicyBodyQuantityToleranceBasisPointsMin).max(createVendorMatchPolicyBodyQuantityToleranceBasisPointsMax),
+  "priceToleranceBasisPoints": zod.number().int().min(createVendorMatchPolicyBodyPriceToleranceBasisPointsMin).max(createVendorMatchPolicyBodyPriceToleranceBasisPointsMax),
+  "taxTolerance": zod.number().int().min(createVendorMatchPolicyBodyTaxToleranceMin),
+  "retentionTolerance": zod.number().int().min(createVendorMatchPolicyBodyRetentionToleranceMin),
+  "totalTolerance": zod.number().int().min(createVendorMatchPolicyBodyTotalToleranceMin)
+})
+
+export const CreateVendorMatchPolicyResponse = zod.object({
+  "id": zod.string(),
+  "version": zod.number().int(),
+  "effectiveFrom": zod.coerce.date(),
+  "quantityToleranceBasisPoints": zod.number().int(),
+  "priceToleranceBasisPoints": zod.number().int(),
+  "taxTolerance": zod.number(),
+  "retentionTolerance": zod.number(),
+  "totalTolerance": zod.number()
+})
+
+
+export const DecideVendorInvoiceParams = zod.object({
+  "invoiceId": zod.coerce.string()
+})
+
+
+
+
+export const DecideVendorInvoiceBody = zod.object({
+  "action": zod.enum(['REVIEW', 'OVERRIDE', 'REJECT', 'CANCEL']),
+  "evidence": zod.string().min(1)
+})
+
+export const DecideVendorInvoiceResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "commitmentId": zod.string(),
+  "lineId": zod.string(),
+  "costCodeId": zod.string(),
+  "vendorKey": zod.string(),
+  "invoiceNumber": zod.string(),
+  "kind": zod.string(),
+  "originalInvoiceId": zod.string().nullish(),
+  "quantity": zod.number().int(),
+  "unitPrice": zod.number(),
+  "tax": zod.number(),
+  "retention": zod.number(),
+  "total": zod.number(),
+  "receiptEventIds": zod.array(zod.string()),
+  "evidence": zod.string(),
+  "status": zod.string(),
+  "exceptions": zod.array(zod.string()),
+  "policyVersion": zod.number().int(),
+  "policySnapshot": zod.record(zod.string(), zod.number()),
+  "eligibleAmount": zod.number(),
+  "makerId": zod.string(),
+  "reviewerId": zod.string().nullish(),
+  "reviewEvidence": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const RequestVendorPaymentParams = zod.object({
+  "invoiceId": zod.coerce.string()
+})
+
+
+
+
+
+export const RequestVendorPaymentBody = zod.object({
+  "amount": zod.number().int().min(1),
+  "evidence": zod.string().min(1)
+})
+
+export const RequestVendorPaymentResponse = zod.object({
+  "id": zod.string(),
+  "invoiceId": zod.string(),
+  "amount": zod.number(),
+  "status": zod.string(),
+  "makerId": zod.string(),
+  "approverId": zod.string().nullish(),
+  "releaserId": zod.string().nullish(),
+  "evidence": zod.string(),
+  "approvalEvidence": zod.string().nullish(),
+  "releaseEvidence": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DecideVendorPaymentParams = zod.object({
+  "paymentId": zod.coerce.string()
+})
+
+
+
+
+export const DecideVendorPaymentBody = zod.object({
+  "action": zod.enum(['APPROVE', 'REJECT', 'RELEASE']),
+  "evidence": zod.string().min(1)
+})
+
+export const DecideVendorPaymentResponse = zod.object({
+  "id": zod.string(),
+  "invoiceId": zod.string(),
+  "amount": zod.number(),
+  "status": zod.string(),
+  "makerId": zod.string(),
+  "approverId": zod.string().nullish(),
+  "releaserId": zod.string().nullish(),
+  "evidence": zod.string(),
+  "approvalEvidence": zod.string().nullish(),
+  "releaseEvidence": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const ListVendorPaymentsParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const ListVendorPaymentsResponseItem = zod.object({
+  "id": zod.string(),
+  "invoiceId": zod.string(),
+  "amount": zod.number(),
+  "status": zod.string(),
+  "makerId": zod.string(),
+  "approverId": zod.string().nullish(),
+  "releaserId": zod.string().nullish(),
+  "evidence": zod.string(),
+  "approvalEvidence": zod.string().nullish(),
+  "releaseEvidence": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVendorPaymentsResponse = zod.array(ListVendorPaymentsResponseItem)
 
 
 /**

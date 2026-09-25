@@ -31,6 +31,8 @@ const requiredMigrations = [
   "0018_complete_petty_cash.sql",
   "0019_unique_petty_cash_location.sql",
   "0020_petty_cash_approval_matrix.sql",
+  "0021_vendor_matching.sql",
+  "0022_allow_vendor_credit_offsets.sql",
 ];
 const expectedTables = [
   "actual_cost_allocations",
@@ -77,6 +79,9 @@ const expectedTables = [
   "tax_rule_versions",
   "user_competency_profiles",
   "user_roles",
+  "vendor_invoices",
+  "vendor_match_policies",
+  "vendor_payments",
 ];
 
 test("upgrading a database with open legacy petty cash requests preserves them", async (t) => {

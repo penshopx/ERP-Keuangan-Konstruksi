@@ -12,6 +12,18 @@ export interface CommitmentLine {
   description: string;
   /** @minimum 0 */
   amount: number;
+  /** @minimum 1 */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  taxBasisPoints: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  retentionBasisPoints: number;
   /** @minimum 0 */
   receivedAmount: number;
   /** @minimum 0 */

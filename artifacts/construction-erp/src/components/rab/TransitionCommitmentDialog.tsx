@@ -55,6 +55,10 @@ export function TransitionCommitmentDialog({ projectId, commitment, action, open
   const isDestructiveAction = action === "REJECT" || action === "CANCEL"
 
   const onSubmit = (values: z.infer<typeof transitionSchema>) => {
+    if (action === "RECEIVE" && !values.note?.trim()) {
+      toast({ title: "Referensi bukti wajib diisi", description: "Sertakan nomor berita acara atau dokumen penerimaan jasa/barang.", variant: "destructive" })
+      return
+    }
     if (isFinancialAction && (!values.lineId || !values.amount || values.amount <= 0)) {
       toast({ title: "Validasi Gagal", description: "Pilih item dan masukkan jumlah yang valid.", variant: "destructive" })
       return
@@ -208,7 +212,7 @@ export function TransitionCommitmentDialog({ projectId, commitment, action, open
               name="note"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Catatan (Opsional)</FormLabel>
+                  <FormLabel>{action === "RECEIVE" ? "Referensi berita acara penerimaan (wajib)" : "Catatan (Opsional)"}</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Tambahkan catatan terkait aksi ini..." {...field} data-testid="input-transition-note" />
                   </FormControl>

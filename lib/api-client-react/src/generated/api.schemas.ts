@@ -5,6 +5,167 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface VendorReceipt {
+  id: string;
+  commitmentId: string;
+  lineId: string;
+  amount: number;
+  createdAt: string;
+}
+
+export interface VendorMatchPolicy {
+  id: string;
+  version: number;
+  effectiveFrom: string;
+  quantityToleranceBasisPoints: number;
+  priceToleranceBasisPoints: number;
+  taxTolerance: number;
+  retentionTolerance: number;
+  totalTolerance: number;
+}
+
+export interface VendorMatchPolicyInput {
+  effectiveFrom: string;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  quantityToleranceBasisPoints: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  priceToleranceBasisPoints: number;
+  /** @minimum 0 */
+  taxTolerance: number;
+  /** @minimum 0 */
+  retentionTolerance: number;
+  /** @minimum 0 */
+  totalTolerance: number;
+}
+
+export type VendorInvoicePolicySnapshot = {[key: string]: number};
+
+export interface VendorInvoice {
+  id: string;
+  projectId: string;
+  commitmentId: string;
+  lineId: string;
+  costCodeId: string;
+  vendorKey: string;
+  invoiceNumber: string;
+  kind: string;
+  /** @nullable */
+  originalInvoiceId?: string | null;
+  quantity: number;
+  unitPrice: number;
+  tax: number;
+  retention: number;
+  total: number;
+  receiptEventIds: string[];
+  evidence: string;
+  status: string;
+  exceptions: string[];
+  policyVersion: number;
+  policySnapshot: VendorInvoicePolicySnapshot;
+  eligibleAmount: number;
+  makerId: string;
+  /** @nullable */
+  reviewerId?: string | null;
+  /** @nullable */
+  reviewEvidence?: string | null;
+  /** @nullable */
+  reviewedAt?: string | null;
+  createdAt: string;
+}
+
+export type VendorInvoiceInputKind = typeof VendorInvoiceInputKind[keyof typeof VendorInvoiceInputKind];
+
+
+export const VendorInvoiceInputKind = {
+  INVOICE: 'INVOICE',
+  CREDIT_NOTE: 'CREDIT_NOTE',
+} as const;
+
+export interface VendorInvoiceInput {
+  commitmentId: string;
+  lineId: string;
+  /** @minLength 1 */
+  invoiceNumber: string;
+  kind?: VendorInvoiceInputKind;
+  originalInvoiceId?: string;
+  /** @minimum 1 */
+  quantity: number;
+  /** @minimum 0 */
+  unitPrice: number;
+  /** @minimum 0 */
+  tax: number;
+  /** @minimum 0 */
+  retention: number;
+  /** @minimum 0 */
+  total: number;
+  /** @minItems 1 */
+  receiptEventIds: string[];
+  /** @minLength 1 */
+  evidence: string;
+}
+
+export type VendorDecisionInputAction = typeof VendorDecisionInputAction[keyof typeof VendorDecisionInputAction];
+
+
+export const VendorDecisionInputAction = {
+  REVIEW: 'REVIEW',
+  OVERRIDE: 'OVERRIDE',
+  REJECT: 'REJECT',
+  CANCEL: 'CANCEL',
+} as const;
+
+export interface VendorDecisionInput {
+  action: VendorDecisionInputAction;
+  /** @minLength 1 */
+  evidence: string;
+}
+
+export interface VendorPaymentInput {
+  /** @minimum 1 */
+  amount: number;
+  /** @minLength 1 */
+  evidence: string;
+}
+
+export type VendorPaymentDecisionInputAction = typeof VendorPaymentDecisionInputAction[keyof typeof VendorPaymentDecisionInputAction];
+
+
+export const VendorPaymentDecisionInputAction = {
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT',
+  RELEASE: 'RELEASE',
+} as const;
+
+export interface VendorPaymentDecisionInput {
+  action: VendorPaymentDecisionInputAction;
+  /** @minLength 1 */
+  evidence: string;
+}
+
+export interface VendorPayment {
+  id: string;
+  invoiceId: string;
+  amount: number;
+  status: string;
+  makerId: string;
+  /** @nullable */
+  approverId?: string | null;
+  /** @nullable */
+  releaserId?: string | null;
+  evidence: string;
+  /** @nullable */
+  approvalEvidence?: string | null;
+  /** @nullable */
+  releaseEvidence?: string | null;
+  createdAt: string;
+}
+
 export interface ProjectCopilotInput {
   /** @minLength 1 */
   projectId: string;
@@ -628,6 +789,18 @@ export interface CommitmentLine {
   description: string;
   /** @minimum 0 */
   amount: number;
+  /** @minimum 1 */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  taxBasisPoints: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  retentionBasisPoints: number;
   /** @minimum 0 */
   receivedAmount: number;
   /** @minimum 0 */
@@ -668,6 +841,18 @@ export type CommitmentInputLinesItem = {
   description: string;
   /** @minimum 0 */
   amount: number;
+  /** @minimum 1 */
+  quantity?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  taxBasisPoints?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  retentionBasisPoints?: number;
   /** @nullable */
   rabItemId?: string | null;
 };
@@ -701,6 +886,18 @@ export type CommitmentTransitionInputLinesItem = {
   description: string;
   /** @minimum 0 */
   amount: number;
+  /** @minimum 1 */
+  quantity?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  taxBasisPoints?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  retentionBasisPoints?: number;
   /** @nullable */
   rabItemId?: string | null;
 };

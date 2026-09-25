@@ -600,6 +600,133 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/RabTemplate"
+  /projects/{projectId}/vendor-invoices:
+    get:
+      operationId: listVendorInvoices
+      tags: [invoices]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Vendor invoice matching records
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/VendorInvoice" } }
+    post:
+      operationId: createVendorInvoice
+      tags: [invoices]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorInvoiceInput" }
+      responses:
+        "201":
+          description: Match result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorInvoice" }
+  /projects/{projectId}/vendor-receipts:
+    get:
+      operationId: listVendorReceipts
+      tags: [invoices]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Recorded goods receipts and service acceptances
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/VendorReceipt" } }
+  /vendor-match-policies:
+    get:
+      operationId: listVendorMatchPolicies
+      tags: [invoices]
+      responses:
+        "200":
+          description: Matching policy history
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/VendorMatchPolicy" } }
+    post:
+      operationId: createVendorMatchPolicy
+      tags: [invoices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorMatchPolicyInput" }
+      responses:
+        "201":
+          description: New effective-dated matching policy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorMatchPolicy" }
+  /vendor-invoices/{invoiceId}/decision:
+    post:
+      operationId: decideVendorInvoice
+      tags: [invoices]
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorDecisionInput" }
+      responses:
+        "200":
+          description: Updated vendor invoice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorInvoice" }
+  /vendor-invoices/{invoiceId}/payments:
+    post:
+      operationId: requestVendorPayment
+      tags: [invoices]
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorPaymentInput" }
+      responses:
+        "201":
+          description: Requested payment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorPayment" }
+  /vendor-payments/{paymentId}/decision:
+    post:
+      operationId: decideVendorPayment
+      tags: [invoices]
+      parameters:
+        - { name: paymentId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorPaymentDecisionInput" }
+      responses:
+        "200":
+          description: Updated payment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorPayment" }
+  /projects/{projectId}/vendor-payments:
+    get:
+      operationId: listVendorPayments
+      tags: [invoices]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Payment requests
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/VendorPayment" } }
   /invoices:
     get:
       operationId: listInvoices
@@ -1106,6 +1233,116 @@ components:
       schema:
         type: string
   schemas:
+    VendorReceipt:
+      type: object
+      required: [id, commitmentId, lineId, amount, createdAt]
+      properties:
+        id: { type: string }
+        commitmentId: { type: string }
+        lineId: { type: string }
+        amount: { type: number }
+        createdAt: { type: string, format: date-time }
+    VendorMatchPolicy:
+      type: object
+      required: [id, version, effectiveFrom, quantityToleranceBasisPoints, priceToleranceBasisPoints, taxTolerance, retentionTolerance, totalTolerance]
+      properties:
+        id: { type: string }
+        version: { type: integer }
+        effectiveFrom: { type: string, format: date-time }
+        quantityToleranceBasisPoints: { type: integer }
+        priceToleranceBasisPoints: { type: integer }
+        taxTolerance: { type: number }
+        retentionTolerance: { type: number }
+        totalTolerance: { type: number }
+    VendorMatchPolicyInput:
+      type: object
+      required: [effectiveFrom, quantityToleranceBasisPoints, priceToleranceBasisPoints, taxTolerance, retentionTolerance, totalTolerance]
+      properties:
+        effectiveFrom: { type: string, format: date-time }
+        quantityToleranceBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+        priceToleranceBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+        taxTolerance: { type: integer, minimum: 0 }
+        retentionTolerance: { type: integer, minimum: 0 }
+        totalTolerance: { type: integer, minimum: 0 }
+    VendorInvoice:
+      type: object
+      required: [id, projectId, commitmentId, lineId, costCodeId, vendorKey, invoiceNumber, kind, quantity, unitPrice, tax, retention, total, receiptEventIds, evidence, status, exceptions, policyVersion, policySnapshot, eligibleAmount, makerId, createdAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        commitmentId: { type: string }
+        lineId: { type: string }
+        costCodeId: { type: string }
+        vendorKey: { type: string }
+        invoiceNumber: { type: string }
+        kind: { type: string }
+        originalInvoiceId: { type: ["string", "null"] }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        tax: { type: number }
+        retention: { type: number }
+        total: { type: number }
+        receiptEventIds: { type: array, items: { type: string } }
+        evidence: { type: string }
+        status: { type: string }
+        exceptions: { type: array, items: { type: string } }
+        policyVersion: { type: integer }
+        policySnapshot: { type: object, additionalProperties: { type: number } }
+        eligibleAmount: { type: number }
+        makerId: { type: string }
+        reviewerId: { type: ["string", "null"] }
+        reviewEvidence: { type: ["string", "null"] }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    VendorInvoiceInput:
+      type: object
+      required: [commitmentId, lineId, invoiceNumber, quantity, unitPrice, tax, retention, total, receiptEventIds, evidence]
+      properties:
+        commitmentId: { type: string }
+        lineId: { type: string }
+        invoiceNumber: { type: string, minLength: 1 }
+        kind: { type: string, enum: [INVOICE, CREDIT_NOTE] }
+        originalInvoiceId: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        unitPrice: { type: integer, minimum: 0 }
+        tax: { type: integer, minimum: 0 }
+        retention: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 0 }
+        receiptEventIds: { type: array, minItems: 1, items: { type: string } }
+        evidence: { type: string, minLength: 1 }
+    VendorDecisionInput:
+      type: object
+      required: [action, evidence]
+      properties:
+        action: { type: string, enum: [REVIEW, OVERRIDE, REJECT, CANCEL] }
+        evidence: { type: string, minLength: 1 }
+    VendorPaymentInput:
+      type: object
+      required: [amount, evidence]
+      properties:
+        amount: { type: integer, minimum: 1 }
+        evidence: { type: string, minLength: 1 }
+    VendorPaymentDecisionInput:
+      type: object
+      required: [action, evidence]
+      properties:
+        action: { type: string, enum: [APPROVE, REJECT, RELEASE] }
+        evidence: { type: string, minLength: 1 }
+    VendorPayment:
+      type: object
+      required: [id, invoiceId, amount, status, makerId, evidence, createdAt]
+      properties:
+        id: { type: string }
+        invoiceId: { type: string }
+        amount: { type: number }
+        status: { type: string }
+        makerId: { type: string }
+        approverId: { type: ["string", "null"] }
+        releaserId: { type: ["string", "null"] }
+        evidence: { type: string }
+        approvalEvidence: { type: ["string", "null"] }
+        releaseEvidence: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
     ProjectCopilotInput:
       type: object
       required: [projectId, prompt]
@@ -1641,12 +1878,15 @@ components:
           items: { $ref: "#/components/schemas/CommitmentLine" }
     CommitmentLine:
       type: object
-      required: [id, costCodeId, description, amount, receivedAmount, invoicedAmount]
+      required: [id, costCodeId, description, amount, quantity, taxBasisPoints, retentionBasisPoints, receivedAmount, invoicedAmount]
       properties:
         id: { type: string }
         costCodeId: { type: string }
         description: { type: string }
         amount: { type: number, minimum: 0 }
+        quantity: { type: integer, minimum: 1 }
+        taxBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+        retentionBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
         receivedAmount: { type: number, minimum: 0 }
         invoicedAmount: { type: number, minimum: 0 }
     CommitmentInput:
@@ -1667,6 +1907,9 @@ components:
               costCodeId: { type: string }
               description: { type: string }
               amount: { type: number, minimum: 0 }
+              quantity: { type: integer, minimum: 1 }
+              taxBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+              retentionBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
               rabItemId: { type: ["string", "null"] }
     CommitmentTransitionInput:
       type: object
@@ -1686,6 +1929,9 @@ components:
               costCodeId: { type: string }
               description: { type: string }
               amount: { type: number, minimum: 0 }
+              quantity: { type: integer, minimum: 1 }
+              taxBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
+              retentionBasisPoints: { type: integer, minimum: 0, maximum: 10000 }
               rabItemId: { type: ["string", "null"] }
     RabTemplateItem:
       type: object
