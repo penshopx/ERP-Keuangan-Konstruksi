@@ -5,6 +5,201 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface FinancePeriodCreateInput {
+  /** @pattern ^\d{4}-(0[1-9]|1[0-2])$ */
+  month: string;
+}
+
+export type FinanceAccountInputType = typeof FinanceAccountInputType[keyof typeof FinanceAccountInputType];
+
+
+export const FinanceAccountInputType = {
+  ASSET: 'ASSET',
+  LIABILITY: 'LIABILITY',
+  EQUITY: 'EQUITY',
+  REVENUE: 'REVENUE',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * @nullable
+ */
+export type FinanceAccountInputCashFlow = typeof FinanceAccountInputCashFlow[keyof typeof FinanceAccountInputCashFlow] | null;
+
+
+export const FinanceAccountInputCashFlow = {
+  OPERATING: 'OPERATING',
+  INVESTING: 'INVESTING',
+  FINANCING: 'FINANCING',
+} as const;
+
+export interface FinanceAccountInput {
+  code: string;
+  name: string;
+  type: FinanceAccountInputType;
+  /** @nullable */
+  cashFlow?: FinanceAccountInputCashFlow;
+  isCash: boolean;
+}
+
+export type FinanceAccount = FinanceAccountInput & {
+  active: string;
+};
+
+export interface FinanceChecklistItem {
+  done: boolean;
+  note: string;
+}
+
+export interface FinanceChecklist {
+  bank: FinanceChecklistItem;
+  ap: FinanceChecklistItem;
+  ar: FinanceChecklistItem;
+  pettyCash: FinanceChecklistItem;
+  payroll: FinanceChecklistItem;
+  tax: FinanceChecklistItem;
+  missingDocuments: FinanceChecklistItem;
+}
+
+export type FinancePeriodStatus = typeof FinancePeriodStatus[keyof typeof FinancePeriodStatus];
+
+
+export const FinancePeriodStatus = {
+  OPEN: 'OPEN',
+  REVIEW: 'REVIEW',
+  CLOSED: 'CLOSED',
+  REOPENED: 'REOPENED',
+} as const;
+
+export interface FinancePeriod {
+  month: string;
+  status: FinancePeriodStatus;
+  checklist: FinanceChecklist;
+  /** @nullable */
+  preparedBy?: string | null;
+  /** @nullable */
+  approvedBy?: string | null;
+  /** @nullable */
+  reopenReason?: string | null;
+  /** @nullable */
+  reopenRequestedBy?: string | null;
+  updatedAt: string;
+}
+
+export interface FinanceJournalLineInput {
+  accountCode: string;
+  /** @minimum 0 */
+  debit: number;
+  /** @minimum 0 */
+  credit: number;
+  /** @nullable */
+  projectId?: string | null;
+  /** @nullable */
+  wbs?: string | null;
+  /** @nullable */
+  costCode?: string | null;
+}
+
+export type FinanceJournalInputKind = typeof FinanceJournalInputKind[keyof typeof FinanceJournalInputKind];
+
+
+export const FinanceJournalInputKind = {
+  NORMAL: 'NORMAL',
+  ADJUSTMENT: 'ADJUSTMENT',
+  REVERSAL: 'REVERSAL',
+} as const;
+
+/**
+ * @nullable
+ */
+export type FinanceJournalInputCashFlowCategory = typeof FinanceJournalInputCashFlowCategory[keyof typeof FinanceJournalInputCashFlowCategory] | null;
+
+
+export const FinanceJournalInputCashFlowCategory = {
+  OPERATING: 'OPERATING',
+  INVESTING: 'INVESTING',
+  FINANCING: 'FINANCING',
+} as const;
+
+export interface FinanceJournalInput {
+  entryDate: string;
+  kind: FinanceJournalInputKind;
+  description: string;
+  /** @nullable */
+  sourceType?: string | null;
+  /** @nullable */
+  sourceId?: string | null;
+  /** @nullable */
+  reversesId?: string | null;
+  /** @nullable */
+  cashFlowCategory?: FinanceJournalInputCashFlowCategory;
+  /** @minItems 2 */
+  lines: FinanceJournalLineInput[];
+}
+
+export type FinanceJournalLinesItem = FinanceJournalLineInput & {
+  id: string;
+  entryId: string;
+};
+
+export interface FinanceJournal {
+  id: string;
+  period: string;
+  entryDate: string;
+  kind: string;
+  /** @nullable */
+  cashFlowCategory?: string | null;
+  description: string;
+  /** @nullable */
+  sourceType?: string | null;
+  /** @nullable */
+  sourceId?: string | null;
+  /** @nullable */
+  reversesId?: string | null;
+  actorUserId: string;
+  createdAt: string;
+  lines: FinanceJournalLinesItem[];
+}
+
+export type FinanceReportsVersionsItemReport = { [key: string]: unknown };
+
+export type FinanceReportsVersionsItem = {
+  id: string;
+  period: string;
+  version: number;
+  issuedAt: string;
+  approvedBy: string;
+  report: FinanceReportsVersionsItemReport;
+};
+
+/**
+ * @nullable
+ */
+export type FinanceReportsDraft = { [key: string]: unknown } | null;
+
+export interface FinanceReports {
+  status: string;
+  versions: FinanceReportsVersionsItem[];
+  /** @nullable */
+  draft?: FinanceReportsDraft;
+}
+
+export type FinanceTransitionAction = typeof FinanceTransitionAction[keyof typeof FinanceTransitionAction];
+
+
+export const FinanceTransitionAction = {
+  REVIEW: 'REVIEW',
+  CLOSE: 'CLOSE',
+  REQUEST_REOPEN: 'REQUEST_REOPEN',
+  APPROVE_REOPEN: 'APPROVE_REOPEN',
+} as const;
+
+export interface FinanceTransition {
+  action: FinanceTransitionAction;
+  checklist?: FinanceChecklist;
+  reason?: string;
+}
+
 export interface VendorReceipt {
   id: string;
   commitmentId: string;
@@ -1829,6 +2024,18 @@ projectId?: string;
 
 export type GetTaxSummaryParams = {
 period?: string;
+};
+
+export type ListFinanceJournalsParams = {
+period: string;
+};
+
+export type PostFinanceJournal201 = {
+  id: string;
+};
+
+export type TransitionFinancePeriod200 = {
+  ok: boolean;
 };
 
 export type ListAccessInvitationsParams = {

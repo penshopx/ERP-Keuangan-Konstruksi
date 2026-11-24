@@ -1,4 +1,5 @@
 export * from "./audit-log";
+export * from "./finance";
 export * from "./invoices";
 export * from "./migrations";
 export * from "./operational-state";

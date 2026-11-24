@@ -22,6 +22,8 @@ export const rolePermissions: Record<Role, readonly string[]> = {
   ESTIMATOR: ["projects:view", "rab:estimate", "rab:volume:write"],
   QUANTITY_SURVEYOR: ["projects:view", "rab:estimate", "rab:review", "rab:approve"],
 };
+rolePermissions.DIRECTOR = [...rolePermissions.DIRECTOR, "finance:view", "finance:post", "finance:approve"];
+rolePermissions.FINANCE = [...rolePermissions.FINANCE, "finance:view", "finance:post"];
 
 /**
  * Security inventory for every state-changing production route.
@@ -29,6 +31,10 @@ export const rolePermissions: Record<Role, readonly string[]> = {
  * router, then exercises every authorization case through that router.
  */
 export const protectedMutationEndpoints: readonly ProtectedMutationEndpoint[] = [
+  { id: "finance-account", method: "POST", routePath: "/finance/accounts", requestPath: "/finance/accounts", requiredPermission: "finance:post" },
+  { id: "finance-period", method: "POST", routePath: "/finance/periods", requestPath: "/finance/periods", requiredPermission: "finance:post" },
+  { id: "finance-journal", method: "POST", routePath: "/finance/journals", requestPath: "/finance/journals", requiredPermission: "finance:post" },
+  { id: "finance-transition", method: "POST", routePath: "/finance/periods/:month/transition", requestPath: "/finance/periods/2026-09/transition", requiredPermission: "finance:post" },
   { id: "invite-staff", method: "POST", routePath: "/access/invitations", requestPath: "/access/invitations", allowedRoles: ["DIRECTOR"] },
   { id: "revoke-invitation", method: "POST", routePath: "/access/invitations/:invitationId/revoke", requestPath: "/access/invitations/missing/revoke", allowedRoles: ["DIRECTOR"] },
   { id: "resend-invitation", method: "POST", routePath: "/access/invitations/:invitationId/resend", requestPath: "/access/invitations/missing/resend", allowedRoles: ["DIRECTOR"] },

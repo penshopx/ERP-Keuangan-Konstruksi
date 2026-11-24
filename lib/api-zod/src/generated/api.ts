@@ -2547,6 +2547,293 @@ export const CreateTaxRuleResponse = zod.object({
 })
 
 
+export const ListFinanceAccountsResponseItem = zod.object({
+  "code": zod.string(),
+  "name": zod.string(),
+  "type": zod.enum(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE']),
+  "cashFlow": zod.union([zod.literal('OPERATING'),zod.literal('INVESTING'),zod.literal('FINANCING'),zod.literal(null)]).nullish(),
+  "isCash": zod.boolean()
+}).and(zod.object({
+  "active": zod.string()
+}))
+export const ListFinanceAccountsResponse = zod.array(ListFinanceAccountsResponseItem)
+
+
+export const CreateFinanceAccountBody = zod.object({
+  "code": zod.string(),
+  "name": zod.string(),
+  "type": zod.enum(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE']),
+  "cashFlow": zod.union([zod.literal('OPERATING'),zod.literal('INVESTING'),zod.literal('FINANCING'),zod.literal(null)]).nullish(),
+  "isCash": zod.boolean()
+})
+
+export const CreateFinanceAccountResponse = zod.object({
+  "code": zod.string(),
+  "name": zod.string(),
+  "type": zod.enum(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE']),
+  "cashFlow": zod.union([zod.literal('OPERATING'),zod.literal('INVESTING'),zod.literal('FINANCING'),zod.literal(null)]).nullish(),
+  "isCash": zod.boolean()
+}).and(zod.object({
+  "active": zod.string()
+}))
+
+
+export const ListFinancePeriodsResponseItem = zod.object({
+  "month": zod.string(),
+  "status": zod.enum(['OPEN', 'REVIEW', 'CLOSED', 'REOPENED']),
+  "checklist": zod.object({
+  "bank": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "ap": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "ar": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "pettyCash": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "payroll": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "tax": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "missingDocuments": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+})
+}),
+  "preparedBy": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "reopenReason": zod.string().nullish(),
+  "reopenRequestedBy": zod.string().nullish(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListFinancePeriodsResponse = zod.array(ListFinancePeriodsResponseItem)
+
+
+export const createFinancePeriodBodyMonthRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');
+
+
+export const CreateFinancePeriodBody = zod.object({
+  "month": zod.string().regex(createFinancePeriodBodyMonthRegExp)
+})
+
+export const CreateFinancePeriodResponse = zod.object({
+  "month": zod.string(),
+  "status": zod.enum(['OPEN', 'REVIEW', 'CLOSED', 'REOPENED']),
+  "checklist": zod.object({
+  "bank": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "ap": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "ar": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "pettyCash": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "payroll": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "tax": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "missingDocuments": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+})
+}),
+  "preparedBy": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "reopenReason": zod.string().nullish(),
+  "reopenRequestedBy": zod.string().nullish(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const ListFinanceJournalsQueryParams = zod.object({
+  "period": zod.coerce.string()
+})
+
+export const listFinanceJournalsResponseLinesItemOneDebitMin = 0;
+
+export const listFinanceJournalsResponseLinesItemOneCreditMin = 0;
+
+
+
+export const ListFinanceJournalsResponseItem = zod.object({
+  "id": zod.string(),
+  "period": zod.string(),
+  "entryDate": zod.coerce.date(),
+  "kind": zod.string(),
+  "cashFlowCategory": zod.string().nullish(),
+  "description": zod.string(),
+  "sourceType": zod.string().nullish(),
+  "sourceId": zod.string().nullish(),
+  "reversesId": zod.string().nullish(),
+  "actorUserId": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "lines": zod.array(zod.object({
+  "accountCode": zod.string(),
+  "debit": zod.number().int().min(listFinanceJournalsResponseLinesItemOneDebitMin),
+  "credit": zod.number().int().min(listFinanceJournalsResponseLinesItemOneCreditMin),
+  "projectId": zod.string().nullish(),
+  "wbs": zod.string().nullish(),
+  "costCode": zod.string().nullish()
+}).and(zod.object({
+  "id": zod.string(),
+  "entryId": zod.string()
+})))
+})
+export const ListFinanceJournalsResponse = zod.array(ListFinanceJournalsResponseItem)
+
+
+export const postFinanceJournalBodyLinesItemDebitMin = 0;
+
+export const postFinanceJournalBodyLinesItemCreditMin = 0;
+
+export const postFinanceJournalBodyLinesMin = 2;
+
+
+
+export const PostFinanceJournalBody = zod.object({
+  "entryDate": zod.coerce.date(),
+  "kind": zod.enum(['NORMAL', 'ADJUSTMENT', 'REVERSAL']),
+  "description": zod.string(),
+  "sourceType": zod.string().nullish(),
+  "sourceId": zod.string().nullish(),
+  "reversesId": zod.string().nullish(),
+  "cashFlowCategory": zod.union([zod.literal('OPERATING'),zod.literal('INVESTING'),zod.literal('FINANCING'),zod.literal(null)]).nullish(),
+  "lines": zod.array(zod.object({
+  "accountCode": zod.string(),
+  "debit": zod.number().int().min(postFinanceJournalBodyLinesItemDebitMin),
+  "credit": zod.number().int().min(postFinanceJournalBodyLinesItemCreditMin),
+  "projectId": zod.string().nullish(),
+  "wbs": zod.string().nullish(),
+  "costCode": zod.string().nullish()
+})).min(postFinanceJournalBodyLinesMin)
+})
+
+export const PostFinanceJournalResponse = zod.object({
+  "id": zod.string()
+})
+
+
+export const GetFinanceJournalParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const getFinanceJournalResponseLinesItemOneDebitMin = 0;
+
+export const getFinanceJournalResponseLinesItemOneCreditMin = 0;
+
+
+
+export const GetFinanceJournalResponse = zod.object({
+  "id": zod.string(),
+  "period": zod.string(),
+  "entryDate": zod.coerce.date(),
+  "kind": zod.string(),
+  "cashFlowCategory": zod.string().nullish(),
+  "description": zod.string(),
+  "sourceType": zod.string().nullish(),
+  "sourceId": zod.string().nullish(),
+  "reversesId": zod.string().nullish(),
+  "actorUserId": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "lines": zod.array(zod.object({
+  "accountCode": zod.string(),
+  "debit": zod.number().int().min(getFinanceJournalResponseLinesItemOneDebitMin),
+  "credit": zod.number().int().min(getFinanceJournalResponseLinesItemOneCreditMin),
+  "projectId": zod.string().nullish(),
+  "wbs": zod.string().nullish(),
+  "costCode": zod.string().nullish()
+}).and(zod.object({
+  "id": zod.string(),
+  "entryId": zod.string()
+})))
+})
+
+
+export const GetFinanceReportsParams = zod.object({
+  "month": zod.coerce.string()
+})
+
+export const GetFinanceReportsResponse = zod.object({
+  "status": zod.string(),
+  "versions": zod.array(zod.object({
+  "id": zod.string(),
+  "period": zod.string(),
+  "version": zod.number().int(),
+  "issuedAt": zod.coerce.date(),
+  "approvedBy": zod.string(),
+  "report": zod.record(zod.string(), zod.unknown())
+})),
+  "draft": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const TransitionFinancePeriodParams = zod.object({
+  "month": zod.coerce.string()
+})
+
+export const TransitionFinancePeriodBody = zod.object({
+  "action": zod.enum(['REVIEW', 'CLOSE', 'REQUEST_REOPEN', 'APPROVE_REOPEN']),
+  "checklist": zod.object({
+  "bank": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "ap": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "ar": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "pettyCash": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "payroll": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "tax": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+}),
+  "missingDocuments": zod.object({
+  "done": zod.boolean(),
+  "note": zod.string()
+})
+}).optional(),
+  "reason": zod.string().optional()
+})
+
+export const TransitionFinancePeriodResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
 /**
  * @summary List audit activity
  */

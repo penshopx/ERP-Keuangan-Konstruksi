@@ -20,6 +20,8 @@ tags:
     description: Tax compliance summaries
   - name: activity
     description: Immutable audit activity
+  - name: finance
+    description: Posted journals and controlled financial period close
   - name: access
     description: Authenticated user access and approvals
   - name: rab
@@ -1057,6 +1059,139 @@ paths:
                 $ref: "#/components/schemas/TaxRule"
         "409":
           description: The effective period overlaps an existing rule with the same criteria
+  /finance/accounts:
+    get:
+      operationId: listFinanceAccounts
+      tags: [finance]
+      responses:
+        "200":
+          description: Chart of accounts
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/FinanceAccount" } }
+    post:
+      operationId: createFinanceAccount
+      tags: [finance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinanceAccountInput" }
+      responses:
+        "201":
+          description: Created account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinanceAccount" }
+  /finance/periods:
+    get:
+      operationId: listFinancePeriods
+      tags: [finance]
+      responses:
+        "200":
+          description: Financial periods
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/FinancePeriod" } }
+    post:
+      operationId: createFinancePeriod
+      tags: [finance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinancePeriodCreateInput" }
+      responses:
+        "201":
+          description: Open period
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinancePeriod" }
+  /finance/journals:
+    get:
+      operationId: listFinanceJournals
+      tags: [finance]
+      parameters:
+        - name: period
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Entries and lines
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/FinanceJournal" } }
+    post:
+      operationId: postFinanceJournal
+      tags: [finance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinanceJournalInput" }
+      responses:
+        "201":
+          description: Posted journal identifier
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties: { id: { type: string } }
+  /finance/journals/{id}:
+    get:
+      operationId: getFinanceJournal
+      tags: [finance]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Journal with its lines
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinanceJournal" }
+  /finance/periods/{month}/reports:
+    get:
+      operationId: getFinanceReports
+      tags: [finance]
+      parameters:
+        - name: month
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Immutable issued versions and optional current draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinanceReports" }
+  /finance/periods/{month}/transition:
+    post:
+      operationId: transitionFinancePeriod
+      tags: [finance]
+      parameters:
+        - name: month
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinanceTransition" }
+      responses:
+        "200":
+          description: State transition recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties: { ok: { type: boolean } }
   /activity:
     get:
       operationId: listActivity
@@ -1233,6 +1368,129 @@ components:
       schema:
         type: string
   schemas:
+    FinancePeriodCreateInput:
+      type: object
+      required: [month]
+      properties: { month: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' } }
+    FinanceAccountInput:
+      type: object
+      required: [code, name, type, isCash]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE] }
+        cashFlow: { type: [string, "null"], enum: [OPERATING, INVESTING, FINANCING, null] }
+        isCash: { type: boolean }
+    FinanceAccount:
+      allOf:
+        - $ref: "#/components/schemas/FinanceAccountInput"
+        - type: object
+          required: [active]
+          properties: { active: { type: string } }
+    FinanceChecklistItem:
+      type: object
+      required: [done, note]
+      properties:
+        done: { type: boolean }
+        note: { type: string }
+    FinanceChecklist:
+      type: object
+      required: [bank, ap, ar, pettyCash, payroll, tax, missingDocuments]
+      properties:
+        bank: { $ref: "#/components/schemas/FinanceChecklistItem" }
+        ap: { $ref: "#/components/schemas/FinanceChecklistItem" }
+        ar: { $ref: "#/components/schemas/FinanceChecklistItem" }
+        pettyCash: { $ref: "#/components/schemas/FinanceChecklistItem" }
+        payroll: { $ref: "#/components/schemas/FinanceChecklistItem" }
+        tax: { $ref: "#/components/schemas/FinanceChecklistItem" }
+        missingDocuments: { $ref: "#/components/schemas/FinanceChecklistItem" }
+    FinancePeriod:
+      type: object
+      required: [month, status, checklist, updatedAt]
+      properties:
+        month: { type: string }
+        status: { type: string, enum: [OPEN, REVIEW, CLOSED, REOPENED] }
+        checklist: { $ref: "#/components/schemas/FinanceChecklist" }
+        preparedBy: { type: [string, "null"] }
+        approvedBy: { type: [string, "null"] }
+        reopenReason: { type: [string, "null"] }
+        reopenRequestedBy: { type: [string, "null"] }
+        updatedAt: { type: string, format: date-time }
+    FinanceJournalLineInput:
+      type: object
+      required: [accountCode, debit, credit]
+      properties:
+        accountCode: { type: string }
+        debit: { type: integer, minimum: 0 }
+        credit: { type: integer, minimum: 0 }
+        projectId: { type: [string, "null"] }
+        wbs: { type: [string, "null"] }
+        costCode: { type: [string, "null"] }
+    FinanceJournalInput:
+      type: object
+      required: [entryDate, kind, description, lines]
+      properties:
+        entryDate: { type: string, format: date }
+        kind: { type: string, enum: [NORMAL, ADJUSTMENT, REVERSAL] }
+        description: { type: string }
+        sourceType: { type: [string, "null"] }
+        sourceId: { type: [string, "null"] }
+        reversesId: { type: [string, "null"] }
+        cashFlowCategory: { type: [string, "null"], enum: [OPERATING, INVESTING, FINANCING, null] }
+        lines:
+          type: array
+          minItems: 2
+          items: { $ref: "#/components/schemas/FinanceJournalLineInput" }
+    FinanceJournal:
+      type: object
+      required: [id, period, entryDate, kind, description, actorUserId, createdAt, lines]
+      properties:
+        id: { type: string }
+        period: { type: string }
+        entryDate: { type: string, format: date }
+        kind: { type: string }
+        cashFlowCategory: { type: [string, "null"] }
+        description: { type: string }
+        sourceType: { type: [string, "null"] }
+        sourceId: { type: [string, "null"] }
+        reversesId: { type: [string, "null"] }
+        actorUserId: { type: string }
+        createdAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/FinanceJournalLineInput"
+              - type: object
+                required: [id, entryId]
+                properties:
+                  id: { type: string }
+                  entryId: { type: string }
+    FinanceReports:
+      type: object
+      required: [status, versions]
+      properties:
+        status: { type: string }
+        versions:
+          type: array
+          items:
+            type: object
+            required: [id, period, version, issuedAt, approvedBy, report]
+            properties:
+              id: { type: string }
+              period: { type: string }
+              version: { type: integer }
+              issuedAt: { type: string, format: date-time }
+              approvedBy: { type: string }
+              report: { type: object, additionalProperties: true }
+        draft: { type: [object, "null"], additionalProperties: true }
+    FinanceTransition:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [REVIEW, CLOSE, REQUEST_REOPEN, APPROVE_REOPEN] }
+        checklist: { $ref: "#/components/schemas/FinanceChecklist" }
+        reason: { type: string }
     VendorReceipt:
       type: object
       required: [id, commitmentId, lineId, amount, createdAt]

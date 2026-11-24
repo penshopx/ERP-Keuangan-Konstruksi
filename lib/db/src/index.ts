@@ -103,6 +103,9 @@ const REQUIRED_MIGRATIONS = [
   "0020_petty_cash_approval_matrix.sql",
   "0021_vendor_matching.sql",
   "0022_allow_vendor_credit_offsets.sql",
+  "0023_finance_periods.sql",
+  "0024_guard_prior_period_posting.sql",
+  "0025_serialize_finance_issuance.sql",
 ];
 
 export async function assertRequiredDatabaseMigrations(): Promise<void> {
@@ -129,6 +132,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     budget_alerts_shape: boolean;
     operational_alert_delivery_status_shape: boolean;
     copilot_usage_shape: boolean;
+    finance_shape: boolean;
   }>(`
     SELECT
       EXISTS (
@@ -244,7 +248,15 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
           )
        ) AS operational_alert_delivery_status_shape,
        (to_regclass('copilot_limits') IS NOT NULL
-         AND to_regclass('copilot_usage') IS NOT NULL) AS copilot_usage_shape
+         AND to_regclass('copilot_usage') IS NOT NULL) AS copilot_usage_shape,
+       (to_regclass('finance_periods') IS NOT NULL
+         AND to_regclass('journal_entries') IS NOT NULL
+         AND to_regclass('journal_lines') IS NOT NULL
+         AND to_regclass('finance_report_versions') IS NOT NULL
+         AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'finance_entry_balance' AND NOT tgisinternal)
+         AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'finance_entry_guard' AND NOT tgisinternal)
+         AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'finance_report_insert_guard' AND NOT tgisinternal)
+       ) AS finance_shape
   `);
 
   const status = result.rows[0];
@@ -261,6 +273,7 @@ export async function assertRequiredDatabaseMigrations(): Promise<void> {
     || !status.budget_alerts_shape
      || !status.operational_alert_delivery_status_shape
      || !status.copilot_usage_shape
+     || !status.finance_shape
   ) {
     throw new Error(
       `Mandatory database migrations ${REQUIRED_MIGRATIONS.join(", ")} are not fully applied. ` +

@@ -20,6 +20,7 @@ const navigation = [
   { name: "Projects", href: "/portal/projects", icon: Building2, permission: "projects:view" },
   { name: "Invoices", href: "/portal/invoices", icon: ReceiptText, permission: "invoices:view" },
   { name: "Kas Kecil", href: "/portal/petty-cash", icon: WalletCards, permission: "petty-cash:view" },
+  { name: "Buku Besar", href: "/portal/finance", icon: Calculator, permission: "finance:view" },
   { name: "Tax & Recon", href: "/portal/tax", icon: Calculator, permission: "tax:view", exact: true },
   { name: "Aturan Pajak", href: "/portal/tax-rules", icon: Scale, permission: "tax-rules:manage" },
   { name: "Audit Trail", href: "/portal/audit", icon: History, permission: "audit:view" },

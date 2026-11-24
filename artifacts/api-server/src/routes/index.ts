@@ -14,6 +14,7 @@ import commitmentsRouter from "./commitments";
 import vendorPaymentsRouter from "./vendor-payments";
 import materialReconciliationRouter from "./material-reconciliation";
 import estimatorWorkbenchRouter from "./estimator-workbench";
+import financeRouter from "./finance";
 
 export function createApiRouter(
   accessMiddleware: RequestHandler = requireAccess,
@@ -37,6 +38,7 @@ export function createApiRouter(
   router.use(estimatorWorkbenchRouter);
   router.use(rabTemplatesRouter);
   router.use(taxRouter);
+  router.use(financeRouter);
   router.use(aiControlPlaneRouter);
   return router;
 }

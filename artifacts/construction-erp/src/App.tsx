@@ -32,6 +32,7 @@ import AuditActivity from '@/pages/AuditActivity';
 import CopilotUsage from '@/pages/CopilotUsage';
 import AccessManagement from '@/pages/AccessManagement';
 import PettyCash from '@/pages/PettyCash';
+import Finance from '@/pages/Finance';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +89,7 @@ function Portal() {
           <Route path="/portal/projects/:id/rab" component={ProjectRab} />
           <Route path="/portal/invoices" component={Invoices} />
           <Route path="/portal/petty-cash" component={PettyCash} />
+          <Route path="/portal/finance" component={Finance} />
           <Route path="/portal/tax" component={TaxSummary} />
           <Route path="/portal/tax-rules" component={TaxRules} />
           <Route path="/portal/audit" component={AuditActivity} />
